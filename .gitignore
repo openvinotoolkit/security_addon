@@ -1,0 +1,11 @@
+# Compiler output
+*.o
+
+# Edger8r output
+Enclave_u.*
+Enclave_t.*
+
+# Build ouput
+lib/*.a
+AppCode/*.so
+AppCode/app

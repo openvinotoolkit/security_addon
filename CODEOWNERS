@@ -1,0 +1,10 @@
+# See help here: https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
+
+*  @openvinotoolkit/ovsa-maintainers
+
+CODEOWNERS  @openvinotoolkit/ovsa-admins @openvinotoolkit/ovsa-maintainers
+
+# CI:
+Jenkinsfile  @openvinotoolkit/ovsa-admins
+/.github/  @openvinotoolkit/ovsa-admins
+/.ci/  @openvinotoolkit/ovsa-admins
