@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# Copyright (c) 2020 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+
+show_usage (){
+     echo "Usage: $0 <model name> <License duration in days>  <customer certificate> <artefacts path>"
+     return 0
+}
+
+if [ "$1" = "-h" ] || [ "$1" = "" ]
+then
+    show_usage
+    exit 1
+fi
+    cd $OVSA_DEV_ARTEFACTS
+    
+    echo "Creating License request file"
+    CUSTOMER_NAME=$(echo $3 | cut -d '_' -f 1)
+    echo "Customer_name: $CUSTOMER_NAME" > $1.txt
+    echo "Customer_certificate: $3.csr.crt" >> $1.txt
+    echo "Model_name: $1" >> $1.txt
+    echo "License_duartion_in_days: $2" >> $1.txt
+    echo "Artefacts_path: $4" >> $1.txt
+
+    # Delete thie files remotely before sending it
+    sudo -u intel ssh intel@192.168.122.7 rm -rf /var/OVSA/artefacts/$1.txt
+    sudo -u intel ssh intel@192.168.122.7 rm -rf /var/OVSA/artefacts/$3.csr.crt
+
+    sudo -u intel scp -q $1.txt intel@192.168.122.7:/var/OVSA/artefacts
+    sudo -u intel scp -q $3.csr.crt intel@192.168.122.7:/var/OVSA/artefacts
+
+    echo "Sent License request"
+    echo "Waiting for license..."
+
+declare -i file_count=0
+#Supressing the inotifywait terminiation message
+exec 2> /dev/null
+while read dir action file; do
+if [[ $file = *.dat ]] || [[ $file = *.lic ]];
+then
+    if [[ $file = *.dat ]];
+    then
+        PROTECT_MODEL="${file}"
+        file_count=$((file_count+1))
+    else
+        CUSTOMER_LIC="${file}"
+        file_count=$((file_count+1))
+    fi
+else
+    echo "The file '$file' appeared in directory '$dir'"
+fi
+
+if [[ $file_count = 2 ]]
+then
+    echo "Received from ISV"
+    echo "    - Protected Model $dir$PROTECT_MODEL"
+    echo "    - Customer License $dir$CUSTOMER_LIC"
+    kill $(pgrep inotifywait) 
+fi
+done < <(inotifywait -q -m $4 -e create) 

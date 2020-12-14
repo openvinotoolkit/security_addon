@@ -1,0 +1,89 @@
+#
+# Copyright (c) 2020 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+FROM openvino/model_server-build as base_build
+
+LABEL version="1.0.0"
+
+ARG DL_DIR=/tmp
+ARG build_type=dbg
+
+#TPM Tool Specific installs
+RUN yum install -y \
+        autoconf-archive \
+        dbus-devel \
+        doxygen \
+        glib2-devel \
+	glibc-static \
+        json-c-devel \
+        libstdc++-devel  \
+        libgcrypt-devel \
+        openssl-devel \
+        uriparser-devel && \
+        yum clean all
+
+SHELL [ "/usr/bin/scl", "enable", "devtoolset-8" ]
+ENV CC=/opt/rh/devtoolset-8/root/bin/gcc
+ENV CXX=/opt/rh/devtoolset-8/root/bin/g++
+
+#TPM2 TSS Build
+WORKDIR /tpm2-tss-build
+
+RUN wget https://github.com/tpm2-software/tpm2-tss/releases/download/2.4.4/tpm2-tss-2.4.4.tar.gz && \
+    tar -xzf tpm2-tss-2.4.4.tar.gz && \
+    cd tpm2-tss-2.4.4 && \
+    ./configure --disable-doxygen-man --prefix=/opt/tpm2-tools && \
+    make -j8 && \
+    make install
+
+ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/lib/pkgconfig:/opt/tpm2-tools/lib/pkgconfig
+WORKDIR /tpm2-abrmd
+RUN wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.3.3/tpm2-abrmd-2.3.3.tar.gz && \
+    tar -xvzf tpm2-abrmd-2.3.3.tar.gz && \
+    pushd tpm2-abrmd-2.3.3 && \
+    ./configure --with-dbuspolicydir=/etc/dbus-1/system.d --prefix=/opt/tpm2-tools && \
+    make -j8 && \
+    make install
+
+WORKDIR /tpm2-tools-build
+RUN wget https://github.com/tpm2-software/tpm2-tools/releases/download/4.3.0/tpm2-tools-4.3.0.tar.gz && \
+        tar -xzf tpm2-tools-4.3.0.tar.gz && \
+        cd tpm2-tools-4.3.0 && \
+        ./configure --prefix=/opt/tpm2-tools && \
+        make -j8 && \
+        make install
+
+
+ENV OVMS_DIR=/ovms/src
+
+WORKDIR /ovsa
+COPY  Ovsa_runtime/ /ovsa/Ovsa_runtime/
+COPY  Ovsa_tool/ /ovsa/Ovsa_tool
+#RUN cd /ovsa/Ovsa_tool && make clean all
+#RUN cd /ovsa/Ovsa_runtime && make clean all
+RUN cd /ovsa/Ovsa_runtime/src/ovms && make clean all
+RUN cp /ovsa/Ovsa_runtime/src/ovms/libovsaruntime.so /ovsa/Ovsa_runtime/lib/
+
+# Copy packages
+RUN mkdir -vp /ovsa-runtime/lib
+RUN mkdir -vp /ovsa-runtime/tpm2-tools
+RUN cp -rv /ovsa/Ovsa_runtime/lib/* /ovsa-runtime/lib/
+RUN cp -rv /opt/tpm2-tools/* /ovsa-runtime/tpm2-tools/
+
+WORKDIR /
+RUN tar cvzf ovsa-runtime.tar.gz /ovsa-runtime
+
+

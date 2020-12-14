@@ -1,0 +1,50 @@
+#
+# Copyright (c) 2020 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+FROM openvino/model_server-nginx-mtls as base_build
+
+LABEL version="1.0.0"
+
+ARG DL_DIR=/tmp
+ARG build_type=dbg
+
+USER root
+
+RUN yum install -y \
+        sudo && \
+        yum clean all
+
+
+WORKDIR /
+RUN mkdir -vp /ovsa-runtime/lib
+RUN mkdir -vp /opt
+
+COPY /release_files/ovsa-runtime/lib /ovsa-runtime/lib
+COPY /release_files/ovsa-runtime/tpm2-tools /opt/tpm2-tools
+
+
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/opt/tpm2-tools/lib/:/ovsa-runtime/lib/
+ENV PATH=${PATH}:/opt/tpm2-tools/bin/
+
+
+RUN  sed -i '/secure_path/ s/$/:\/opt\/tpm2-tools\/bin/' /etc/sudoers
+
+
+RUN sed -i 's/#set -x/set -x/g' /ovms_wrapper
+
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--", "/ovms_wrapper"]
+#ENTRYPOINT []

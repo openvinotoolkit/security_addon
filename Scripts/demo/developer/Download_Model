@@ -1,0 +1,44 @@
+#! /bin/bash
+#
+# Copyright (c) 2020 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+
+show_usage (){
+	printf "Usage: $0 <mode name>\n"
+	return 0
+}
+
+if [ "$1" = "-h" ] || [ "$1" = "" ]
+then
+	show_usage
+	exit 1
+else
+       
+       	cd $OVSA_DEV_ARTEFACTS
+      
+	if curl --output /dev/null --silent --head --fail "https://download.01.org/opencv/2021/openvinotoolkit/2021.1/open_model_zoo/models_bin/1/$1/FP32/$1.xml"; then
+           curl --create-dirs --silent \
+		   https://download.01.org/opencv/2021/openvinotoolkit/2021.1/open_model_zoo/models_bin/1/$1/FP32/$1.xml \
+		   https://download.01.org/opencv/2021/openvinotoolkit/2021.1/open_model_zoo/models_bin/1/$1/FP32/$1.bin \
+		   -o model/$1.xml \
+		   -o model/$1.bin
+
+	   chown intel:intel $OVSA_DEV_ARTEFACTS/model
+	   echo "Model $1 downloaded to $OVSA_DEV_ARTEFACTS/model"
+	else
+	   echo "Model $1 does not exist"
+	fi
+fi

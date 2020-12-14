@@ -1,0 +1,27 @@
+{
+   "custom_loader_config_list":[
+     {
+          "config":{
+                "loader_name":"ovsa",
+                "library_path": "/ovsa-runtime/lib/libovsaruntime.so"
+          }
+     }
+   ],
+  "model_config_list":[
+    {
+      "config":{
+        "name":"fd",
+        "base_path":"/sampleloader/artefacts",
+        "custom_loader_options": {"loader_name":  "ovsa", "keystore":  "Cust_Keystore", "protected_file": "face-detection-retail-0004"}
+      }
+    },
+	{
+      "config":{
+        "name":"pd",
+        "base_path":"/sampleloader/artefacts",
+        "custom_loader_options": {"loader_name":  "ovsa", "keystore":  "Cust_Keystore", "protected_file": "person-detection-retail-0013"}
+      }
+    }
+  ]
+}
+

@@ -1,0 +1,21 @@
+{
+   "custom_loader_config_list":[
+     {
+          "config":{
+                "loader_name":"ovsa",
+                "library_path": "/ovsa-runtime/lib/libovsaruntime.so"
+          }
+     }
+   ],
+  "model_config_list":[
+    {
+      "config":{
+        "name":"protected-model",
+        "base_path":"/sampleloader/model/fd",
+        "custom_loader_options": {"loader_name":  "ovsa", "keystore":  "custkeystore", "protected_file": "face_detection_model"}
+      }
+    }
+
+  ]
+}
+

@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# Copyright (c) 2020 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+
+declare -i file_count=0
+
+echo "Waiting for License request from Customer"
+while read dir action file
+    do
+        if [[ $file = *.txt ]] || [[ $file = *.crt ]];
+        then
+            if [[ $file = *.txt ]];
+            then
+                LICENSE_REQ_FILE="${file}"
+                file_count=$((file_count+1))
+            	#echo "License req file '$file' appeared in directory '$dir'"
+            else
+                CUSTOMER_CERT="${file}"
+                file_count=$((file_count+1))
+            	#echo "Customer cert file '$file' appeared in directory '$dir'"
+            fi
+        else
+            echo "The file '$file' appeared in directory '$dir'"
+        fi
+
+	if [[ $((file_count%2)) = 0 ]]
+        then
+            CUSTOMER_NAME=`grep Customer_name /var/OVSA/artefacts/$LICENSE_REQ_FILE | awk 'END{print $2}'`	
+	    echo ""
+	    echo "========================="
+            echo "Received request from $CUSTOMER_NAME"
+            echo "    - $dir$LICENSE_REQ_FILE"
+            echo "    - $dir$CUSTOMER_CERT"
+            #kill $(pgrep inotifywait)
+        fi
+done < <(inotifywait -m /var/OVSA/artefacts -e create)
+
+
+#echo "License Requested File $LICENSE_REQ_FILE"
+#echo "Customer Certificate $CUSTOMER_CERT"
+
+MODEL_NAME=`grep Model_name /var/OVSA/artefacts/$LICENSE_REQ_FILE | awk 'END{print $2}'`
+LICENSE_TIME=`grep License_duartion_in_days /var/OVSA/artefacts/$LICENSE_REQ_FILE  | awk 'END{print $2}'`
+ARTEFACTS_PATH=`grep Artefacts_path /var/OVSA/artefacts/$LICENSE_REQ_FILE | awk 'END{print $2}'`
+
+echo "Model Name is $MODEL_NAME"
+echo "Requested License Duration is $LICENSE_TIME days"
+echo "Artefacts path is $ARTEFACTS_PATH"

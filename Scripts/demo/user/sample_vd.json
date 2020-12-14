@@ -1,0 +1,21 @@
+{
+   "custom_loader_config_list":[
+     {
+          "config":{
+                "loader_name":"ovsa",
+                "library_path": "/ovsa-runtime/lib/libovsaruntime.so"
+          }
+     }
+   ],
+  "model_config_list":[
+    {
+      "config":{
+        "name":"vd",
+        "base_path":"/sampleloader/artefacts",
+        "custom_loader_options": {"loader_name":  "ovsa", "keystore":  "Cust_Keystore", "protected_file": "vehicle-detection-adas-0002"}
+      }
+    }
+
+  ]
+}
+

@@ -1,0 +1,92 @@
+#!/bin/bash
+#
+# Copyright (c) 2020 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+
+OPTIND=1
+TRACE=/dev/null
+
+show_usage (){
+    echo "Usage: $0 <keystore name> <tcb file name> <protected model file> <Master License> <License request file>"
+    return 0
+}
+
+declare -i file_count=0
+
+if [ "$1" = "" ]
+then
+    show_usage
+    exit 1
+fi
+
+PARAMS=""
+while (( "$#" )); do
+  case "$1" in
+    -v)
+      TRACE=/dev/stdout
+      shift
+      ;;
+    -h)
+      show_help
+      exit 1
+      ;;
+    -*|--*=) # unsupported flags
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+  esac
+done
+# set positional arguments in their proper place
+eval set -- "$PARAMS"
+
+MODEL_NAME=`grep Model_name $5 | awk 'END{print $2}'`
+LICENSE_TIME=`grep License_duartion_in_days $5 | awk 'END{print $2}'`
+ARTEFACTS_PATH=`grep Artefacts_path $5 | awk 'END{print $2}'`
+CUSTOMER_NAME=`grep Customer_name $5 | awk 'END{print $2}'`	
+CUSTOMER_CERT=`grep Customer_certificate $5 | awk 'END{print $2}'`
+#echo "CUSTOMER CERT: $CUSTOMER_CERT"
+
+#echo "Model Name is $MODEL_NAME"
+#echo "Requested License Duration is $LICENSE_TIME days"
+#echo "Artefacts path is $ARTEFACTS_PATH"
+
+cd $OVSA_DEV_ARTEFACTS
+/opt/ovsa/bin/ovsatool licgen -t TimeLimit -l $LICENSE_TIME -n "Time Limit License Config" -v 1.0 -u "192.168.122.7:4451" -k $1 -o "$MODEL_NAME"_"$LICENSE_TIME"days.licconf > $TRACE
+if [ "$?" != 0 ]
+then
+    echo "Generating config for $MODEL_NAME_$LICENSE_TIME days failed"
+    exit 1
+fi
+
+/opt/ovsa/bin/ovsatool sale -m $4 -k $1 -l "$MODEL_NAME"_"$LICENSE_TIME"days.licconf -t $2 -p /var/OVSA/artefacts/$CUSTOMER_CERT -c $MODEL_NAME.c_lic > $TRACE
+if [ "$?" != 0 ]
+then
+    echo "Generating license $MODEL_NAME.c_lic for $CUSTOMER_NAME failed"
+    exit 1
+fi
+
+python3 /opt/ovsa/DB/ovsa_store_customer_lic_cert_db.py /opt/ovsa/DB/ovsa.db $MODEL_NAME.c_lic /var/OVSA/artefacts/$CUSTOMER_CERT > $TRACE
+if [ "$?" = 0 ]
+then
+    echo "Generated license $OVSA_DEV_ARTEFACTS/$MODEL_NAME.c_lic for $CUSTOMER_NAME"
+else
+    echo "DB update of $MODEL_NAME.c_lic for $CUSTOMER_NAME failed"
+    exit 1
+fi

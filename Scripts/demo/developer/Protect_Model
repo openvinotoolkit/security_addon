@@ -1,0 +1,78 @@
+#! /bin/bash
+#
+# Copyright (c) 2020 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+
+OPTIND=1
+TRACE=/dev/null
+
+show_usage (){
+    echo "Usage: $0 <keystore name> <model files path>"
+    return 0
+}
+
+if [ "$1" = "" ]
+then
+    show_usage
+    exit 1
+fi
+
+PARAMS=""
+while (( "$#" )); do
+  case "$1" in
+    -v)
+      TRACE=/dev/stdout
+      shift
+      ;;
+    -h)
+      show_help
+      exit 1
+      ;;
+    -*|--*=) # unsupported flags
+      echo "Error: Unsupported flag $1" >&2
+      exit 1
+      ;;
+    *) # preserve positional arguments
+      PARAMS="$PARAMS $1"
+      shift
+      ;;
+  esac
+done
+# set positional arguments in their proper place
+eval set -- "$PARAMS"
+
+echo "Protecting model $2. Please wait..."
+       
+cd $OVSA_DEV_ARTEFACTS
+guid=$(uuidgen)
+       
+/opt/ovsa/bin/ovsatool protect -i $2.bin $2.xml -n $2 -d $2 -v 0001 -p $2.dat -m $2.m_lic -k $1 -g $guid > $TRACE
+if [ "$?" != 0 ]
+then
+    echo "Protecting model $OVSA_DEV_ARTEFACTS/$2 failed"
+    exit 1
+fi       
+
+. /opt/ovsa/scripts/setupvars.sh > $TRACE
+/opt/ovsa/bin/ovsaruntime gen-tcb-signature -n $2_tcb -v "1.0" -f $2.tcb -k $1 > $TRACE
+if [ "$?" = 0 ]
+then
+    echo "Successfully protected $OVSA_DEV_ARTEFACTS/$2.dat"
+    echo "Successfully created $OVSA_DEV_ARTEFACTS/$2.m_lic"
+else
+    echo "Generating Reference TCB for $OVSA_DEV_ARTEFACTS/$2 failed"
+    exit 1
+fi
