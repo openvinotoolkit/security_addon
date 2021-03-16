@@ -99,7 +99,7 @@ Begin this step on the Intel® Core™ or Xeon® processor machine that meets th
    * `/dev/tpm0`
    * `/dev/tpmrm0`
    
-   If you do not see this information, your system does not meet the <a href="#prerequisites">prerequisites</a>  to use the OpenVINO™ Security Add-on.
+   If you do not see this information, your system does not meet the <a href="#prerequisites">prerequisites</a>  to use the OpenVINO™ Security Add-on. TPM on host is needed to obtain host boot measurements which are verified against the known values by the license server while checking for the license
 2. Make sure hardware virtualization support is enabled in the BIOS:
    ```sh
    kvm-ok 
@@ -126,12 +126,12 @@ Begin this step on the Intel® Core™ or Xeon® processor machine that meets th
 5.  Build and install the [`libtpm` package](https://github.com/stefanberger/libtpms/). 
 6.  Build and install the [`swtpm` package](https://github.com/stefanberger/swtpm/).
 7.  Add the `swtpm` package to the `$PATH` environment variable.
-8.  Install the software tool [`tpm2-tss`]( https://github.com/tpm2-software/tpm2-tss/releases/download/2.4.4/tpm2-tss-2.4.4.tar.gz).<br>
-    Installation information is at https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md
-9.  Install the software tool [`tpm2-abmrd`](https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.3.3/tpm2-abrmd-2.3.3.tar.gz).<br>
-    Installation information is at https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.md
-10. Install the [`tpm2-tools`](https://github.com/tpm2-software/tpm2-tools/releases/download/4.3.0/tpm2-tools-4.3.0.tar.gz).<br>
-    Installation information is at https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md
+8.  Install the software tool [`tpm2-tss`](https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz).<br>
+    Installation information is at [https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md](https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md)
+9.  Install the software tool [`tpm2-abmrd`](https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz).<br>
+    Installation information is at [https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.md](https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.md)
+10. Install the [`tpm2-tools`](https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz).<br>
+    Installation information is at [https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md](https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md)
 11. Install the [Docker packages](https://docs.docker.com/engine/install/ubuntu/).	
 
 **NOTE**: Regardless of whether you used the `install_host_deps.sh` script, complete step 12 to finish setting up the packages on the Host Machine.
@@ -289,22 +289,25 @@ As an option, you can use `virsh` and the virtual machine manager to create and 
    -vnc :1
    ```
 8. Choose ONE of these options to install additional required software:
-<details><summary>Option 1: Use a script to install additional software</summary>
+<details>
+	<summary>Option 1: Use a script to install additional software</summary>
+	
 	a. Copy the script `install_guest_deps.sh` from the Scripts/reference directory of the OVSA repository to the Guest VM<br>
 	b. Run the script.<br>
 	c. Shut down the Guest VM.<br><br>
 	Click the triangled line to close Option 1
 </details>
-
-<details><summary>Option 2: Manually install additional software</summary>
-	a.  Install the software tool [`tpm2-tss`](https://github.com/tpm2-software/tpm2-tss/releases/download/2.4.4/tpm2-tss-2.4.4.tar.gz)<br>
-    Installation information is at https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md<br>
-	b.  Install the software tool [`tpm2-abmrd`](https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.3.3/tpm2-abrmd-2.3.3.tar.gz)<br>
-    Installation information is at https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.md<br>
-	c. Install the [`tpm2-tools`](https://github.com/tpm2-software/tpm2-tools/releases/download/4.3.0/tpm2-tools-4.3.0.tar.gz)<br>
-    Installation information is at https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md<br>
-	d. Install the [Docker packages](https://docs.docker.com/engine/install/ubuntu/)
-	e. Shut down the Guest VM.<br><br>
+<details>
+	<summary>Option 2: Manually install additional software</summary>
+	
+	a.  Install the software tool [`tpm2-tss`](https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz) <br>
+    Installation information is at [https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md](https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md)  <br>
+	b.  Install the software tool [`tpm2-abmrd`](https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz) <br>
+    Installation information is at [https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.md](https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.md) <br>
+	c. Install the [`tpm2-tools`](https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz.tar.gz) <br>
+    Installation information is at [https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md](https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md) <br>
+	d. Install the [Docker packages](https://docs.docker.com/engine/install/ubuntu/) <br>
+	e. Shut down the Guest VM. <br><br>
 	Click the triangled line to close Option 2
 </details>
 
@@ -347,93 +350,89 @@ As an option, you can use `virsh` and the virtual machine manager to create and 
    
 12. Use a VNC client to log on to the Guest VM at `<host-ip-address>:1`
 
-</details>
-
 ### Step 4: Set Up one Guest VM for the User role
 
 1. Choose ONE of these options to create a Guest VM for the User role:
 
-<details><summary>Option 1: Copy and Rename the `ovsa_isv_dev_vm_disk.qcow2` disk image</summary>
-1. Copy the `ovsa_isv_dev_vm_disk.qcow2` disk image to a new image named `ovsa_runtime_vm_disk.qcow2`. You created the `ovsa_isv_dev_vm_disk.qcow2` disk image in <a  href="#prerequisites">Step 3</a>.
+	<details><summary>Option 1: Copy and Rename the `ovsa_isv_dev_vm_disk.qcow2` disk image</summary>
+    
+    1. Copy the `ovsa_isv_dev_vm_disk.qcow2` disk image to a new image named `ovsa_runtime_vm_disk.qcow2`. You created the `ovsa_isv_dev_vm_disk.qcow2` disk image in <a  href="#prerequisites">Step 3</a>.
 
-2. Boot the new image. 
+	2. Boot the new image. 
 
-3. Change the hostname from `ovsa_isv_dev` to `ovsa_runtime`.  
-	```sh 
-	sudo hostnamectl set-hostname ovsa_runtime
-	```
+	3. Change the hostname from `ovsa_isv_dev` to `ovsa_runtime`.  
+		```sh 
+		sudo hostnamectl set-hostname ovsa_runtime
+		```
 	
-4. Replace all instances of 'ovsa_isv_dev' to 'ovsa_runtime' in the new image.
+	4. Replace all instances of 'ovsa_isv_dev' to 'ovsa_runtime' in the new image.
 	
-	```sh 	
-	sudo nano /etc/hosts
-	```
-5. Change the `/etc/machine-id`:
-	```sh
-	sudo rm /etc/machine-id
-	systemd-machine-id-setup
-	```
-6. Shut down the Guest VM.<br><br>
+		```sh 	
+		sudo nano /etc/hosts
+		```
+	5. Change the `/etc/machine-id`:
+		```sh
+		sudo rm /etc/machine-id
+		systemd-machine-id-setup
+		```
+	6. Shut down the Guest VM.<br><br>
 
-Click the triangled line above to close Option 1.
-</details>
+	Click the triangled line above to close Option 1.
+	</details>
+	<details><summary>Option 2: Manually create the Guest VM</summary>
+	
+	1. Create an empty virtual disk image:
+		```sh
+		sudo qemu-img create -f qcow2 <path>/ovsa_ovsa_runtime_vm_disk.qcow2 20G
+		```
 
-<details><summary>Option 2: Manually create the Guest VM</summary>
+	2. Install Ubuntu 18.04 on the Guest VM. Name the Guest VM `ovsa_runtime`:
+		```sh
+		sudo qemu-system-x86_64 -m 8192 -enable-kvm \
+		-cpu host \
+		-drive if=virtio,file=<path-to-disk-image>/ovsa_ovsa_runtime_vm_disk.qcow2,cache=none \
+		-cdrom <path-to-iso-image>/ubuntu-18.04.5-live-server-amd64.iso \
+		-device e1000,netdev=hostnet1,mac=52:54:00:d1:66:5f \
+		-netdev tap,id=hostnet1,script=<path-to-scripts>/virbr0-qemu-ifup,downscript=<path-to-scripts>/virbr0-qemu-ifdown \
+		-vnc :2
+		```
 	
-1. Create an empty virtual disk image:
-	```sh
-	sudo qemu-img create -f qcow2 <path>/ovsa_ovsa_runtime_vm_disk.qcow2 20G
-	```
+	3. Connect a VNC client with `<host-ip-address>:2`.
+	
+	4. Follow the prompts on the screen to finish installing the Guest VM. Name the Guest VM `ovsa_runtime`.
+	
+	5. Shut down the Guest VM. 
+	
+	6. Restart the Guest VM:
+		```sh
+		sudo qemu-system-x86_64 -m 8192 -enable-kvm \
+		-cpu host \
+		-drive if=virtio,file=<path-to-disk-image>/ovsa_ovsa_runtime_vm_disk.qcow2,cache=none \
+		-device e1000,netdev=hostnet1,mac=52:54:00:d1:66:5f \
+		-netdev tap,id=hostnet1,script=<path-to-scripts>/virbr0-qemu-ifup,downscript=<path-to-scripts>/virbr0-qemu-ifdown \
+		-vnc :2
+		```
+	
+	7. Choose ONE of these options to install additional required software:
+		<details><summary>Option 1: Use a script to install additional software</summary>
+		a. Copy the script `install_guest_deps.sh` from the Scripts/reference directory of the OVSA repository to the Guest VM
+		b. Run the script.
+		c. Shut down the Guest VM.<br><br>
+    
+		Click the triangled line to close Option 2.
+		</details>
+		<details><summary>Option 2: Manually install additional software</summary>
+		a.  Install the software tool [`tpm2-tss`](https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz) <br>
+    	Installation information is at [https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md](https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md) <br><br>
+		b.  Install the software tool [`tpm2-abmrd`](https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz) <br>
+    	Installation information is at [https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.](https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.md) <br><br>
+		c. Install the [`tpm2-tools`](https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz) <br>
+    	Installation information is at [https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md](https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md) <br><br>
+		d. Install the [Docker packages](https://docs.docker.com/engine/install/ubuntu/) <br><br>
+		e. Shut down the Guest VM.<br><br>
 
-2. Install Ubuntu 18.04 on the Guest VM. Name the Guest VM `ovsa_runtime`:
-	```sh
-	sudo qemu-system-x86_64 -m 8192 -enable-kvm \
-	-cpu host \
-	-drive if=virtio,file=<path-to-disk-image>/ovsa_ovsa_runtime_vm_disk.qcow2,cache=none \
-	-cdrom <path-to-iso-image>/ubuntu-18.04.5-live-server-amd64.iso \
-	-device e1000,netdev=hostnet1,mac=52:54:00:d1:66:5f \
-	-netdev tap,id=hostnet1,script=<path-to-scripts>/virbr0-qemu-ifup,downscript=<path-to-scripts>/virbr0-qemu-ifdown \
-	-vnc :2
-	```
-	
-3. Connect a VNC client with `<host-ip-address>:2`.
-	
-4. Follow the prompts on the screen to finish installing the Guest VM. Name the Guest VM `ovsa_runtime`.
-	
-5. Shut down the Guest VM. 
-	
-6. Restart the Guest VM:
-	```sh
-	sudo qemu-system-x86_64 -m 8192 -enable-kvm \
-	-cpu host \
-	-drive if=virtio,file=<path-to-disk-image>/ovsa_ovsa_runtime_vm_disk.qcow2,cache=none \
-	-device e1000,netdev=hostnet1,mac=52:54:00:d1:66:5f \
-	-netdev tap,id=hostnet1,script=<path-to-scripts>/virbr0-qemu-ifup,downscript=<path-to-scripts>/virbr0-qemu-ifdown \
-	-vnc :2
-	```
-	
-7. Choose ONE of these options to install additional required software:
-<details><summary>Option 1: Use a script to install additional software</summary>
-	a. Copy the script `install_guest_deps.sh` from the Scripts/reference directory of the OVSA repository to the Guest VM
-	b. Run the script.
-	c. Shut down the Guest VM.<br><br>
-	
-Click the triangled line to close Option 2.
-	
-</details>
-
-<details><summary>Option 2: Manually install additional software</summary>
-	a.  Install the software tool [`tpm2-tss`](https://github.com/tpm2-software/tpm2-tss/releases/download/2.4.4/tpm2-tss-2.4.4.tar.gz) <br>
-    Installation information is at https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md <br><br>
-	b.  Install the software tool [`tpm2-abmrd`](https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.3.3/tpm2-abrmd-2.3.3.tar.gz) <br>
-    Installation information is at https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.md <br><br>
-	c. Install the [`tpm2-tools`](https://github.com/tpm2-software/tpm2-tools/releases/download/4.3.0/tpm2-tools-4.3.0.tar.gz) <br>
-    Installation information is at https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md <br><br>
-	d. Install the [Docker packages](https://docs.docker.com/engine/install/ubuntu/) <br><br>
-	e. Shut down the Guest VM.<br><br>
-
-Click the triangled line to close the option to manually install additional software.
-</details>
+		Click the triangled line to close the option to manually install additional software.
+		</details>
 
 </details>
 
@@ -625,7 +624,7 @@ The Model Developer creates model, defines access control and creates the user l
 	source /opt/ovsa/scripts/setupvars.sh
 	
 2. Create files to request a certificate:<br>
-	This example uses a self-signed certificate for demonstration purposes. In a production environment, use CSR files to request for a CA-signed certificate.
+	This example uses a self-signed certificate for demonstration purposes. **In a production environment, use CSR files to request for a CA-signed certificate**
  
 	```sh
 	cd $OVSA_DEV_ARTEFACTS
