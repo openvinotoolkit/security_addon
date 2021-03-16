@@ -289,15 +289,15 @@ As an option, you can use `virsh` and the virtual machine manager to create and 
    -vnc :1
    ```
 8. Choose ONE of these options to install additional required software:
-<details>
+	<details>
 	<summary>Option 1: Use a script to install additional software</summary>
 	
 	a. Copy the script `install_guest_deps.sh` from the Scripts/reference directory of the OVSA repository to the Guest VM<br>
 	b. Run the script.<br>
 	c. Shut down the Guest VM.<br><br>
 	Click the triangled line to close Option 1
-</details>
-<details>
+	</details>
+	<details>
 	<summary>Option 2: Manually install additional software</summary>
 	
 	a.  Install the software tool [`tpm2-tss`](https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz) <br>
@@ -309,7 +309,7 @@ As an option, you can use `virsh` and the virtual machine manager to create and 
 	d. Install the [Docker packages](https://docs.docker.com/engine/install/ubuntu/) <br>
 	e. Shut down the Guest VM. <br><br>
 	Click the triangled line to close Option 2
-</details>
+	</details>
 
 9. On the host, create a directory to support the virtual TPM device. Only `root` should have read/write permission to this directory:
    ```sh
@@ -415,13 +415,15 @@ As an option, you can use `virsh` and the virtual machine manager to create and 
 	
 	7. Choose ONE of these options to install additional required software:
 		<details><summary>Option 1: Use a script to install additional software</summary>
+	
 		a. Copy the script `install_guest_deps.sh` from the Scripts/reference directory of the OVSA repository to the Guest VM
 		b. Run the script.
 		c. Shut down the Guest VM.<br><br>
-    
+	
 		Click the triangled line to close Option 2.
 		</details>
 		<details><summary>Option 2: Manually install additional software</summary>
+		
 		a.  Install the software tool [`tpm2-tss`](https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz) <br>
     	Installation information is at [https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md](https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md) <br><br>
 		b.  Install the software tool [`tpm2-abmrd`](https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz) <br>
@@ -434,7 +436,7 @@ As an option, you can use `virsh` and the virtual machine manager to create and 
 		Click the triangled line to close the option to manually install additional software.
 		</details>
 
-</details>
+	</details>
 
 2. Create a directory to support the virtual TPM device. Only `root` should have read/write permission to this directory:
 	```sh
