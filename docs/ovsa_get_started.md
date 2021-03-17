@@ -6,7 +6,7 @@ This guide provides instructions for people who use the OpenVINO™ Security Add
 * **Independent Software Vendor**: Use this guide for instructions to use the OpenVINO™ Security Add-on to validate license for access controlled models that are provided to your customers (users). 
 * **User**: This document includes instructions for end users who need to access and run access controlled models through the OpenVINO™ Security Add-on.  
 
-In this release, one person performs the role of both the Model Developer and the Independent Software Vendor. Therefore, this document provides instructions to configure one system for these two roles and one system for the User role. This document also provides a way for the same person to play the role of the Model Developer, Independent Software Vendor, and User to let you see how the OpenVINO™ Security Add-on functions from the User perspective.
+In this document, one person performs the role of both the Model Developer and the Independent Software Vendor. Therefore, this document provides instructions to configure one system for these two roles and one system for the User role. This document also provides a way for the same person to play the role of the Model Developer, Independent Software Vendor, and User to let you see how the OpenVINO™ Security Add-on functions from the User perspective.
 
 
 ## Overview
@@ -38,16 +38,15 @@ The OpenVINO™ Security Add-on consists of three components that run in Kernel-
 <details>
     <summary><strong>OpenVINO™ Security Add-on Runtime</strong>: Users install and use the OpenVINO™ Security Add-on Runtime on a virtual machine. </summary>
 
-Users host the OpenVINO™ Security Add-on Runtime component in a virtual machine. 
+- Users host the OpenVINO™ Security Add-on Runtime component in a virtual machine. 
 
-Externally from the OpenVINO™ Security Add-on, the User adds the access controlled model to the OpenVINO™ Model Server config file. The OpenVINO™ Model Server attempts to load the model in memory. At this time, the OpenVINO™ Security Add-on Runtime component validates the user's license for the access controlled model against information stored in the License Service provided by the Independent Software Vendor. 
+- Externally from the OpenVINO™ Security Add-on, the User adds the access controlled model to the OpenVINO™ Model Server config file. The OpenVINO™ Model Server attempts to load the model in memory. At this time, the OpenVINO™ Security Add-on Runtime component validates the user's license for the access controlled model against information stored in the License Service provided by the Independent Software Vendor. 
 
-After the license is successfully validated, the OpenVINO™ Model Server loads the model and services the inference requests. 
+- After the license is successfully validated, the OpenVINO™ Model Server loads the model and services the inference requests. 
 
 </details> 
 
-<br>
-**Where the OpenVINO™ Security Add-on Fits into Model Development and Deployment**
+#### Where the OpenVINO™ Security Add-on Fits into Model Development and Deployment 
 
 ![Security Add-on Diagram](ovsa_diagram.png)
 
@@ -622,7 +621,7 @@ The Model Developer creates model, defines access control and creates the user l
 	```sh
 	sudo -s
 	cd /<username-home-directory>/OVSA/artefacts
-	export OVSA_RUNTIME_ARTEFACTS=$PWD
+	export OVSA_DEV_ARTEFACTS=$PWD
 	source /opt/ovsa/scripts/setupvars.sh
 	
 2. Create files to request a certificate:<br>
@@ -668,7 +667,7 @@ This example uses `curl` to download the `face-detection-retail-004` model from 
 	```
 3. Define and enable the model access control and master license:
 	```sh	
-	/opt/ovsa/bin/ovsatool protect -i model/face-detection-retail-0004.xml model/face-detection-retail-0004.bin -n "face detection" -d "face detection retail" -v 0004 -p face_detection_model.dat -m face_detection_model.masterlic -k isv_keystore -g <output-of-uuidgen>
+	/opt/ovsa/bin/ovsatool controlAccess -i model/face-detection-retail-0004.xml model/face-detection-retail-0004.bin -n "face detection" -d "face detection retail" -v 0004 -p face_detection_model.dat -m face_detection_model.masterlic -k isv_keystore -g <output-of-uuidgen>
 	```
 The Intermediate Representation files for the `face-detection-retail-0004` model are encrypted as `face_detection_model.dat` and a master license is generated as `face_detection_model.masterlic`
 
@@ -784,9 +783,9 @@ The `$OVSA_RUNTIME_ARTEFACTS/../ovms` directory contains scripts and a sample co
 	"model_config_list":[
 		{
 		"config":{
-			"name":"protected-model",
+			"name":"controlled-access-model",
 			"base_path":"/sampleloader/model/fd",
-			"custom_loader_options": {"loader_name":  "ovsa", "keystore":  "custkeystore", "protected_file": "face_detection_model"}
+			"custom_loader_options": {"loader_name":  "ovsa", "keystore":  "custkeystore", "controlled_access_file": "face_detection_model"}
 		}
 		}
 	]
@@ -825,7 +824,7 @@ For information about the NGINX interface, see https://github.com/openvinotoolki
 
 Run the `face_detection.py` script. 
 ```sh
-python3 face_detection.py --grpc_port 3335 --batch_size 1 --width 300 --height 300 --input_images_dir images --output_dir results --tls --server_cert server.pem --client_cert client.pem --client_key client.key --model_name protected-model
+python3 face_detection.py --grpc_port 3335 --batch_size 1 --width 300 --height 300 --input_images_dir images --output_dir results --tls --server_cert server.pem --client_cert client.pem --client_key client.key --model_name controlled-access-model
 ```	
 
 ## Summary
