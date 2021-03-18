@@ -98,9 +98,9 @@ fi
 
 #Install SWTPM for vTPM
 echo "Installing software tpm for qemu......"
-wget https://github.com/stefanberger/libtpms/archive/v0.7.4.tar.gz
-tar -xzf v0.7.4.tar.gz
-pushd libtpms-0.7.4/
+wget https://github.com/stefanberger/libtpms/archive/v0.7.7.tar.gz
+tar -xzf v0.7.7.tar.gz
+pushd libtpms-0.7.7/
 ./autogen.sh --with-tpm2 --with-openssl
 if [ $? != 0 ];then
  echo "ERROR: Missing package dependencies for libtpms installation."
@@ -118,11 +118,11 @@ popd
 
 #Install known dependencies for swtpm
 sudo apt-get install -y pkg-config libtasn1-6-dev gnutls-bin libgnutls28-dev expect socat libseccomp-dev selinux-policy-dev python3-setuptools
-wget https://github.com/stefanberger/swtpm/archive/v0.5.1.tar.gz
-tar -xzf v0.5.1.tar.gz
-pushd swtpm-0.5.1/
+wget https://github.com/stefanberger/swtpm/archive/v0.5.2.tar.gz
+tar -xzf v0.5.2.tar.gz
+pushd swtpm-0.5.2/
 ./autogen.sh
-./configure --prefix=/usr
+./configure --prefix=/usr --with-gnutls
 if [ $? != 0 ];then
  echo "ERROR: Missing package dependencies for lswtpm installation."
  echo "Please refer https://github.com/stefanberger/swtpm/blob/master/INSTALL"
@@ -140,9 +140,9 @@ popd
 #TSS
 echo "Installing TPM Packages"
 sudo apt-get install -y libjson-c-dev libcurl4-openssl-dev doxygen
-wget https://github.com/tpm2-software/tpm2-tss/releases/download/2.4.4/tpm2-tss-2.4.4.tar.gz
-tar -xvzf tpm2-tss-2.4.4.tar.gz
-pushd tpm2-tss-2.4.4
+wget https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz
+tar -xvzf tpm2-tss-3.0.3.tar.gz
+pushd tpm2-tss-3.0.3
 ./configure  --with-udevrulesdir=/etc/udev/rules.d/ --prefix=/usr
 if [ $? != 0 ];then
  echo "ERROR: Missing package dependencies for tss installation."
@@ -164,9 +164,9 @@ popd
 
 #ABRMD
 sudo apt-get install -y libglib2.0-dev
-wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.3.3/tpm2-abrmd-2.3.3.tar.gz
-tar -xvzf tpm2-abrmd-2.3.3.tar.gz
-pushd tpm2-abrmd-2.3.3
+wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz
+tar -xvzf tpm2-abrmd-2.4.0.tar.gz
+pushd tpm2-abrmd-2.4.0
 ./configure --with-dbuspolicydir=/etc/dbus-1/system.d --prefix=/usr
 if [ $? != 0 ];then
  echo "ERROR: Missing package dependencies for tpm2-abrmd installation."
@@ -184,9 +184,9 @@ popd
 
 #TOOLS
 sudo apt-get install -y pandoc uuid-dev
-wget https://github.com/tpm2-software/tpm2-tools/releases/download/4.3.0/tpm2-tools-4.3.0.tar.gz
-tar -xvzf tpm2-tools-4.3.0.tar.gz
-pushd tpm2-tools-4.3.0
+wget https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz
+tar -xvzf tpm2-tools-5.0.tar.gz
+pushd tpm2-tools-5.0
 ./configure --prefix=/usr
 if [ $? != 0 ];then
  echo "ERROR: Missing package dependencies for tpm2-tools installation."
