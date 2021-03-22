@@ -439,11 +439,11 @@ As an option, you can use `virsh` and the virtual machine manager to create and 
 			b. Run the script.
 			c. Shut down the Guest VM.<br><br>
 	
-		Click the triangled line to close Option 2.
+			Click the triangled line to close Option 2.
 		</details>
 		<details><summary>Option 2: Manually install additional software</summary>
 		
-			a.  Install the software tool [`tpm2-tss`](https://github.com/tpm2-software/tpm2-tss/releases/download/2.4.4/tpm2-tss-2.4.4.tar.gz) <br>
+		a.  Install the software tool [`tpm2-tss`](https://github.com/tpm2-software/tpm2-tss/releases/download/2.4.4/tpm2-tss-2.4.4.tar.gz) <br>
     			Installation information is at https://github.com/tpm2-software/tpm2-tss/blob/master/INSTALL.md <br><br>
 			b.  Install the software tool [`tpm2-abmrd`](https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.3.3/tpm2-abrmd-2.3.3.tar.gz) <br>
     			Installation information is at https://github.com/tpm2-software/tpm2-abrmd/blob/master/INSTALL.md <br><br>
@@ -451,7 +451,7 @@ As an option, you can use `virsh` and the virtual machine manager to create and 
     			Installation information is at https://github.com/tpm2-software/tpm2-tools/blob/master/INSTALL.md <br><br>
 			d. Install the [Docker packages](https://docs.docker.com/engine/install/ubuntu/) <br><br>
 			e. Shut down the Guest VM.<br><br>
-		Click the triangled line to close the option to manually install additional software.
+			Click the triangled line to close the option to manually install additional software.
 		</details>
 	</details>
 
