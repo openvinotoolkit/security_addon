@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 
 
 show_usage (){
-    echo "Usage: $0 <Cusotmer License> <Protected Model> <Artefacts Path>"
+    echo "Usage: $0 <Customer License> <Controlled Access Model> <Artefacts Path>"
     return 0
 }
 
@@ -39,7 +39,7 @@ sudo -u intel ssh intel@192.168.122.79 rm -rf $3/$CUSTOMER_LIC.dat
 sudo -u intel scp -q $1 intel@192.168.122.79:$3/$CUSTOMER_LIC.lic
 sudo -u intel scp -q $2 intel@192.168.122.79:$3
 
-echo "Sent Protected Model $3/$CUSTOMER_LIC.dat"
+echo "Sent Controlled Access Model $3/$CUSTOMER_LIC.dat"
 echo "Sent License $3/$CUSTOMER_LIC.c_lic"
 
 #rm -rf /var/OVSA/artefacts/*

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,14 +60,14 @@ ovsa_license_type_t ovsa_json_map_license_type(const char* lictype) {
         OVSA_DBG(DBG_D, "TIMELIMIT\n");
         return TIMELIMIT;
     } else {
-        OVSA_DBG(DBG_E, "Error: Invalid option for license type\n");
+        OVSA_DBG(DBG_E, "OVSA: Error invalid option for license type\n");
         return MAXLICENSETYPE;
     }
 }
 
 /* Create json blob */
 ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* lic_conf_sig,
-                                              char* outputBuf) {
+                                              size_t outputBuf_size, char* outputBuf) {
     ovsa_status_t ret     = OVSA_OK;
     cJSON* license_config = NULL;
     char* str_print       = NULL;
@@ -76,7 +76,7 @@ ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* l
 
     if (lic_conf_sig == NULL || outputBuf == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
-        OVSA_DBG(DBG_E, "Error: Input parameters invalid %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input parameters invalid %d\n", ret);
         goto end;
     }
 
@@ -84,7 +84,7 @@ ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* l
     license_config = cJSON_CreateObject();
     if (license_config == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Create license config Json object failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create license config Json object failed %d\n", ret);
         goto end;
     }
 
@@ -92,19 +92,19 @@ ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* l
     if (cJSON_AddStringToObject(license_config, "name", lic_conf_sig->lic_config.license_name) ==
         NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add name to license config failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add name to license config failed %d\n", ret);
         goto end;
     }
 
     const char* lic_type = ovsa_json_get_license_type_string(lic_conf_sig->lic_config.license_type);
     if (cJSON_AddStringToObject(license_config, "license_type", lic_type) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add license_type to license config failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add license_type to license config failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(license_config, "license_version",
                                 lic_conf_sig->lic_config.license_version) == NULL) {
-        OVSA_DBG(DBG_E, "Error: Could not add number object version \n");
+        OVSA_DBG(DBG_E, "OVSA: Error could not add number object version \n");
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
         goto end;
     }
@@ -112,7 +112,7 @@ ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* l
     cJSON* srvurl = cJSON_CreateObject();
     if (srvurl == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Could not create object srvurl\n");
+        OVSA_DBG(DBG_E, "OVSA: Error could not create object srvurl\n");
         goto end;
     }
     cJSON_AddItemToObject(license_config, "license_serv_url", srvurl);
@@ -120,13 +120,13 @@ ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* l
     ovsa_license_serv_url_list_t* list = lic_conf_sig->lic_config.license_url_list;
     if (list != NULL) {
         int i = 0;
-        char fname[10];
+        char fname[MAX_FILE_NAME_LEN];
         while (list->license_serv_url != NULL) {
-            snprintf_s_i(fname, 10, "url_%d", (i++) % 100u);
+            snprintf_s_i(fname, MAX_FILE_NAME_LEN, "url_%d", (i++) % 100u);
             cJSON* url = cJSON_CreateString(list->license_serv_url);
             if (url == NULL) {
                 ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-                OVSA_DBG(DBG_E, "Error: Could not create string url\n");
+                OVSA_DBG(DBG_E, "OVSA: Error could not create string url\n");
                 goto end;
             }
             OVSA_DBG(DBG_D, "%s\n", fname);
@@ -142,35 +142,35 @@ ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* l
     if (cJSON_AddNumberToObject(license_config, "usage_count",
                                 lic_conf_sig->lic_config.usage_count) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add usage_count to license config failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add usage_count to license config failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddNumberToObject(license_config, "time_limit",
                                 lic_conf_sig->lic_config.time_limit) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add time_limit to license config failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add time_limit to license config failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(license_config, "isv_certificate",
                                 lic_conf_sig->lic_config.isv_certificate) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add isv_certificate to license config failed\n");
+        OVSA_DBG(DBG_E, "OVSA: Error add isv_certificate to license config failed\n");
         goto end;
     }
 
     str_print = cJSON_Print(license_config);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
-        OVSA_DBG(DBG_E, "Error: Print json to buffer failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error print json to buffer failed %d\n", ret);
         goto end;
     }
     size_t str_len = 0;
     ret            = ovsa_get_string_length(str_print, &str_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
-    memcpy_s(outputBuf, str_len, str_print, str_len);
+    memcpy_s(outputBuf, outputBuf_size, str_print, str_len);
     outputBuf[str_len] = '\0';
 
 end:
@@ -180,80 +180,90 @@ end:
     return ret;
 }
 
-ovsa_status_t ovsa_json_create_protected_model(const ovsa_protected_model_sig_t* prot_model_sig,
-                                               size_t size, char* outputBuf) {
-    ovsa_status_t ret      = OVSA_OK;
-    cJSON* protected_model = NULL;
-    char* str_print        = NULL;
+ovsa_status_t ovsa_json_create_controlled_access_model(
+    const ovsa_controlled_access_model_sig_t* control_access_model_sig, size_t outputBuf_size,
+    char* outputBuf) {
+    ovsa_status_t ret              = OVSA_OK;
+    cJSON* controlled_access_model = NULL;
+    char* str_print                = NULL;
 
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
 
-    if (prot_model_sig == NULL || outputBuf == NULL) {
+    if (control_access_model_sig == NULL || outputBuf == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
-        OVSA_DBG(DBG_E, "Error: Input parameters invalid %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input parameters invalid %d\n", ret);
         goto end;
     }
 
     /* Create json object */
-    protected_model = cJSON_CreateObject();
-    if (protected_model == NULL) {
+    controlled_access_model = cJSON_CreateObject();
+    if (controlled_access_model == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Create protected model Json object failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create controlled access model Json object failed %d\n", ret);
         goto end;
     }
 
     /* Populate the json structure */
-    if (cJSON_AddStringToObject(protected_model, "name",
-                                prot_model_sig->protect_model.model_name) == NULL) {
+    if (cJSON_AddStringToObject(controlled_access_model, "name",
+                                control_access_model_sig->controlled_access_model.model_name) ==
+        NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add name to protected model failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add name to controlled access model failed %d\n", ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(protected_model, "description",
-                                prot_model_sig->protect_model.description) == NULL) {
+    if (cJSON_AddStringToObject(controlled_access_model, "description",
+                                control_access_model_sig->controlled_access_model.description) ==
+        NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add description to protected model failed failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add description to controlled access model failed failed %d\n",
+                 ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(protected_model, "version",
-                                prot_model_sig->protect_model.version) == NULL) {
+    if (cJSON_AddStringToObject(controlled_access_model, "version",
+                                control_access_model_sig->controlled_access_model.version) ==
+        NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add version to protected model failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add version to controlled access model failed %d\n", ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(protected_model, "model_guid",
-                                prot_model_sig->protect_model.model_guid) == NULL) {
+    if (cJSON_AddStringToObject(controlled_access_model, "model_guid",
+                                control_access_model_sig->controlled_access_model.model_guid) ==
+        NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add model_guid to protected model failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add model_guid to controlled access model failed %d\n", ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(protected_model, "isv_certificate",
-                                prot_model_sig->protect_model.isv_certificate) == NULL) {
+    if (cJSON_AddStringToObject(
+            controlled_access_model, "isv_certificate",
+            control_access_model_sig->controlled_access_model.isv_certificate) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add isv_certificate to protected model failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add isv_certificate to controlled access model failed %d\n",
+                 ret);
         goto end;
     }
     cJSON* model_files = cJSON_CreateArray();
     if (model_files == NULL) {
-        OVSA_DBG(DBG_E, "Error: Could not create object model_files\n");
+        OVSA_DBG(DBG_E, "OVSA: Error could not create object model_files\n");
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
         goto end;
     }
-    cJSON_AddItemToObject(protected_model, "files", model_files);
+    cJSON_AddItemToObject(controlled_access_model, "files", model_files);
 
-    struct ovsa_enc_models* list = prot_model_sig->protect_model.enc_model;
+    struct ovsa_enc_models* list = control_access_model_sig->controlled_access_model.enc_model;
     if (list != NULL) {
         int i = 0;
-        char name[20];
+        char name[MAX_FILE_NAME_LEN];
         errno_t ret      = EOK;
         char* filename   = NULL;
         cJSON* file_name = NULL;
+
+        memset_s(name, sizeof(name), 0);
         while (list->enc_model != NULL) {
-            snprintf_s_i(name, 20, "file_name_%d", (i) % 100u);
+            snprintf_s_i(name, MAX_FILE_NAME_LEN, "file_name_%d", (i) % 100u);
 
             cJSON* enc_file = cJSON_CreateObject();
             if (enc_file == NULL) {
-                OVSA_DBG(DBG_E, "Error: Could not create object enc_file\n");
+                OVSA_DBG(DBG_E, "OVSA: Error could not create object enc_file\n");
                 ret = OVSA_JSON_ERROR_CREATE_OBJECT;
                 goto end;
             }
@@ -270,22 +280,22 @@ ovsa_status_t ovsa_json_create_protected_model(const ovsa_protected_model_sig_t*
                 printf("Filename is %s\n", list->file_name);
             } else {
                 ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-                OVSA_DBG(DBG_E, "Error: Could not create string file\n");
+                OVSA_DBG(DBG_E, "OVSA: Error could not create string file\n");
                 goto end;
             }
 
             if (file_name == NULL) {
                 ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-                OVSA_DBG(DBG_E, "Error: Could not create string file\n");
+                OVSA_DBG(DBG_E, "OVSA: Error could not create string file\n");
                 goto end;
             }
             cJSON_AddItemToObject(enc_file, name, file_name);
 
-            snprintf_s_i(name, 20, "file_body_%d", (i++) % 100u);
+            snprintf_s_i(name, MAX_FILE_NAME_LEN, "file_body_%d", (i++) % 100u);
             cJSON* file = cJSON_CreateString(list->enc_model);
             if (file == NULL) {
                 ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-                OVSA_DBG(DBG_E, "Error: Could not create string file\n");
+                OVSA_DBG(DBG_E, "OVSA: Error could not create string file\n");
                 goto end;
             }
             cJSON_AddItemToObject(enc_file, name, file);
@@ -299,29 +309,30 @@ ovsa_status_t ovsa_json_create_protected_model(const ovsa_protected_model_sig_t*
         }
     }
 
-    str_print = cJSON_Print(protected_model);
+    str_print = cJSON_Print(controlled_access_model);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
-        OVSA_DBG(DBG_E, "Error: Print json to buffer failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error print json to buffer failed %d\n", ret);
         goto end;
     }
     size_t str_len = 0;
     ret            = ovsa_get_string_length(str_print, &str_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
-    memcpy_s(outputBuf, str_len, str_print, str_len);
+    memcpy_s(outputBuf, outputBuf_size, str_print, str_len);
     outputBuf[str_len] = '\0';
 
 end:
-    cJSON_Delete(protected_model);
+    cJSON_Delete(controlled_access_model);
     ovsa_safe_free(&str_print);
     OVSA_DBG(DBG_D, "%s exit\n", __func__);
     return ret;
 }
 
-ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, char* outputBuf) {
+ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, size_t outputBuf_size,
+                                             char* outputBuf) {
     ovsa_status_t ret = OVSA_OK;
     cJSON* tcb_sig    = NULL;
     char* str_print   = NULL;
@@ -330,7 +341,7 @@ ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, char* o
 
     if (tsig == NULL || outputBuf == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
-        OVSA_DBG(DBG_E, "Error: Input parameters invalid %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input parameters invalid %d\n", ret);
         goto end;
     }
 
@@ -338,64 +349,64 @@ ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, char* o
     tcb_sig = cJSON_CreateObject();
     if (tcb_sig == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Create license config Json object failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create license config Json object failed %d\n", ret);
         goto end;
     }
 
     /* Populate the json structure */
     if (cJSON_AddStringToObject(tcb_sig, "name", tsig->tcbinfo.tcb_name) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add name to tcb info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add name to tcb info failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(tcb_sig, "version", tsig->tcbinfo.tcb_version) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add version to tcb info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add version to tcb info failed %d\n", ret);
         goto end;
     }
 #ifndef DISABLE_TPM2_HWQUOTE
     if (cJSON_AddStringToObject(tcb_sig, "HW_Quote_PCR", tsig->tcbinfo.hw_quote) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add HW_quote to tcb info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_quote to tcb info failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(tcb_sig, "HW_AK_Pub_Key", tsig->tcbinfo.hw_pub_key) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add HW_pub_key to tcb info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_pub_key to tcb info failed %d\n", ret);
         goto end;
     }
 #endif
     if (cJSON_AddStringToObject(tcb_sig, "SW_Quote_PCR", tsig->tcbinfo.sw_quote) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add SW_quote to tcb info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_quote to tcb info failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(tcb_sig, "SW_AK_Pub_key", tsig->tcbinfo.sw_pub_key) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add SW_pub_key to tcb info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_pub_key to tcb info failed %d\n", ret);
         goto end;
     }
 
     if (cJSON_AddStringToObject(tcb_sig, "isv_certificate", tsig->tcbinfo.isv_certificate) ==
         NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add isv_certificate to tcb info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add isv_certificate to tcb info failed %d\n", ret);
         goto end;
     }
 
     str_print = cJSON_Print(tcb_sig);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
-        OVSA_DBG(DBG_E, "Error: Print json to buffer failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error print json to buffer failed %d\n", ret);
         goto end;
     }
     size_t str_len = 0;
     ret            = ovsa_get_string_length(str_print, &str_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
-    memcpy_s(outputBuf, str_len, str_print, str_len);
+    memcpy_s(outputBuf, outputBuf_size, str_print, str_len);
     outputBuf[str_len] = '\0';
 
 end:
@@ -406,7 +417,7 @@ end:
 }
 
 ovsa_status_t ovsa_json_create_master_license(const ovsa_master_license_sig_t* master_lic_sig,
-                                              char* outputBuf) {
+                                              size_t outputBuf_size, char* outputBuf) {
     ovsa_status_t ret     = OVSA_OK;
     cJSON* master_license = NULL;
     char* str_print       = NULL;
@@ -415,7 +426,7 @@ ovsa_status_t ovsa_json_create_master_license(const ovsa_master_license_sig_t* m
 
     if (outputBuf == NULL || master_lic_sig == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
-        OVSA_DBG(DBG_E, "Error: Input parameters invalid %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input parameters invalid %d\n", ret);
         goto end;
     }
 
@@ -423,7 +434,7 @@ ovsa_status_t ovsa_json_create_master_license(const ovsa_master_license_sig_t* m
     master_license = cJSON_CreateObject();
     if (master_license == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Create master license Json object failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create master license Json object failed %d\n", ret);
         goto end;
     }
 
@@ -431,54 +442,54 @@ ovsa_status_t ovsa_json_create_master_license(const ovsa_master_license_sig_t* m
     if (cJSON_AddStringToObject(master_license, "creation_date",
                                 master_lic_sig->master_lic.creation_date) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add creation_date to master license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add creation_date to master license failed %d\n", ret);
         goto end;
     }
 
     if (cJSON_AddStringToObject(master_license, "model_hash",
                                 master_lic_sig->master_lic.model_hash) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add model_hash to master license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add model_hash to master license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(master_license, "license_guid",
                                 master_lic_sig->master_lic.license_guid) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add license_guid to master license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add license_guid to master license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(master_license, "model_guid",
                                 master_lic_sig->master_lic.model_guid) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add model_guid to master license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add model_guid to master license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(master_license, "encryption_key",
                                 master_lic_sig->master_lic.encryption_key) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add encryption_key to master license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add encryption_key to master license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(master_license, "isv_certificate",
                                 master_lic_sig->master_lic.isv_certificate) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add isv_certificate to master license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add isv_certificate to master license failed %d\n", ret);
         goto end;
     }
 
     str_print = cJSON_Print(master_license);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
-        OVSA_DBG(DBG_E, "Error: Print json to buffer failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error print json to buffer failed %d\n", ret);
         goto end;
     }
     size_t str_len = 0;
     ret            = ovsa_get_string_length(str_print, &str_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
-    memcpy_s(outputBuf, str_len, str_print, str_len);
+    memcpy_s(outputBuf, outputBuf_size, str_print, str_len);
     outputBuf[str_len] = '\0';
 
 end:
@@ -489,7 +500,7 @@ end:
 }
 
 ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_t* cust_lic_sig,
-                                                char* outputBuf) {
+                                                size_t outputbuf_size, char* outputBuf) {
     ovsa_status_t ret       = OVSA_OK;
     cJSON* customer_license = NULL;
     char* str_print         = NULL;
@@ -498,7 +509,7 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
 
     if (cust_lic_sig == NULL || outputBuf == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
-        OVSA_DBG(DBG_E, "Error: Input parameters invalid %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input parameters invalid %d\n", ret);
         goto end;
     }
 
@@ -506,7 +517,7 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
     customer_license = cJSON_CreateObject();
     if (customer_license == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Create customer license Json object failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create customer license Json object failed %d\n", ret);
         goto end;
     }
 
@@ -514,58 +525,58 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
     if (cJSON_AddStringToObject(customer_license, "creation_date",
                                 cust_lic_sig->customer_lic.creation_date) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add creation_date to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add creation_date to customer license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(customer_license, "isv_certificate",
                                 cust_lic_sig->customer_lic.isv_certificate) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add isv_certificate to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add isv_certificate to customer license failed %d\n", ret);
         goto end;
     }
 
     if (cJSON_AddStringToObject(customer_license, "model_hash",
                                 cust_lic_sig->customer_lic.model_hash) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add model_hash to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add model_hash to customer license failed %d\n", ret);
         goto end;
     }
 
     if (cJSON_AddStringToObject(customer_license, "license_name",
                                 cust_lic_sig->customer_lic.license_name) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add license_name to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add license_name to customer license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(customer_license, "license_version",
                                 cust_lic_sig->customer_lic.license_version) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add license_version to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add license_version to customer license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(customer_license, "license_guid",
                                 cust_lic_sig->customer_lic.license_guid) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add license_guid to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add license_guid to customer license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(customer_license, "model_guid",
                                 cust_lic_sig->customer_lic.model_guid) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add model_guid to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add model_guid to customer license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(customer_license, "encryption_key",
                                 cust_lic_sig->customer_lic.encryption_key) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add encryption_key to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add encryption_key to customer license failed %d\n", ret);
         goto end;
     }
 
     cJSON* srvurl = cJSON_CreateObject();
     if (srvurl == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Could not create object srvurl\n");
+        OVSA_DBG(DBG_E, "OVSA: Error could not create object srvurl\n");
         goto end;
     }
     cJSON_AddItemToObject(customer_license, "license_serv_url", srvurl);
@@ -573,13 +584,14 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
     ovsa_license_serv_url_list_t* list = cust_lic_sig->customer_lic.license_url_list;
     if (list != NULL) {
         int i = 0;
-        char fname[10];
+        char fname[MAX_FILE_NAME_LEN];
+        memset_s(fname, sizeof(fname), 0);
         while (list->license_serv_url != NULL) {
-            snprintf_s_i(fname, 10, "url_%d", (i++) % 100u);
+            snprintf_s_i(fname, MAX_FILE_NAME_LEN, "url_%d", (i++) % 100u);
             cJSON* url = cJSON_CreateString(list->license_serv_url);
             if (url == NULL) {
                 ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-                OVSA_DBG(DBG_E, "Error: Could not create string url\n");
+                OVSA_DBG(DBG_E, "OVSA: Error could not create string url\n");
                 goto end;
             }
             OVSA_DBG(DBG_D, "%s\n", fname);
@@ -596,26 +608,26 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
         ovsa_json_get_license_type_string(cust_lic_sig->customer_lic.license_type);
     if (cJSON_AddStringToObject(customer_license, "license_type", lic_type) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add license_type to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add license_type to customer license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddNumberToObject(customer_license, "usage_count",
                                 cust_lic_sig->customer_lic.usage_count) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add usage_count to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add usage_count to customer license failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddNumberToObject(customer_license, "time_limit",
                                 cust_lic_sig->customer_lic.time_limit) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add time_limit to customer license failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add time_limit to customer license failed %d\n", ret);
         goto end;
     }
 
     cJSON* tcb_list = cJSON_CreateObject();
     if (tcb_list == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Could not create object tcb_list\n");
+        OVSA_DBG(DBG_E, "OVSA: Error could not create object tcb_list\n");
         goto end;
     }
     cJSON_AddItemToObject(customer_license, "tcb_signature", tcb_list);
@@ -623,13 +635,14 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
     ovsa_tcb_sig_list_t* tlist = cust_lic_sig->customer_lic.tcb_signatures;
     if (tlist != NULL) {
         int i = 0;
-        char fname[10];
+        char fname[MAX_FILE_NAME_LEN];
+        memset_s(fname, sizeof(fname), 0);
         while (tlist->tcb_signature != NULL) {
-            snprintf_s_i(fname, 10, "sig_%d", (i++) % 100u);
+            snprintf_s_i(fname, MAX_FILE_NAME_LEN, "sig_%d", (i++) % 100u);
             cJSON* sig = cJSON_CreateString(tlist->tcb_signature);
             if (sig == NULL) {
                 ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-                OVSA_DBG(DBG_E, "Error: Could  not create string sig %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error could  not create string sig %d\n", ret);
                 goto end;
             }
             OVSA_DBG(DBG_D, "%s\n", fname);
@@ -644,16 +657,16 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
     str_print = cJSON_Print(customer_license);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
-        OVSA_DBG(DBG_E, "Error: Print json to buffer failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error print json to buffer failed %d\n", ret);
         goto end;
     }
     size_t str_len = 0;
     ret            = ovsa_get_string_length(str_print, &str_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
-    memcpy_s(outputBuf, str_len, str_print, str_len);
+    memcpy_s(outputBuf, outputbuf_size, str_print, str_len);
     outputBuf[str_len] = '\0';
 
 end:
@@ -675,7 +688,7 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
     cJSON* version         = NULL;
     cJSON* parse_json      = NULL;
     int i                  = 0;
-    char fname[10];
+    char fname[MAX_FILE_NAME_LEN];
     ovsa_license_serv_url_list_t* head = NULL;
     ovsa_license_serv_url_list_t* cur  = NULL;
     ovsa_license_serv_url_list_t* tail = NULL;
@@ -683,22 +696,22 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
 
     if (inputBuf == NULL || lic_conf_sig == NULL) {
-        OVSA_DBG(DBG_E, "Error: Input is null %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input is null %d\n", ret);
         ret = OVSA_JSON_INVALID_INPUT;
         goto end;
     }
-
+    memset_s(fname, sizeof(fname), 0);
     parse_json = cJSON_Parse(inputBuf);
     if (parse_json == NULL) {
         ret = OVSA_JSON_PARSE_FAIL;
-        OVSA_DBG(DBG_E, "Error: could not parse %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not parse %d\n", ret);
         goto end;
     }
 
     name = cJSON_GetObjectItemCaseSensitive(parse_json, "name");
     if (cJSON_IsString(name) && (name->valuestring != NULL)) {
-        memcpy_s(lic_conf_sig->lic_config.license_name, strnlen_s(name->valuestring, MAX_NAME_SIZE),
-                 name->valuestring, strnlen_s(name->valuestring, MAX_NAME_SIZE));
+        memcpy_s(lic_conf_sig->lic_config.license_name, MAX_NAME_SIZE, name->valuestring,
+                 strnlen_s(name->valuestring, MAX_NAME_SIZE));
         OVSA_DBG(DBG_D, "name: %s\n", name->valuestring);
     }
 
@@ -715,12 +728,12 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
         size_t str_len = 0;
         ret            = ovsa_get_string_length(isv_certificate->valuestring, &str_len);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n", ret);
             goto end;
         }
         ret = ovsa_safe_malloc(str_len + 1, &lic_conf_sig->lic_config.isv_certificate);
         if (ret < OVSA_OK || lic_conf_sig->lic_config.isv_certificate == NULL) {
-            OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
             goto end;
         }
         memcpy_s(lic_conf_sig->lic_config.isv_certificate, str_len, isv_certificate->valuestring,
@@ -734,13 +747,13 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
         cJSON* device = svrurl->child;
         i             = 0;
         while (device) {
-            snprintf_s_i(fname, 10, "url_%d", (i++) % 100u);
+            snprintf_s_i(fname, MAX_FILE_NAME_LEN, "url_%d", (i++) % 100u);
             cJSON* url = cJSON_GetObjectItemCaseSensitive(svrurl, fname);
             if (head == NULL) {
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_license_serv_url_list_t), (char**)&head);
                 if (ret < OVSA_OK || head == NULL) {
-                    OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
                 head->next = NULL;
@@ -749,7 +762,7 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_license_serv_url_list_t), (char**)&cur);
                 if (ret < OVSA_OK || cur == NULL) {
-                    OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
                 cur->next  = NULL;
@@ -758,8 +771,8 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
             }
             if (cJSON_IsString(url) && (url->valuestring != NULL)) {
                 memset_s(tail->license_serv_url, MAX_URL_SIZE, 0);
-                memcpy_s(tail->license_serv_url, strnlen_s(url->valuestring, MAX_URL_SIZE),
-                         url->valuestring, strnlen_s(url->valuestring, MAX_URL_SIZE));
+                memcpy_s(tail->license_serv_url, MAX_URL_SIZE, url->valuestring,
+                         strnlen_s(url->valuestring, MAX_URL_SIZE));
                 OVSA_DBG(DBG_D, "%s\n", fname);
             }
             device = device->next;
@@ -781,8 +794,7 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
 
     version = cJSON_GetObjectItemCaseSensitive(parse_json, "license_version");
     if (cJSON_IsString(version) && (version->valuestring != NULL)) {
-        memcpy_s(lic_conf_sig->lic_config.license_version,
-                 strnlen_s(version->valuestring, MAX_VERSION_SIZE), version->valuestring,
+        memcpy_s(lic_conf_sig->lic_config.license_version, MAX_VERSION_SIZE, version->valuestring,
                  strnlen_s(version->valuestring, MAX_VERSION_SIZE));
         OVSA_DBG(DBG_D, "version: %s\n", version->valuestring);
     }
@@ -794,8 +806,8 @@ end:
 }
 
 #ifdef OVSA_RUNTIME
-ovsa_status_t ovsa_json_extract_protected_model(const char* inputBuf,
-                                                ovsa_protected_model_sig_t* prot_model_sig) {
+ovsa_status_t ovsa_json_extract_controlled_access_model(
+    const char* inputBuf, ovsa_controlled_access_model_sig_t* control_access_model_sig) {
     ovsa_status_t ret       = OVSA_OK;
     cJSON* name             = NULL;
     cJSON* description      = NULL;
@@ -810,52 +822,48 @@ ovsa_status_t ovsa_json_extract_protected_model(const char* inputBuf,
     ovsa_enc_models_t* tail = NULL;
     char* tail_enc_model    = NULL;
     int i                   = 0;
-    char fname[20];
+    char fname[MAX_FILE_NAME_LEN];
 
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
 
-    if (inputBuf == NULL || prot_model_sig == NULL) {
-        OVSA_DBG(DBG_E, "Error: Input is null %d\n", ret);
+    if (inputBuf == NULL || control_access_model_sig == NULL) {
+        OVSA_DBG(DBG_E, "OVSA: Error input is null %d\n", ret);
         ret = OVSA_JSON_INVALID_INPUT;
         goto end;
     }
-
+    memset_s(fname, sizeof(fname), 0);
     parse_json = cJSON_Parse(inputBuf);
     if (parse_json == NULL) {
         ret = OVSA_JSON_PARSE_FAIL;
-        OVSA_DBG(DBG_E, "Error: could not parse %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not parse %d\n", ret);
         goto end;
     }
 
     name = cJSON_GetObjectItemCaseSensitive(parse_json, "name");
     if (cJSON_IsString(name) && (name->valuestring != NULL)) {
-        memcpy_s(prot_model_sig->protect_model.model_name,
-                 strnlen_s(name->valuestring, MAX_NAME_SIZE), name->valuestring,
-                 strnlen_s(name->valuestring, MAX_NAME_SIZE));
+        memcpy_s(control_access_model_sig->controlled_access_model.model_name, MAX_NAME_SIZE,
+                 name->valuestring, strnlen_s(name->valuestring, MAX_NAME_SIZE));
         OVSA_DBG(DBG_D, "name %s\n", name->valuestring);
     }
 
     description = cJSON_GetObjectItemCaseSensitive(parse_json, "description");
     if (cJSON_IsString(description) && (description->valuestring != NULL)) {
-        memcpy_s(prot_model_sig->protect_model.description,
-                 strnlen_s(description->valuestring, MAX_NAME_SIZE), description->valuestring,
-                 strnlen_s(description->valuestring, MAX_NAME_SIZE));
+        memcpy_s(control_access_model_sig->controlled_access_model.description, MAX_NAME_SIZE,
+                 description->valuestring, strnlen_s(description->valuestring, MAX_NAME_SIZE));
         OVSA_DBG(DBG_D, "description %s\n", description->valuestring);
     }
 
     version = cJSON_GetObjectItemCaseSensitive(parse_json, "version");
     if (cJSON_IsString(version) && (version->valuestring != NULL)) {
-        memcpy_s(prot_model_sig->protect_model.version,
-                 strnlen_s(version->valuestring, MAX_VERSION_SIZE), version->valuestring,
-                 strnlen_s(version->valuestring, MAX_VERSION_SIZE));
+        memcpy_s(control_access_model_sig->controlled_access_model.version, MAX_VERSION_SIZE,
+                 version->valuestring, strnlen_s(version->valuestring, MAX_VERSION_SIZE));
         OVSA_DBG(DBG_D, "version %s\n", version->valuestring);
     }
 
     model_guid = cJSON_GetObjectItemCaseSensitive(parse_json, "model_guid");
     if (cJSON_IsString(model_guid) && (model_guid->valuestring != NULL)) {
-        memcpy_s(prot_model_sig->protect_model.model_guid,
-                 strnlen_s(model_guid->valuestring, GUID_SIZE), model_guid->valuestring,
-                 strnlen_s(model_guid->valuestring, GUID_SIZE));
+        memcpy_s(control_access_model_sig->controlled_access_model.model_guid, GUID_SIZE,
+                 model_guid->valuestring, strnlen_s(model_guid->valuestring, GUID_SIZE));
         OVSA_DBG(DBG_D, "model_guid %s\n", model_guid->valuestring);
     }
 
@@ -865,33 +873,35 @@ ovsa_status_t ovsa_json_extract_protected_model(const char* inputBuf,
         size_t str_len = 0;
         ret            = ovsa_get_string_length(isv_certificate->valuestring, &str_len);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n", ret);
             goto end;
         }
-        ret = ovsa_safe_malloc(str_len + 1, &prot_model_sig->protect_model.isv_certificate);
-        if (ret < OVSA_OK || prot_model_sig->protect_model.isv_certificate == NULL) {
-            OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+        ret = ovsa_safe_malloc(str_len + 1,
+                               &control_access_model_sig->controlled_access_model.isv_certificate);
+        if (ret < OVSA_OK ||
+            control_access_model_sig->controlled_access_model.isv_certificate == NULL) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
             goto end;
         }
-        memcpy_s(prot_model_sig->protect_model.isv_certificate, str_len,
+        memcpy_s(control_access_model_sig->controlled_access_model.isv_certificate, str_len,
                  isv_certificate->valuestring, str_len);
-        prot_model_sig->protect_model.isv_certificate[str_len] = '\0';
+        control_access_model_sig->controlled_access_model.isv_certificate[str_len] = '\0';
         OVSA_DBG(DBG_D, "isv_certificate %s\n", isv_certificate->valuestring);
     }
 
     signature = cJSON_GetObjectItemCaseSensitive(parse_json, "signature");
     if (cJSON_IsString(signature) && (signature->valuestring != NULL)) {
-        memcpy_s(prot_model_sig->signature, strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE),
-                 signature->valuestring, strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE));
+        memcpy_s(control_access_model_sig->signature, MAX_SIGNATURE_SIZE, signature->valuestring,
+                 strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE));
         OVSA_DBG(DBG_D, "signature %s\n", signature->valuestring);
     }
 
     cJSON* model_files = cJSON_GetObjectItemCaseSensitive(parse_json, "files");
     cJSON_ArrayForEach(file, model_files) {
-        snprintf_s_i(fname, 20, "file_name_%d", (i) % 100u);
+        snprintf_s_i(fname, MAX_FILE_NAME_LEN, "file_name_%d", (i) % 100u);
         cJSON* file_name = cJSON_GetObjectItemCaseSensitive(file, fname);
 
-        snprintf_s_i(fname, 20, "file_body_%d", (i++) % 100u);
+        snprintf_s_i(fname, MAX_FILE_NAME_LEN, "file_body_%d", (i++) % 100u);
         cJSON* file_body = cJSON_GetObjectItemCaseSensitive(file, fname);
 
         if (cJSON_IsString(file_body) && (file_body->valuestring != NULL) &&
@@ -900,7 +910,7 @@ ovsa_status_t ovsa_json_extract_protected_model(const char* inputBuf,
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_enc_models_t), (char**)&head);
                 if (ret < OVSA_OK || head == NULL) {
-                    OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
                 head->enc_model = NULL;
@@ -910,7 +920,7 @@ ovsa_status_t ovsa_json_extract_protected_model(const char* inputBuf,
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_enc_models_t), (char**)&cur);
                 if (ret < OVSA_OK || cur == NULL) {
-                    OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
                 cur->enc_model = NULL;
@@ -922,23 +932,23 @@ ovsa_status_t ovsa_json_extract_protected_model(const char* inputBuf,
             size_t str_len = 0;
             ret            = ovsa_get_string_length(file_body->valuestring, &str_len);
             if (ret < OVSA_OK) {
-                OVSA_DBG(DBG_E, "Error: Could not get length of file_body string %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error could not get length of file_body string %d\n", ret);
                 goto end;
             }
             ret             = ovsa_safe_malloc(str_len + 1, &tail_enc_model);
             tail->enc_model = tail_enc_model;
             if (ret < OVSA_OK || tail->enc_model == NULL) {
-                OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                 goto end;
             }
             memcpy_s(tail->enc_model, str_len, file_body->valuestring, str_len);
             tail->enc_model[str_len] = '\0';
-            memcpy_s(tail->file_name, strnlen_s(file_name->valuestring, MAX_NAME_SIZE),
-                     file_name->valuestring, strnlen_s(file_name->valuestring, MAX_NAME_SIZE));
+            memcpy_s(tail->file_name, MAX_NAME_SIZE, file_name->valuestring,
+                     strnlen_s(file_name->valuestring, MAX_NAME_SIZE));
             OVSA_DBG(DBG_D, "%s\n", file_name->valuestring);
         }
     }
-    prot_model_sig->protect_model.enc_model = head;
+    control_access_model_sig->controlled_access_model.enc_model = head;
 
 end:
     cJSON_Delete(parse_json);
@@ -963,7 +973,7 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
 
     if (inputBuf == NULL || tsig == NULL) {
-        OVSA_DBG(DBG_E, "Error: Input is null %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input is null %d\n", ret);
         ret = OVSA_JSON_INVALID_INPUT;
         goto end;
     }
@@ -971,21 +981,21 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
     parse_json = cJSON_Parse(inputBuf);
     if (parse_json == NULL) {
         ret = OVSA_JSON_PARSE_FAIL;
-        OVSA_DBG(DBG_E, "Error: could not parse %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not parse %d\n", ret);
         goto end;
     }
 
     name = cJSON_GetObjectItemCaseSensitive(parse_json, "name");
     if (cJSON_IsString(name) && (name->valuestring != NULL)) {
-        memcpy_s(tsig->tcbinfo.tcb_name, strnlen_s(name->valuestring, MAX_NAME_SIZE),
-                 name->valuestring, strnlen_s(name->valuestring, MAX_NAME_SIZE));
+        memcpy_s(tsig->tcbinfo.tcb_name, MAX_NAME_SIZE, name->valuestring,
+                 strnlen_s(name->valuestring, MAX_NAME_SIZE));
         OVSA_DBG(DBG_D, "name %s\n", name->valuestring);
     }
 
     version = cJSON_GetObjectItemCaseSensitive(parse_json, "version");
     if (cJSON_IsString(version) && (version->valuestring != NULL)) {
-        memcpy_s(tsig->tcbinfo.tcb_version, strnlen_s(version->valuestring, MAX_VERSION_SIZE),
-                 version->valuestring, strnlen_s(version->valuestring, MAX_VERSION_SIZE));
+        memcpy_s(tsig->tcbinfo.tcb_version, MAX_VERSION_SIZE, version->valuestring,
+                 strnlen_s(version->valuestring, MAX_VERSION_SIZE));
         OVSA_DBG(DBG_D, "version %s\n", version->valuestring);
     }
 #ifndef DISABLE_TPM2_HWQUOTE
@@ -994,7 +1004,7 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
         size_t str_len = 0;
         ret            = ovsa_get_string_length(hw_quote->valuestring, &str_len);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Could not get length of HW_quote string %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of HW_quote string %d\n", ret);
             goto end;
         }
         memcpy_s(tsig->tcbinfo.hw_quote, TPM2_QUOTE_SIZE, hw_quote->valuestring, str_len);
@@ -1002,8 +1012,8 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
     }
     hw_pub_key = cJSON_GetObjectItemCaseSensitive(parse_json, "HW_AK_Pub_Key");
     if (cJSON_IsString(hw_pub_key) && (hw_pub_key->valuestring != NULL)) {
-        memcpy_s(tsig->tcbinfo.hw_pub_key, strnlen_s(hw_pub_key->valuestring, TPM2_PUBKEY_SIZE),
-                 hw_pub_key->valuestring, strnlen_s(hw_pub_key->valuestring, TPM2_PUBKEY_SIZE));
+        memcpy_s(tsig->tcbinfo.hw_pub_key, TPM2_PUBKEY_SIZE, hw_pub_key->valuestring,
+                 strnlen_s(hw_pub_key->valuestring, TPM2_PUBKEY_SIZE));
         OVSA_DBG(DBG_D, "hw_pub_key %s\n", hw_pub_key->valuestring);
     }
 #endif
@@ -1012,7 +1022,7 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
         size_t str_len = 0;
         ret            = ovsa_get_string_length(sw_quote->valuestring, &str_len);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Could not get length of SW_quote string %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of SW_quote string %d\n", ret);
             goto end;
         }
         memcpy_s(tsig->tcbinfo.sw_quote, TPM2_QUOTE_SIZE, sw_quote->valuestring, str_len);
@@ -1020,8 +1030,8 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
     }
     sw_pub_key = cJSON_GetObjectItemCaseSensitive(parse_json, "SW_AK_Pub_key");
     if (cJSON_IsString(sw_pub_key) && (sw_pub_key->valuestring != NULL)) {
-        memcpy_s(tsig->tcbinfo.sw_pub_key, strnlen_s(sw_pub_key->valuestring, TPM2_PUBKEY_SIZE),
-                 sw_pub_key->valuestring, strnlen_s(sw_pub_key->valuestring, TPM2_PUBKEY_SIZE));
+        memcpy_s(tsig->tcbinfo.sw_pub_key, TPM2_PUBKEY_SIZE, sw_pub_key->valuestring,
+                 strnlen_s(sw_pub_key->valuestring, TPM2_PUBKEY_SIZE));
         OVSA_DBG(DBG_D, "SW_pub_key %s\n", sw_pub_key->valuestring);
     }
 
@@ -1030,13 +1040,13 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
         size_t str_len = 0;
         ret            = ovsa_get_string_length(isv_certificate->valuestring, &str_len);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n", ret);
             goto end;
         }
         /* Memory allocated and this needs to be freed by consumer */
         ret = ovsa_safe_malloc(str_len + 1, &tsig->tcbinfo.isv_certificate);
         if (ret < OVSA_OK || tsig->tcbinfo.isv_certificate == NULL) {
-            OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
             goto end;
         }
         memcpy_s(tsig->tcbinfo.isv_certificate, str_len, isv_certificate->valuestring, str_len);
@@ -1046,8 +1056,8 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
 
     signature = cJSON_GetObjectItemCaseSensitive(parse_json, "signature");
     if (cJSON_IsString(signature) && (signature->valuestring != NULL)) {
-        memcpy_s(tsig->signature, strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE),
-                 signature->valuestring, strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE));
+        memcpy_s(tsig->signature, MAX_SIGNATURE_SIZE, signature->valuestring,
+                 strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE));
         OVSA_DBG(DBG_D, "signature %s\n", signature->valuestring);
     }
 
@@ -1073,7 +1083,7 @@ ovsa_status_t ovsa_json_extract_master_license(const char* inputBuf,
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
 
     if (inputBuf == NULL || master_lic_sig == NULL) {
-        OVSA_DBG(DBG_E, "Error: Input is null %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input is null %d\n", ret);
         ret = OVSA_JSON_INVALID_INPUT;
         goto end;
     }
@@ -1081,15 +1091,14 @@ ovsa_status_t ovsa_json_extract_master_license(const char* inputBuf,
     parse_json = cJSON_Parse(inputBuf);
     if (parse_json == NULL) {
         ret = OVSA_JSON_PARSE_FAIL;
-        OVSA_DBG(DBG_E, "Error: could not parse %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not parse %d\n", ret);
         goto end;
     }
 
     creation_date = cJSON_GetObjectItemCaseSensitive(parse_json, "creation_date");
     if (cJSON_IsString(creation_date) && (creation_date->valuestring != NULL)) {
-        memcpy_s(master_lic_sig->master_lic.creation_date,
-                 strnlen_s(creation_date->valuestring, MAX_NAME_SIZE), creation_date->valuestring,
-                 strnlen_s(creation_date->valuestring, MAX_NAME_SIZE));
+        memcpy_s(master_lic_sig->master_lic.creation_date, MAX_NAME_SIZE,
+                 creation_date->valuestring, strnlen_s(creation_date->valuestring, MAX_NAME_SIZE));
         OVSA_DBG(DBG_D, "creation_date %s\n", creation_date->valuestring);
     }
 
@@ -1098,13 +1107,13 @@ ovsa_status_t ovsa_json_extract_master_license(const char* inputBuf,
         size_t str_len = 0;
         ret            = ovsa_get_string_length(isv_certificate->valuestring, &str_len);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n", ret);
             goto end;
         }
         /* Memory allocated and this needs to be freed by consumer */
         ret = ovsa_safe_malloc(str_len + 1, &master_lic_sig->master_lic.isv_certificate);
         if (ret < OVSA_OK || master_lic_sig->master_lic.isv_certificate == NULL) {
-            OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
             goto end;
         }
         memcpy_s(master_lic_sig->master_lic.isv_certificate, str_len, isv_certificate->valuestring,
@@ -1114,41 +1123,37 @@ ovsa_status_t ovsa_json_extract_master_license(const char* inputBuf,
 
     model_hash = cJSON_GetObjectItemCaseSensitive(parse_json, "model_hash");
     if (cJSON_IsString(model_hash) && (model_hash->valuestring != NULL)) {
-        memcpy_s(master_lic_sig->master_lic.model_hash,
-                 strnlen_s(model_hash->valuestring, HASH_SIZE), model_hash->valuestring,
+        memcpy_s(master_lic_sig->master_lic.model_hash, HASH_SIZE, model_hash->valuestring,
                  strnlen_s(model_hash->valuestring, HASH_SIZE));
         OVSA_DBG(DBG_D, "model_hash %s\n", model_hash->valuestring);
     }
 
     signature = cJSON_GetObjectItemCaseSensitive(parse_json, "signature");
     if (cJSON_IsString(signature) && (signature->valuestring != NULL)) {
-        memcpy_s(master_lic_sig->signature, strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE),
-                 signature->valuestring, strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE));
+        memcpy_s(master_lic_sig->signature, MAX_SIGNATURE_SIZE, signature->valuestring,
+                 strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE));
         OVSA_DBG(DBG_D, "signature %s\n", master_lic_sig->signature);
     }
 
     license_guid = cJSON_GetObjectItemCaseSensitive(parse_json, "license_guid");
     if (cJSON_IsString(license_guid) && (license_guid->valuestring != NULL)) {
-        memcpy_s(master_lic_sig->master_lic.license_guid,
-                 strnlen_s(license_guid->valuestring, GUID_SIZE), license_guid->valuestring,
+        memcpy_s(master_lic_sig->master_lic.license_guid, GUID_SIZE, license_guid->valuestring,
                  strnlen_s(license_guid->valuestring, GUID_SIZE));
         OVSA_DBG(DBG_D, "license_guid %s\n", license_guid->valuestring);
     }
 
     model_guid = cJSON_GetObjectItemCaseSensitive(parse_json, "model_guid");
     if (cJSON_IsString(model_guid) && (model_guid->valuestring != NULL)) {
-        memcpy_s(master_lic_sig->master_lic.model_guid,
-                 strnlen_s(model_guid->valuestring, GUID_SIZE), model_guid->valuestring,
+        memcpy_s(master_lic_sig->master_lic.model_guid, GUID_SIZE, model_guid->valuestring,
                  strnlen_s(model_guid->valuestring, GUID_SIZE));
         OVSA_DBG(DBG_D, "model_guid %s\n", model_guid->valuestring);
     }
 
     encryption_key = cJSON_GetObjectItemCaseSensitive(parse_json, "encryption_key");
     if (cJSON_IsString(encryption_key) && (encryption_key->valuestring != NULL)) {
-        memcpy_s(master_lic_sig->master_lic.encryption_key,
-                 strnlen_s(encryption_key->valuestring, MAX_EKEY_SIZE), encryption_key->valuestring,
+        memcpy_s(master_lic_sig->master_lic.encryption_key, MAX_EKEY_SIZE,
+                 encryption_key->valuestring,
                  strnlen_s(encryption_key->valuestring, MAX_EKEY_SIZE));
-        OVSA_DBG(DBG_D, "encryption_key %s\n", encryption_key->valuestring);
     }
 
 end:
@@ -1166,13 +1171,13 @@ ovsa_status_t ovsa_json_extract_element(const char* inputBuf, const char* keyNam
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
     if (inputBuf == NULL || keyName == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
-        OVSA_DBG(DBG_E, "Error: Input parameters invalid %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input parameters invalid %d\n", ret);
         goto end;
     }
     parse_json = cJSON_Parse(inputBuf);
     if (parse_json == NULL) {
         ret = OVSA_JSON_PARSE_FAIL;
-        OVSA_DBG(DBG_E, "Error: Json parse failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error Json parse failed %d\n", ret);
         goto end;
     }
     key = cJSON_GetObjectItemCaseSensitive(parse_json, keyName);
@@ -1180,13 +1185,13 @@ ovsa_status_t ovsa_json_extract_element(const char* inputBuf, const char* keyNam
         size_t str_len = 0;
         ret            = ovsa_get_string_length(key->valuestring, &str_len);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Could not get length of key string %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of key string %d\n", ret);
             goto end;
         }
         ret = ovsa_safe_malloc(str_len + 1, (char**)keyValue);
         if (ret < OVSA_OK) {
             ret = OVSA_JSON_MEMORY_ALLOC_FAIL;
-            OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
             goto end;
         }
         memcpy_s(*keyValue, str_len, key->valuestring, str_len);
@@ -1218,7 +1223,7 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
     cJSON* time_limit      = NULL;
     cJSON* parse_json      = NULL;
     int i                  = 0;
-    char fname[10];
+    char fname[MAX_FILE_NAME_LEN];
     ovsa_license_serv_url_list_t* head = NULL;
     ovsa_license_serv_url_list_t* cur  = NULL;
     ovsa_license_serv_url_list_t* tail = NULL;
@@ -1230,23 +1235,22 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
 
     if (inputBuf == NULL || cust_lic_sig == NULL) {
-        OVSA_DBG(DBG_E, "Error: Input is null %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input is null %d\n", ret);
         ret = OVSA_JSON_INVALID_INPUT;
         goto end;
     }
-
+    memset_s(fname, sizeof(fname), 0);
     parse_json = cJSON_Parse(inputBuf);
     if (parse_json == NULL) {
         ret = OVSA_JSON_PARSE_FAIL;
-        OVSA_DBG(DBG_E, "Error: could not parse %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not parse %d\n", ret);
         goto end;
     }
 
     creation_date = cJSON_GetObjectItemCaseSensitive(parse_json, "creation_date");
     if (cJSON_IsString(creation_date) && (creation_date->valuestring != NULL)) {
-        memcpy_s(cust_lic_sig->customer_lic.creation_date,
-                 strnlen_s(creation_date->valuestring, MAX_NAME_SIZE), creation_date->valuestring,
-                 strnlen_s(creation_date->valuestring, MAX_NAME_SIZE));
+        memcpy_s(cust_lic_sig->customer_lic.creation_date, MAX_NAME_SIZE,
+                 creation_date->valuestring, strnlen_s(creation_date->valuestring, MAX_NAME_SIZE));
         OVSA_DBG(DBG_D, "creation_date %s\n", creation_date->valuestring);
     }
 
@@ -1255,13 +1259,13 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
         size_t str_len = 0;
         ret            = ovsa_get_string_length(isv_certificate->valuestring, &str_len);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n", ret);
             goto end;
         }
         /* Memory allocated and this needs to be freed by consumer */
         ret = ovsa_safe_malloc(str_len + 1, &cust_lic_sig->customer_lic.isv_certificate);
         if (ret < OVSA_OK || cust_lic_sig->customer_lic.isv_certificate == NULL) {
-            OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
             goto end;
         }
         memcpy_s(cust_lic_sig->customer_lic.isv_certificate, str_len, isv_certificate->valuestring,
@@ -1272,57 +1276,51 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
 
     model_hash = cJSON_GetObjectItemCaseSensitive(parse_json, "model_hash");
     if (cJSON_IsString(model_hash) && (model_hash->valuestring != NULL)) {
-        memcpy_s(cust_lic_sig->customer_lic.model_hash,
-                 strnlen_s(model_hash->valuestring, HASH_SIZE), model_hash->valuestring,
+        memcpy_s(cust_lic_sig->customer_lic.model_hash, HASH_SIZE, model_hash->valuestring,
                  strnlen_s(model_hash->valuestring, HASH_SIZE));
         OVSA_DBG(DBG_D, "model_hash %s\n", model_hash->valuestring);
     }
 
     signature = cJSON_GetObjectItemCaseSensitive(parse_json, "signature");
     if (cJSON_IsString(signature) && (signature->valuestring != NULL)) {
-        memcpy_s(cust_lic_sig->signature, strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE),
-                 signature->valuestring, strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE));
+        memcpy_s(cust_lic_sig->signature, MAX_SIGNATURE_SIZE, signature->valuestring,
+                 strnlen_s(signature->valuestring, MAX_SIGNATURE_SIZE));
         OVSA_DBG(DBG_D, "signature %s\n", cust_lic_sig->signature);
     }
 
     name = cJSON_GetObjectItemCaseSensitive(parse_json, "license_name");
     if (cJSON_IsString(name) && (name->valuestring != NULL)) {
-        memcpy_s(cust_lic_sig->customer_lic.license_name,
-                 strnlen_s(name->valuestring, MAX_NAME_SIZE), name->valuestring,
+        memcpy_s(cust_lic_sig->customer_lic.license_name, MAX_NAME_SIZE, name->valuestring,
                  strnlen_s(name->valuestring, MAX_NAME_SIZE));
         OVSA_DBG(DBG_D, "name %s\n", name->valuestring);
     }
 
     version = cJSON_GetObjectItemCaseSensitive(parse_json, "license_version");
     if (cJSON_IsString(version) && (version->valuestring != NULL)) {
-        memcpy_s(cust_lic_sig->customer_lic.license_version,
-                 strnlen_s(version->valuestring, MAX_VERSION_SIZE), version->valuestring,
+        memcpy_s(cust_lic_sig->customer_lic.license_version, MAX_VERSION_SIZE, version->valuestring,
                  strnlen_s(version->valuestring, MAX_VERSION_SIZE));
         OVSA_DBG(DBG_D, "version %s\n", version->valuestring);
     }
 
     license_guid = cJSON_GetObjectItemCaseSensitive(parse_json, "license_guid");
     if (cJSON_IsString(license_guid) && (license_guid->valuestring != NULL)) {
-        memcpy_s(cust_lic_sig->customer_lic.license_guid,
-                 strnlen_s(license_guid->valuestring, GUID_SIZE), license_guid->valuestring,
+        memcpy_s(cust_lic_sig->customer_lic.license_guid, GUID_SIZE, license_guid->valuestring,
                  strnlen_s(license_guid->valuestring, GUID_SIZE));
         OVSA_DBG(DBG_D, "license_guid %s\n", license_guid->valuestring);
     }
 
     model_guid = cJSON_GetObjectItemCaseSensitive(parse_json, "model_guid");
     if (cJSON_IsString(model_guid) && (model_guid->valuestring != NULL)) {
-        memcpy_s(cust_lic_sig->customer_lic.model_guid,
-                 strnlen_s(model_guid->valuestring, GUID_SIZE), model_guid->valuestring,
+        memcpy_s(cust_lic_sig->customer_lic.model_guid, GUID_SIZE, model_guid->valuestring,
                  strnlen_s(model_guid->valuestring, GUID_SIZE));
         OVSA_DBG(DBG_D, "model_guid %s\n", model_guid->valuestring);
     }
 
     encryption_key = cJSON_GetObjectItemCaseSensitive(parse_json, "encryption_key");
     if (cJSON_IsString(encryption_key) && (encryption_key->valuestring != NULL)) {
-        memcpy_s(cust_lic_sig->customer_lic.encryption_key,
-                 strnlen_s(encryption_key->valuestring, MAX_EKEY_SIZE), encryption_key->valuestring,
+        memcpy_s(cust_lic_sig->customer_lic.encryption_key, MAX_EKEY_SIZE,
+                 encryption_key->valuestring,
                  strnlen_s(encryption_key->valuestring, MAX_EKEY_SIZE));
-        OVSA_DBG(DBG_D, "encryption_key %s\n", encryption_key->valuestring);
     }
 
     cJSON* svrurl = cJSON_GetObjectItemCaseSensitive(parse_json, "license_serv_url");
@@ -1330,13 +1328,13 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
         cJSON* device = svrurl->child;
         i             = 0;
         while (device) {
-            snprintf_s_i(fname, 10, "url_%d", (i++) % 100u);
+            snprintf_s_i(fname, MAX_FILE_NAME_LEN, "url_%d", (i++) % 100u);
             cJSON* url = cJSON_GetObjectItemCaseSensitive(svrurl, fname);
             if (head == NULL) {
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_license_serv_url_list_t), (char**)&head);
                 if (ret < OVSA_OK || head == NULL) {
-                    OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
                 head->next = NULL;
@@ -1345,7 +1343,7 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_license_serv_url_list_t), (char**)&cur);
                 if (ret < OVSA_OK || cur == NULL) {
-                    OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
                 cur->next  = NULL;
@@ -1353,8 +1351,8 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
                 tail       = cur;
             }
             if (cJSON_IsString(url) && (url->valuestring != NULL)) {
-                memcpy_s(tail->license_serv_url, strnlen_s(url->valuestring, MAX_URL_SIZE),
-                         url->valuestring, strnlen_s(url->valuestring, MAX_URL_SIZE));
+                memcpy_s(tail->license_serv_url, MAX_URL_SIZE, url->valuestring,
+                         strnlen_s(url->valuestring, MAX_URL_SIZE));
                 OVSA_DBG(DBG_D, "%s\n", fname);
             }
             device = device->next;
@@ -1385,13 +1383,13 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
         cJSON* device = tcb_sig->child;
         i             = 0;
         while (device) {
-            snprintf_s_i(fname, 10, "sig_%d", (i++) % 100u);
+            snprintf_s_i(fname, MAX_FILE_NAME_LEN, "sig_%d", (i++) % 100u);
             cJSON* sig = cJSON_GetObjectItemCaseSensitive(tcb_sig, fname);
             if (tcb_head == NULL) {
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_tcb_sig_list_t), (char**)&tcb_head);
                 if (ret < OVSA_OK || tcb_head == NULL) {
-                    OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
                 tcb_head->next = NULL;
@@ -1400,7 +1398,7 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_tcb_sig_list_t), (char**)&tcb_cur);
                 if (ret < OVSA_OK || tcb_cur == NULL) {
-                    OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
                 tcb_cur->next  = NULL;
@@ -1411,14 +1409,15 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
                 size_t str_len = 0;
                 ret            = ovsa_get_string_length(sig->valuestring, &str_len);
                 if (ret < OVSA_OK) {
-                    OVSA_DBG(DBG_E, "Error: Could not get length of signature string %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not get length of signature string %d\n",
+                             ret);
                     goto end;
                 }
                 /* Memory allocated and this needs to be freed by consumer */
                 ret                     = ovsa_safe_malloc(str_len + 1, &tcb_tail_signature);
                 tcb_tail->tcb_signature = tcb_tail_signature;
                 if (ret < OVSA_OK || tcb_tail->tcb_signature == NULL) {
-                    OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+                    OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
                 memcpy_s(tcb_tail->tcb_signature, str_len, sig->valuestring, str_len);
@@ -1443,7 +1442,7 @@ ovsa_status_t ovsa_append_json_payload_len_to_blob(const char* input_buf, char**
     memset_s(payload_len, sizeof(payload_len), 0);
     ret = ovsa_get_string_length(input_buf, &json_payload_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of input_buf string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of input_buf string %d\n", ret);
         return ret;
     }
     snprintf_s_l(payload_len, (PAYLOAD_LENGTH + 1), "%08ld", json_payload_len);
@@ -1463,29 +1462,28 @@ ovsa_status_t ovsa_json_create_message_blob(ovsa_command_type_t cmdtype, const c
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
     if (cmdtype < 0 || payload == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
-        OVSA_DBG(DBG_E, "Error: Input parameters invalid %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input parameters invalid %d\n", ret);
         goto end;
     }
     memset_s(command, sizeof(command), 0);
 
     if (cmdtype == OVSA_SEND_SIGN_NONCE) {
-        memcpy_s(command, strnlen_s("OVSA_SEND_SIGN_NONCE", RSIZE_MAX_STR), "OVSA_SEND_SIGN_NONCE",
+        memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_SIGN_NONCE",
                  strnlen_s("OVSA_SEND_SIGN_NONCE", RSIZE_MAX_STR));
     } else if (cmdtype == OVSA_SEND_HW_QUOTE) {
-        memcpy_s(command, strnlen_s("OVSA_SEND_HW_QUOTE", RSIZE_MAX_STR), "OVSA_SEND_HW_QUOTE",
+        memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_HW_QUOTE",
                  strnlen_s("OVSA_SEND_HW_QUOTE", RSIZE_MAX_STR));
     } else if (cmdtype == OVSA_SEND_QUOTE_INFO) {
-        memcpy_s(command, strnlen_s("OVSA_SEND_QUOTE_INFO", RSIZE_MAX_STR), "OVSA_SEND_QUOTE_INFO",
+        memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_QUOTE_INFO",
                  strnlen_s("OVSA_SEND_QUOTE_INFO", RSIZE_MAX_STR));
     } else if (cmdtype == OVSA_SEND_EK_AK_BIND_INFO) {
-        memcpy_s(command, strnlen_s("OVSA_SEND_EK_AK_BIND_INFO", RSIZE_MAX_STR),
-                 "OVSA_SEND_EK_AK_BIND_INFO",
+        memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_EK_AK_BIND_INFO",
                  strnlen_s("OVSA_SEND_EK_AK_BIND_INFO", RSIZE_MAX_STR));
     } else if (cmdtype == OVSA_SEND_CUST_LICENSE) {
-        memcpy_s(command, strnlen_s("OVSA_SEND_CUST_LICENSE", RSIZE_MAX_STR),
-                 "OVSA_SEND_CUST_LICENSE", strnlen_s("OVSA_SEND_CUST_LICENSE", RSIZE_MAX_STR));
+        memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_CUST_LICENSE",
+                 strnlen_s("OVSA_SEND_CUST_LICENSE", RSIZE_MAX_STR));
     } else {
-        OVSA_DBG(DBG_E, "Error: json message command not valid \n");
+        OVSA_DBG(DBG_E, "OVSA: Error json message command not valid \n");
         goto end;
     }
 
@@ -1493,38 +1491,38 @@ ovsa_status_t ovsa_json_create_message_blob(ovsa_command_type_t cmdtype, const c
     message = cJSON_CreateObject();
     if (message == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Create create_send_nonce_message failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create message blob failed %d\n", ret);
         goto end;
     }
 
     /* Populate the json */
     if (cJSON_AddStringToObject(message, "command", command) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add command to message info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add command to message info failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "payload", (char*)payload) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add payload to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add payload to json failed %d\n", ret);
         goto end;
     }
 
     str_print = cJSON_Print(message);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
-        OVSA_DBG(DBG_E, "Error: Print message json to buffer failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error print message json to buffer failed %d\n", ret);
         goto end;
     }
     ret = ovsa_get_string_length(str_print, &len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
     /* For NULL termination */
     len = len + 1;
     ret = ovsa_safe_malloc(len, (char**)outputBuf);
     if (ret < OVSA_OK || *outputBuf == NULL) {
-        OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
         goto end;
     }
     *valuelen = len;
@@ -1550,86 +1548,69 @@ ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_sw_ek_ak_bind_info_t
     message = cJSON_CreateObject();
     if (message == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Create json message object failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create json message object failed %d\n", ret);
         goto end;
     }
     /* Populate the json */
     if (sw_ek_ak_bind_info.sw_ek_cert == NULL) {
-        if (cJSON_AddStringToObject(message, "EK_cert", "") == NULL) {
-            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-            OVSA_DBG(DBG_E, "Error: Add EK_cert to message info failed %d\n", ret);
-            goto end;
-        }
-        if (cJSON_AddStringToObject(message, "EKcert_signature", "") == NULL) {
-            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-            OVSA_DBG(DBG_E, "Error: Add EKcert_signature to json failed %d\n", ret);
-            goto end;
-        }
-        if (cJSON_AddStringToObject(message, "EK_pub", sw_ek_ak_bind_info.sw_ek_pub_key) == NULL) {
-            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-            OVSA_DBG(DBG_E, "Error: Add EK_pub to message info failed %d\n", ret);
-            goto end;
-        }
-        if (cJSON_AddStringToObject(message, "EKpub_signature", sw_ek_ak_bind_info.sw_ek_pub_sig) ==
-            NULL) {
-            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-            OVSA_DBG(DBG_E, "Error: Add EKpub_signature to json failed %d\n", ret);
-            goto end;
-        }
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error SW EK certificate in empty %d\n", ret);
+        goto end;
     } else {
         if (cJSON_AddStringToObject(message, "EK_cert", sw_ek_ak_bind_info.sw_ek_cert) == NULL) {
             ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-            OVSA_DBG(DBG_E, "Error: Add EK_cert to message info failed %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error add EK_cert to message info failed %d\n", ret);
             goto end;
         }
         if (cJSON_AddStringToObject(message, "EKcert_signature",
                                     sw_ek_ak_bind_info.sw_ek_cert_sig) == NULL) {
             ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-            OVSA_DBG(DBG_E, "Error: Add EKcert_signature to json failed %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error add EKcert_signature to json failed %d\n", ret);
             goto end;
         }
         if (cJSON_AddStringToObject(message, "EK_pub", "") == NULL) {
             ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-            OVSA_DBG(DBG_E, "Error: Add EK_pub to message info failed %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error add EK_pub to message info failed %d\n", ret);
             goto end;
         }
         if (cJSON_AddStringToObject(message, "EKpub_signature", "") == NULL) {
             ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-            OVSA_DBG(DBG_E, "Error: Add EKpub_signature to json failed %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error add EKpub_signature to json failed %d\n", ret);
             goto end;
         }
     }
+
     if (cJSON_AddStringToObject(message, "AKpub", sw_ek_ak_bind_info.sw_ak_pub_key) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add AKpub to message info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add AKpub to message info failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "AK_name", sw_ek_ak_bind_info.sw_ak_name) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add AK_name to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add AK_name to json failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "certificate", sw_ek_ak_bind_info.platform_cert) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add certificate to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add certificate to json failed %d\n", ret);
         goto end;
     }
     str_print = cJSON_Print(message);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
-        OVSA_DBG(DBG_E, "Error: Print message json to buffer failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error print message json to buffer failed %d\n", ret);
         goto end;
     }
     ret = ovsa_get_string_length(str_print, &len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
     /* For NULL termination */
     len = len + 1;
     ret = ovsa_safe_malloc(len, (char**)outputBuf);
     if (ret < OVSA_OK || *outputBuf == NULL) {
-        OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
         goto end;
     }
     *valuelen = len;
@@ -1654,85 +1635,90 @@ ovsa_status_t ovsa_json_create_quote_info_blob(const char* secret,
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
     if (secret == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
-        OVSA_DBG(DBG_E, "Error: Input parameters invalid %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error input parameters invalid %d\n", ret);
         goto end;
     }
     /* Create json object */
     message = cJSON_CreateObject();
     if (message == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "Error: Create json message object failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create json message object failed %d\n", ret);
         goto end;
     }
     /* Populate the json */
     if (cJSON_AddStringToObject(message, "Secret", secret) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add secret to message info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add secret to message info failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "SW_Quote_MSG", sw_quote_info.quote_message) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add SW_Quote_MSG to message info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_Quote_MSG to message info failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "SW_Quote_SIG", sw_quote_info.quote_sig) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add SW_Quote_SIG to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_Quote_SIG to json failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "SW_Quote_PCR", sw_quote_info.quote_pcr) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add SW_Quote_PCR to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_Quote_PCR to json failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "SW_AK_Pub_key", sw_quote_info.ak_pub_key) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add SW_AK_Pub_key to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_AK_Pub_key to json failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(message, "SW_EK_Cert", sw_quote_info.ek_cert) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_EK_Cert to json failed %d\n", ret);
         goto end;
     }
 #ifndef DISABLE_TPM2_HWQUOTE
     if (cJSON_AddStringToObject(message, "HW_Quote_MSG", hw_quote_info.quote_message) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add HW_Quote_MSG to message info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_Quote_MSG to message info failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "HW_Quote_SIG", hw_quote_info.quote_sig) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add HW_Quote_SIG to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_Quote_SIG to json failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "HW_Quote_PCR", hw_quote_info.quote_pcr) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add HW_Quote_PCR to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_Quote_PCR to json failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "HW_AK_Pub_Key", hw_quote_info.ak_pub_key) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add HW_AK_Pub_Key to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_AK_Pub_Key to json failed %d\n", ret);
         goto end;
     }
     if (cJSON_AddStringToObject(message, "HW_EK_Cert", hw_quote_info.ek_cert) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "Error: Add HW_EK_Cert to json failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_EK_Cert to json failed %d\n", ret);
         goto end;
     }
 #endif
     str_print = cJSON_Print(message);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
-        OVSA_DBG(DBG_E, "Error: Print message json to buffer failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error print message json to buffer failed %d\n", ret);
         goto end;
     }
     ret = ovsa_get_string_length(str_print, &len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
     /* For NULL termination */
     len = len + 1;
     ret = ovsa_safe_malloc(len, (char**)outputBuf);
     if (ret < OVSA_OK || *outputBuf == NULL) {
-        OVSA_DBG(DBG_E, "Error: could not allocate memory %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
         goto end;
     }
     *valuelen = len;

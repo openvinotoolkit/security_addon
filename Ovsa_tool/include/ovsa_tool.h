@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,17 +21,17 @@
 #define MAX_OVSA_CMDS 4
 
 /* Needs to be updated based on the json blob key names */
-#define LICENSE_CONFIG_BLOB_TEXT_SIZE   147
-#define LICENSE_URL_BLOB_TEXT_SIZE      15
-#define PROTECT_MODEL_BLOB_TEXT_SIZE    110
-#define MODEL_FILE_BLOB_TEXT_SIZE       15
-#define MASTER_LICENSE_BLOB_TEXT_SIZE   131
-#define CUSTOMER_LICENSE_BLOB_TEXT_SIZE 300
-#define TCB_NAME_BLOB_TEXT_SIZE         15
-
-#define TPM2_BLOB_TEXT_SIZE 130
-#define TPM2_QUOTE_SIZE     3072
-#define TPM2_PUBKEY_SIZE    512
+#define LICENSE_CONFIG_BLOB_TEXT_SIZE          147
+#define LICENSE_URL_BLOB_TEXT_SIZE             15
+#define CONTROLLED_ACCESS_MODEL_BLOB_TEXT_SIZE 110
+#define MODEL_FILE_BLOB_TEXT_SIZE              15
+#define MASTER_LICENSE_BLOB_TEXT_SIZE          131
+#define CUSTOMER_LICENSE_BLOB_TEXT_SIZE        300
+#define TCB_NAME_BLOB_TEXT_SIZE                15
+#define MAX_FILE_NAME_LEN                      20
+#define TPM2_BLOB_TEXT_SIZE                    130
+#define TPM2_QUOTE_SIZE                        3072
+#define TPM2_PUBKEY_SIZE                       512
 
 /* Struct to handle specified input commands */
 typedef struct ovsa_handle_cmd {
@@ -147,7 +147,7 @@ typedef struct ovsa_tcb_sig {
 } ovsa_tcb_sig_t;
 
 /*
- * Protect Model Struct
+ * Controlled Access Model Struct
  * First file would be BIN file followed by XML file and other files
  * This structure would contain encrypted data of these files
  */
@@ -157,21 +157,21 @@ typedef struct ovsa_enc_models {
     struct ovsa_enc_models* next;
 } ovsa_enc_models_t;
 
-/* Protect Model Struct */
-typedef struct ovsa_protected_model {
+/* Controlled Access Model Struct */
+typedef struct ovsa_controlled_access_model {
     char model_name[MAX_NAME_SIZE];
     char description[MAX_NAME_SIZE];
     char version[MAX_VERSION_SIZE];
     char* isv_certificate;
     GUID model_guid;
     ovsa_enc_models_t* enc_model;
-} ovsa_protected_model_t;
+} ovsa_controlled_access_model_t;
 
-/* Protect Model Struct with Signature */
-typedef struct ovsa_protected_model_sig {
+/* Controlled Access Model Struct with Signature */
+typedef struct ovsa_controlled_access_model_sig {
     char signature[MAX_SIGNATURE_SIZE];
-    ovsa_protected_model_t protect_model;
-} ovsa_protected_model_sig_t;
+    ovsa_controlled_access_model_t controlled_access_model;
+} ovsa_controlled_access_model_sig_t;
 
 /* To Store list of Model files, TCB Signature file specified as input */
 typedef struct ovsa_input_files {
@@ -199,15 +199,15 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]);
  */
 ovsa_status_t ovsa_licgen_main(int argc, char* argv[]);
 
-/* protect APIs */
+/* controlaccess APIs */
 /*!
- * \brief initiates protect model amd master license config generaton
+ * \brief initiates contolled access model amd master license config generaton
  *
  * \param [in] count of command line params
  * \param [in] command line params
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_protect_main(int argc, char* argv[]);
+ovsa_status_t ovsa_controlaccess_main(int argc, char* argv[]);
 
 /* sale APIs */
 /*!

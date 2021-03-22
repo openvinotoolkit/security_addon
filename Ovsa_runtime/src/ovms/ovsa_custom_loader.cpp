@@ -1,5 +1,5 @@
 //*****************************************************************************
-// Copyright 2020 Intel Corporation
+// Copyright 2020-2021 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,24 +31,24 @@
 using namespace ovms;
 
 extern "C" {
-ovsa_status_t ovsa_license_check_module(const char* keystore, const char* protected_model,
-                                      const char* customer_license, char** decrypt_xml,
-                                      char** decrypt_bin, int* xml_len, int* bin_len);
+ovsa_status_t ovsa_license_check_module(const char* keystore, const char* controlled_access_model,
+                                        const char* customer_license, char** decrypt_xml,
+                                        char** decrypt_bin, int* xml_len, int* bin_len);
 ovsa_status_t ovsa_crypto_init();
 void ovsa_crypto_deinit();
 void ovsa_safe_free(char** ptr);
 };
 
 // Time in seconds at which model status will be checked
-#define VALIDITY_CHECK_INTERVAL_MAX 1440 // 24hrs
-#define VALIDITY_CHECK_INTERVAL_MIN 1    // 1min
+#define VALIDITY_CHECK_INTERVAL_MAX 1440  // 24hrs
+#define VALIDITY_CHECK_INTERVAL_MIN 1     // 1min
 
 #if OVMS_LICCHECK_MINS < VALIDITY_CHECK_INTERVAL_MIN
-#define VALIDITY_CHECK_INTERVAL (VALIDITY_CHECK_INTERVAL_MIN*60*1000) // 1min minimum value
+#define VALIDITY_CHECK_INTERVAL (VALIDITY_CHECK_INTERVAL_MIN * 60 * 1000)  // 1min minimum value
 #elif OVMS_LICCHECK_MINS > VALIDITY_CHECK_INTERVAL_MAX
-#define VALIDITY_CHECK_INTERVAL (VALIDITY_CHECK_INTERVAL_MAX*60*1000) // 24hrs maximum value
+#define VALIDITY_CHECK_INTERVAL (VALIDITY_CHECK_INTERVAL_MAX * 60 * 1000)  // 24hrs maximum value
 #else
-#define VALIDITY_CHECK_INTERVAL (OVMS_LICCHECK_MINS*60*1000)
+#define VALIDITY_CHECK_INTERVAL (OVMS_LICCHECK_MINS * 60 * 1000)
 #endif
 
 typedef std::pair<std::string, int> map_key_t;
@@ -79,6 +79,7 @@ class OvsaCustomLoader : public CustomLoaderInterface {
                                                       const std::string& loaderOptions,
                                                       std::string& loaderName, std::string& ksFile,
                                                       std::string& licFile, std::string& datFile);
+
    public:
     OvsaCustomLoader();
     ~OvsaCustomLoader();
@@ -92,7 +93,6 @@ class OvsaCustomLoader : public CustomLoaderInterface {
                                  std::vector<uint8_t>& modelBuffer, std::vector<uint8_t>& weights);
     CustomLoaderStatus getModelBlacklistStatus(const std::string& modelName, int version);
     CustomLoaderStatus retireModel(const std::string& modelName);
-
 };
 
 extern "C" CustomLoaderInterface* createCustomLoader() {
@@ -124,7 +124,7 @@ CustomLoaderStatus OvsaCustomLoader::ovsa_json_extract_input_params(
     rapidjson::Document doc;
 
     if (basePath.empty() | loaderOptions.empty()) {
-        std::cout << "OvsaCustomLoader: Invalid input parameters to loadModel" << std::endl;
+        std::cout << "OvsaCustomLoader: Error invalid input parameters to loadModel" << std::endl;
         return CustomLoaderStatus::MODEL_LOAD_ERROR;
     }
 
@@ -142,15 +142,15 @@ CustomLoaderStatus OvsaCustomLoader::ovsa_json_extract_input_params(
     if (doc.HasMember("loader_name")) {
         std::string lname = doc["loader_name"].GetString();
         loaderName        = fullPath + "/" + lname;
-        std::cout << "loader_name:" << loaderName << std::endl;
+        std::cout << "OvsaCustomLoader: \nloader_name:" << loaderName << std::endl;
     }
 
-    if (doc.HasMember("protected_file")) {
-        std::string protected_file = doc["protected_file"].GetString();
-        datFile                    = fullPath + "/" + protected_file + ".dat";
+    if (doc.HasMember("controlled_access_file")) {
+        std::string controlled_access_file = doc["controlled_access_file"].GetString();
+        datFile = fullPath + "/" + controlled_access_file + ".dat";
         std::cout << "datFile:" << datFile << std::endl;
 
-        licFile = fullPath + "/" + protected_file + ".lic";
+        licFile = fullPath + "/" + controlled_access_file + ".lic";
         std::cout << "licFile:" << licFile << std::endl;
     }
 
@@ -184,14 +184,14 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
     std::string datFile;
 
     if (modelName.empty() || basePath.empty() || loaderOptions.empty()) {
-        std::cout << "OvsaCustomLoader: Invalid input parameters to loadModel" << std::endl;
+        std::cout << "OvsaCustomLoader: Error invalid input parameters to loadModel" << std::endl;
         return CustomLoaderStatus::MODEL_LOAD_ERROR;
     }
 
     CustomLoaderStatus st = ovsa_json_extract_input_params(basePath, version, loaderOptions,
-		                                           loaderName, ksFile, licFile, datFile);
+                                                           loaderName, ksFile, licFile, datFile);
     if (st != CustomLoaderStatus::OK || ksFile.empty() || licFile.empty() || datFile.empty()) {
-        std::cout << "OvsaCustomLoader: Invalid custom loader options" << std::endl;
+        std::cout << "OvsaCustomLoader: Error invalid custom loader options" << std::endl;
         return CustomLoaderStatus::MODEL_LOAD_ERROR;
     }
 
@@ -201,13 +201,14 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
     if (rets != OVSA_OK) {
         if (rets == OVSA_LICENSE_SERVER_CONNECT_FAIL) {
             OVSA_DBG(DBG_E,
-                     "OvsaCustomLoader: LICENSE CHECK SERVER CONNECT FAILED"
+                     "OvsaCustomLoader: Error LICENSE CHECK SERVER CONNECT FAILED"
                      " with %d\n",
                      rets);
         } else if (rets == OVSA_LICENSE_CHECK_FAIL) {
-            OVSA_DBG(DBG_E, "OvsaCustomLoader: LICENSE CHECK FAILED with %d\n", rets);
+            OVSA_DBG(DBG_E, "OvsaCustomLoader: Error LICENSE CHECK FAILED with %d\n", rets);
         } else {
-            OVSA_DBG(DBG_E, "OvsaCustomLoader: ovsa_license_check_module with code %d\n", rets);
+            OVSA_DBG(DBG_E, "OvsaCustomLoader: Error ovsa_license_check_module with code %d\n",
+                     rets);
         }
         ovsa_safe_free(&modelBuf);
         ovsa_safe_free(&weightsBuf);
@@ -282,7 +283,7 @@ CustomLoaderStatus OvsaCustomLoader::getModelBlacklistStatus(const std::string& 
     map_key_t toFind = std::make_pair(modelName, version);
     auto it          = model_map.find(toFind);
     if (it == model_map.end()) {
-        OVSA_DBG(DBG_E, "OvsaCustomLoader: Model not loaded\n");
+        OVSA_DBG(DBG_E, "OvsaCustomLoader: Error model not loaded\n");
         return CustomLoaderStatus::OK;
     }
 

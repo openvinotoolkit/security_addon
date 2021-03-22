@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@
 ovsa_status_t ovsa_do_load_EK_context_AKkeys() {
     ovsa_status_t ret = OVSA_OK;
 
-    OVSA_DBG(DBG_I, "LibOVSA: Entering %s\n", __func__);
+    OVSA_DBG(DBG_D, "LibOVSA: Entering %s\n", __func__);
 
     /* Clean up the previous context which are not flushed before starting */
     char* const flushall_context_cmd[] = {
@@ -135,7 +135,7 @@ ovsa_status_t ovsa_do_load_EK_context_AKkeys() {
 ovsa_status_t ovsa_tpm2_generaterand() {
     ovsa_status_t ret = OVSA_OK;
 
-    OVSA_DBG(DBG_I, "LibOVSA: Entering %s\n", __func__);
+    OVSA_DBG(DBG_D, "LibOVSA: Entering %s\n", __func__);
 
     /* Generate Nonce using TPM2_getrandom */
     char* const getrand_cmd[] = {"/usr/bin/sudo",
@@ -160,9 +160,9 @@ ovsa_status_t ovsa_tpm2_generaterand() {
 ovsa_status_t ovsa_tpm2_generatequote(char* nonce) {
     ovsa_status_t ret = OVSA_OK;
 
-    OVSA_DBG(DBG_I, "LibOVSA: Entering %s\n", __func__);
+    OVSA_DBG(DBG_D, "LibOVSA: Entering %s\n", __func__);
 
-    if (nonce == NULL) {
+    if (nonce[0] == '\0') {
         nonce = "/var/OVSA/Quote/nonce.bin";
 
         /* Generate Nonce using TPM2_getrandom */
@@ -232,6 +232,7 @@ ovsa_status_t ovsa_do_run_tpm2_command(char* const argv[], char* output) {
     int child_status = 0, nbytes = 0, link[2], err = -1;
     pid_t child_pid;
     char cmd_output[MAX_EKEY_SIZE];
+    char error_output[MAX_BUF_SIZE];
 
     if ((argv == NULL) || (argv[1] == NULL)) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 command failed with invalid parameter\n");
@@ -248,6 +249,7 @@ ovsa_status_t ovsa_do_run_tpm2_command(char* const argv[], char* output) {
     if (child_pid == 0) {
         if (dup2(link[1], STDOUT_FILENO) == -1) {
             OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 command failed in dup2 syscall\n");
+            close(link[1]);
             return OVSA_SYSCALL_DUP2_FAIL;
         }
         close(link[0]);
@@ -262,6 +264,8 @@ ovsa_status_t ovsa_do_run_tpm2_command(char* const argv[], char* output) {
         }
     } else if (child_pid < 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error TPM2 command failed in fork\n");
+        close(link[0]);
+        close(link[1]);
         return OVSA_SYSCALL_FORK_FAIL;
     }
 
@@ -291,16 +295,36 @@ ovsa_status_t ovsa_do_run_tpm2_command(char* const argv[], char* output) {
 
     if ((waitpid(child_pid, &child_status, 0)) == -1) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 command failed in waitpid\n");
+        close(link[0]);
         return OVSA_SYSCALL_WAITPID_FAIL;
     }
 
     if (WIFEXITED(child_status)) {
         int exit_status = WEXITSTATUS(child_status);
         if (exit_status != 0) {
-            OVSA_DBG(DBG_E, "LibOVSA: Error execution of TPM2 %s failed\n", argv[1]);
+            OVSA_DBG(DBG_E, "LibOVSA: Error execution of TPM2 %s failed with exit_status %d \n",
+                     argv[1], exit_status);
+            memset_s(error_output, sizeof(error_output), 0);
+            nbytes = read(link[0], error_output, (sizeof(error_output) - 1));
+            if (nbytes > 0) {
+                int output_len = strnlen_s(error_output, (sizeof(error_output) - 1));
+                if (output_len == EOK) {
+                    OVSA_DBG(DBG_E,
+                             "LibOVSA: Error tpm2 command failed in getting the size of the "
+                             "command output\n");
+                    close(link[0]);
+                    return OVSA_TPM2_GENERIC_ERROR;
+                }
+                /* Added for KW issue */
+                output_len = (output_len == MAX_BUF_SIZE) ? (output_len - 1) : (output_len);
+                error_output[output_len] = '\0';
+                OVSA_DBG(DBG_E, "%s\n", error_output);
+            }
+            close(link[0]);
             return OVSA_SYSCALL_WAITPID_FAIL;
         }
     }
+    close(link[0]);
 
     return ret;
 }
@@ -430,7 +454,7 @@ ovsa_status_t ovsa_tpm2_unsealkey(char* encryption_key) {
                                 "--message=" TPM2_SEAL_PCR_POLICY,
                                 "--signature=" TPM2_SEAL_PCR_SIGN,
                                 "--ticket=" TPM2_VERIFICATION_TKT,
-                                "--format=rsassa",
+                                "--scheme=rsassa",
                                 "-T",
                                 "device:/dev/tpmrm0",
                                 0,

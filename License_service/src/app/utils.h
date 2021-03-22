@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,5 +88,12 @@ int ovsa_server_crypto_get_file_size(FILE* fp);
  * \param[in] listhead  Pointer to the list of tcbs.
  */
 void ovsa_server_safe_free_tcb_list(ovsa_tcb_sig_list_t** listhead);
-
+/*!
+ *  * \brief ovsa_server_safe_add
+ *
+ * \param [in]  size_t Variable1,sum of var1+var2 stored in var1
+ * \param [in]  size_t Variable2
+ * \return ovsa_status_t
+ */
+ovsa_status_t ovsa_server_safe_add(size_t* var1, size_t var2);
 #endif

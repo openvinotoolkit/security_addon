@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,13 +44,6 @@ loaded_key_name=`sudo cat tpm_ak.name | xxd -p -c $file_size`
 
 sudo echo $loaded_key_name > tpm_ak.name.hex
 
-sudo tpm2_getcap properties-fixed -T device:/dev/tpmrm0 | grep IBM
-if [ "$?" == 0 ]
-then
-  echo "SW TPM, skipping reading EK Certificate"
-  exit 1
-fi
-
 # READ EK Cert
 # Location 1 - TPM2 NV Index 0x1c00002 is the TCG specified location for RSA-EK-certificate.
 RSA_EK_CERT_NV_INDEX=0x01C00002
@@ -59,13 +52,20 @@ echo "Read EK Certificate size from TPM2"
 NV_SIZE=`sudo tpm2_nvreadpublic $RSA_EK_CERT_NV_INDEX -T device:/dev/tpmrm0 | grep size |  awk '{print $2}'` 
 check_status "Warning: EK Certificate not provisioned"
 
-echo "Read EK Certificate from TPM2"
+if [ $NV_SIZE -eq  0 ]
+then
+   echo "Read EK Certificate from TPM2 - ECC EK Certificate"
+   sudo tpm2 getekcertificate -u tpm_ek.pub -x -X -o tpm_hw_ek_cert.bin
+   check_status "Warning: EK Certificate not provisioned"
+else
+   echo "Read EK Certificate from TPM2"
 sudo tpm2_nvread \
 --hierarchy owner \
 --size $NV_SIZE \
 --output tpm_ek_cert.bin \
 $RSA_EK_CERT_NV_INDEX -T device:/dev/tpmrm0
 check_status "Warning: EK Certificate not provisioned"
+fi
 
 echo "Converting EK Certificate from DER to PEM Format"
 openssl x509 -inform der -in tpm_ek_cert.bin -out tpm_ek_cert.pem

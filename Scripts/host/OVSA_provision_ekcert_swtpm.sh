@@ -1,4 +1,3 @@
-#! /bin/sh
 #
 # Copyright (c) 2020-2021 Intel Corporation
 #
@@ -15,13 +14,15 @@
 # limitations under the License.
 #
 
+echo "Executing $0 $1"
+if [ "$#" == 0 ] || [ "$1" == "-h" ]
+then
+        echo "Usage : $0 <tpm_dir_path>"
+        echo "Usage : $0 -h"
+        exit 0
+fi
 
-
-export OVSA_DEV_ARTEFACTS=$PWD/artefacts/1
-
-cd $OVSA_DEV_ARTEFACTS
-
-rm *
-
-cd ../..
+export XDG_CONFIG_HOME=~/.config
+/usr/share/swtpm/swtpm-create-user-config-files
+swtpm_setup --tpmstate "$1" --create-ek-cert --create-platform-cert --overwrite --tpm2 --pcr-banks -
 

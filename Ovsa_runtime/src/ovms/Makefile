@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ OVMS_LICCHECK_MINS=1440
 G++ = g++
 CP = cp
 
-CFLAGS +=  -g -Wall -DENABLE_SELF_SIGNED_CERT -D_GNU_SOURCE -DENABLE_OCSP_CHECK -fno-exceptions -fPIC -DDEBUG=$(DEBUG) -DOVMS_LICCHECK_MINS=$(OVMS_LICCHECK_MINS) -D OVSA_RUNTIME -DCREATE_PROT_MODEL -fstack-protector-strong -fPIE -fPIC -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security
+CFLAGS +=  -g -Wall -DENABLE_SELF_SIGNED_CERT -D_GNU_SOURCE -DENABLE_OCSP_CHECK -fno-exceptions -fPIC -DDEBUG=$(DEBUG) -DOVMS_LICCHECK_MINS=$(OVMS_LICCHECK_MINS) -D OVSA_RUNTIME -fstack-protector-strong -fPIE -fPIC -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security
 
 ifndef OVMS_DIR
 $(error OVMS_DIR not set. Please set before compilation)

@@ -94,7 +94,7 @@ scp <path-to-security-addon-repo>/Scripts/demo/developer/*  <user-name>@<ip-addr
 - This would copy the following scripts.
   - Create_Keystore - Creates cryptographic material and stores into the specified kesytore file
   -  Download_Model - Downloads the specified model from Model Zoo to generate model with access control restrictions.
-  -  Protect_Model - Creates the access control enabled model for the downloaded model using Download_Model
+  -  Control_Access_Model - Creates the access control enabled model for the downloaded model using Download_Model
   -  License_Request_Watcher - Daemon to monitor the License request & Customer certificate sent by ovsa_runtime for purchasing the access controlled model
   -  Create_License - Creates Customer license for the access controlled model based on the info provided while requesting for license from ovsa_runtime
   -  Send_License - Sends the Customer license and access controlled model to ovsa_runtime.
@@ -152,7 +152,7 @@ License_Request_Watcher &
 ```shell
 Create_Keystore AX_Keystore
 Download_Model face-detection-retail-0004
-Protect_Model AX_Keystore model/face-detection-retail-0004
+Control_Access_Model AX_Keystore model/face-detection-retail-0004
 ```
 - On the Terminal 3, proceed to create the model users' keystore and request 30 day license for face-detection-retail-0004 model from the developer
 ```shell

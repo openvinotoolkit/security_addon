@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+sudo swtpm socket --tpm2 --server port=8380 \
+                  --ctrl type=tcp,port=8381 \
+                  --flags not-need-init --tpmstate dir=/var/OVSA/vtpm/vtpm_runtime &
+
+sudo -u tss tpm2-abrmd --tcti=swtpm:port=8380
+
+sudo tpm2_startup --clear -T swtpm:port=8380
+sudo tpm2_startup -T swtpm:port=8380
+python3 OVSA_write_hwquote_swtpm_nvram.py 8380
+sudo pkill -f vtpm_runtime
 
 sudo swtpm socket --tpmstate dir=/var/OVSA/vtpm/vtpm_runtime \
      --tpm2 \

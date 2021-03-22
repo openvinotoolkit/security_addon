@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,10 +47,10 @@ all: create_dirs build_mbedtls rapidjson ovsaruntime_build
 
 ############################# MBEDTLS DEPENDENCY ##############################
 
-MBEDTLS_VERSION ?= 2.21.0
+MBEDTLS_VERSION ?= 2.26.0
 MBEDTLS_SRC ?= mbedtls-$(MBEDTLS_VERSION).tar.gz
 MBEDTLS_URI ?= https://github.com/ARMmbed/mbedtls/archive/
-MBEDTLS_CHECKSUM ?= 320e930b7596ade650ae4fc9ba94b510d05e3a7d63520e121d8fdc7a21602db9
+MBEDTLS_CHECKSUM ?= 35d8d87509cd0d002bddbd5508b9d2b931c5e83747d087234cc7ad551d53fe05
 
 # mbedTLS uses a submodule mbedcrypto, need to download it and move under mbedtls/crypto
 MBEDCRYPTO_VERSION ?= 3.1.0

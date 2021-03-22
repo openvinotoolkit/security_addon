@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,26 +28,35 @@
 /* Size of the GUID size */
 #define GUID_SIZE 36
 
-#define MAX_FILE_NAME                            256
-#define MAX_NAME_SIZE                            256
-#define MAX_VERSION_SIZE                         32
-#define MAX_SIGNATURE_SIZE                       256 /* Actual size: 143 */
-#define MAX_MAC_SIZE                             128 /* Actual size: 90 */
-#define MAX_KEY_SIZE                             512 /* Actual size: 359 */
-#define MAX_EKEY_SIZE                            256 /* Actual size: 45 */
-#define MAX_URL_SIZE                             256
-#define MAX_TCB_SIZE                             256
-#define KEYSTORE_BLOB_TEXT_SIZE                  135
-#define MIN_KEY_SLOT                             0
-#define MAX_KEY_SLOT                             64
-#define SYMMETRIC_KEY_SIZE                       32
-#define ENC_KEYSTORE_BLOB_TEXT_SIZE              20
-#define SIGNATURE_BLOB_TEXT_SIZE                 18
-#define NULL_TERMINATOR                          1
-#define MAX_DATE_TIME_SIZE                       32
-#define MAX_CERT_VALIDITY_PERIOD                 18 /* Months */
-#define MAX_PROTECTED_MODEL_VALIDITY_TIME_PERIOD 5  /* 5 years */
-#define TIMECONVERT_SECSTODAYS(timeSecs)         ((timeSecs % (86400 * 30)) / 86400)
+#define MAX_FILE_NAME                                    256
+#define MAX_NAME_SIZE                                    256
+#define MAX_SAFE_ARGC                                    64
+#define MAX_VERSION_SIZE                                 32
+#define MAX_SIGNATURE_SIZE                               256 /* Actual size: 143 */
+#define MAX_MAC_SIZE                                     128 /* Actual size: 90 */
+#define MAX_KEY_SIZE                                     512 /* Actual size: 359 */
+#define MAX_EKEY_SIZE                                    256 /* Actual size: 45 */
+#define MAX_URL_SIZE                                     256
+#define MAX_TCB_SIZE                                     256
+#define MAX_BUF_SIZE                                     4096
+#define KEYSTORE_BLOB_TEXT_SIZE                          135
+#define MIN_KEY_SLOT                                     0
+#define MAX_KEY_SLOT                                     64
+#define SYMMETRIC_KEY_SIZE                               32
+#define ENC_KEYSTORE_BLOB_TEXT_SIZE                      20
+#define SIGNATURE_BLOB_TEXT_SIZE                         18
+#define NULL_TERMINATOR                                  1
+#define MAX_DATE_TIME_SIZE                               32
+#define MAX_CERT_VALIDITY_PERIOD                         18 /* Months */
+#define MAX_CONTROLLED_ACCESS_MODEL_VALIDITY_TIME_PERIOD 5  /* 5 years */
+#define TIMECONVERT_SECSTODAYS(timeSecs)                 ((timeSecs % (86400 * 30)) / 86400)
+#define HASH_ALG_SHA256                                  1
+#define HASH_ALG_SHA512                                  2
+
+/* As per the ASN1_STRING_TABLE, computed max size of the attribute types
+   found in the Distinguished Name are around ~129K and added certain buffer
+   to accomadate the attributes where max size is not available. */
+#define MAX_CERT_SIZE (256UL << 10) /* 256KB */
 
 typedef enum { ECDSA, INVALID_ALGO = 99 } ovsa_key_alg_t;
 
@@ -291,11 +300,13 @@ ovsa_status_t ovsa_crypto_extract_pubkey_certificate(const char* cert, char* pub
 /** \brief This function computes the hash of the memory buffer.
  *
  * \param[in]  in_buff   Input buffer for hashing.
+ * \param[in]  hash_alg  Hashing algorithm.
  * \param[out] out_buff  Output buffer to store the computed hashed.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_crypto_compute_hash(const char* in_buff, char* out_buff);
+ovsa_status_t ovsa_crypto_compute_hash(const char* in_buff, int hash_alg, unsigned char* out_buff,
+                                       bool b64_format);
 
 /** \brief This function verifies the entire certificate chain along with OCSP check.
  *

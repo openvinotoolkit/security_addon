@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -217,5 +217,14 @@ ovsa_status_t ovsa_json_apend_signature(const char* inputBuf, const char* sigBuf
  */
 ovsa_status_t ovsa_json_extract_and_strip_signature(const char* inputBuf, char* sigBuf,
                                                     char* outBuf);
+
+/*!
+ * \brief ovsa_safe_add
+ *
+ * \param [in]  size_t Variable1 ,Sum of var1+var2 stored in var1
+ * \param [in]  size_t Variable2
+ * \return ovsa_status_t
+ */
+ovsa_status_t ovsa_safe_add(size_t* var1, size_t var2);
 
 #endif /* __OVSA_UTILS_H_ */

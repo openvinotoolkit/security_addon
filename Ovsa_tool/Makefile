@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/curl),)
 endif
 ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/openssl),)
 	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/openssl/openssl.git
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1h
+	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1j
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && ./config --prefix=$(shell readlink -f crypto/) shared -fPIC
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && $(MAKE) && $(MAKE) -j1 install_sw
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libcrypto.a ../../../lib

@@ -12,7 +12,7 @@
       "config":{
         "name":"vd",
         "base_path":"/sampleloader/artefacts",
-        "custom_loader_options": {"loader_name":  "ovsa", "keystore":  "Cust_Keystore", "protected_file": "vehicle-detection-adas-0002"}
+        "custom_loader_options": {"loader_name":  "ovsa", "keystore":  "Cust_Keystore", "controlled_access_file": "vehicle-detection-adas-0002"}
       }
     }
 

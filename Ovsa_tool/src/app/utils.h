@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ extern ovsa_status_t ovsa_get_string_length(const char* in_buff, size_t* in_buff
  *
  * \return true or false
  */
-bool ovsa_is_guid_valid(char* guid);
+bool ovsa_is_guid_valid(unsigned char* guid);
 
 /** \brief This function is used to free the allocated memory.
  *

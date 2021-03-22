@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,25 +19,10 @@
 
 #include "license_service.h"
 
-#define OVSA_DB_PATH "../DB/ovsa.db"
+#define SQL_BUFFER_LENGTH 1024
+#define OVSA_DB_PATH      "/opt/ovsa/DB/ovsa.db"
+
 /* API's */
-/*!
- * \brief ovsa_db_create_customer_license
- *
- * \param [in]  db_name buffer pointing to the database name
- * \param [in]  license_guid buffer pointing to the license guid
- * \param [in]  model_guid buffer pointing to the model guid
- * \param [in]  isv_certificate buffer pointing to the isv certificate
- * \param [in]  customer_certificate buffer pointing to the customer certificate
- * \param [in]  license type indicate the type of license - sale, instance
- * limit, time limit \param [in]  limit_count indicate the max usage limit -
- * instance or time \return ovsa_status_t
- */
-
-ovsa_status_t ovsa_db_create_customer_license(char* db_name, char* license_guid, char* model_guid,
-                                              char* isv_certificate, char* customer_certificate,
-                                              int license_type, int limit_count);
-
 /*!
  * \brief ovsa_db_get_customer_certificate
  *

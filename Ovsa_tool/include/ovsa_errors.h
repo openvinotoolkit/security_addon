@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,6 +100,9 @@ typedef enum {
     OVSA_SOCKET_READ_FAIL   = -43,
     OVSA_SOCKET_WRITE_FAIL  = -44,
     OVSA_SOCKET_CONN_CLOSED = -45,
+
+    OVSA_INTEGER_OVERFLOW  = -46,
+    OVSA_INTEGER_UNDERFLOW = -47,
 
     OVSA_FAIL = -99
 } ovsa_status_t;

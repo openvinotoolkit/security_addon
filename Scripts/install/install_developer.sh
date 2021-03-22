@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@ cp -vR bin/* /opt/ovsa/bin/
 cp -vR scripts/* /opt/ovsa/scripts/
 cp -vR DB/* /opt/ovsa/DB/
 cp -vR lib/* /opt/ovsa/lib/
+
+python3 /opt/ovsa/DB/ovsa_create_db.py /opt/ovsa/DB/ovsa.db
 
 mkdir -vp /var/OVSA/Seal
 cp /opt/ovsa/scripts/OVSA_Seal_Key_TPM_Policy_Authorize.sh /var/OVSA/Seal

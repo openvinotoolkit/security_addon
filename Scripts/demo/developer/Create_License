@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ OPTIND=1
 TRACE=/dev/null
 
 show_usage (){
-    echo "Usage: $0 <keystore name> <tcb file name> <protected model file> <Master License> <License request file>"
+    echo "Usage: $0 <keystore name> <tcb file name> <controlled access model file> <master License> <license request file>"
     return 0
 }
 

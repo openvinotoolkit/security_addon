@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,24 +56,24 @@ static void ovsa_keygen_help(const char* argv) {
 
 static ovsa_status_t ovsa_do_cmd_verify(const char* file_to_verify, const char* signature,
                                         const char* keystore) {
-    ovsa_status_t ret = OVSA_OK;
-    size_t sig_file_size;
-    char* sig_buf    = NULL;
-    FILE* fptr       = NULL;
-    int asym_keyslot = -1;
+    ovsa_status_t ret    = OVSA_OK;
+    size_t sig_file_size = 0;
+    char* sig_buf        = NULL;
+    FILE* fptr           = NULL;
+    int asym_keyslot     = -1;
 
     if ((file_to_verify != NULL) && (signature != NULL) && (keystore != NULL)) {
         /* Initialize crypto */
         ret = ovsa_crypto_init();
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Ovsa crypto init failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error ovsa crypto init failed with code %d\n", ret);
             goto out;
         }
 
         /* Load asymmetric_key */
         ret = ovsa_crypto_load_asymmetric_key(keystore, &asym_keyslot);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Get keyslot failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error get keyslot failed with code %d\n", ret);
             goto exit;
         }
 
@@ -81,7 +81,7 @@ static ovsa_status_t ovsa_do_cmd_verify(const char* file_to_verify, const char* 
         fptr = fopen(signature, "r");
         if (fptr == NULL) {
             ret = OVSA_FILEOPEN_FAIL;
-            OVSA_DBG(DBG_E, "Error: Opening signature file failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error opening signature file failed with code %d\n", ret);
             goto exit;
         }
 
@@ -89,7 +89,7 @@ static ovsa_status_t ovsa_do_cmd_verify(const char* file_to_verify, const char* 
         sig_file_size = ovsa_crypto_get_file_size(fptr);
         ret           = ovsa_safe_malloc(sig_file_size, &sig_buf);
         if (ret < OVSA_OK || sig_buf == NULL) {
-            OVSA_DBG(DBG_E, "Error: Signature buffer allocation failed %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error signature buffer allocation failed %d\n", ret);
             goto exit;
         }
         ret = fread(sig_buf, 1, sig_file_size, fptr);
@@ -97,7 +97,7 @@ static ovsa_status_t ovsa_do_cmd_verify(const char* file_to_verify, const char* 
         /* Verify file */
         ret = ovsa_crypto_verify_file(asym_keyslot, file_to_verify, sig_buf);
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Verification failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error verification failed with code %d\n", ret);
         }
         ovsa_safe_free(&sig_buf);
     exit:
@@ -107,7 +107,7 @@ static ovsa_status_t ovsa_do_cmd_verify(const char* file_to_verify, const char* 
         ovsa_crypto_deinit();
 
     } else {
-        OVSA_DBG(DBG_E, "Error: Wrong command given. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
         ret = OVSA_INVALID_PARAMETER;
     }
 out:
@@ -123,27 +123,27 @@ static ovsa_status_t ovsa_do_cmd_sign(const char* file_to_sign, const char* sign
         /* Initialize crypto */
         ret = ovsa_crypto_init();
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Crypto init failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error crypto init failed with code %d\n", ret);
             goto out;
         }
 
         /* Load asymmetric_key */
         ret = ovsa_crypto_load_asymmetric_key(keystore, &asym_keyslot);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Get keyslot failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error get keyslot failed with code %d\n", ret);
             goto exit;
         }
 
         /* Sign file */
         ret = ovsa_crypto_sign_file(asym_keyslot, file_to_sign, signed_file);
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Signing failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error signing failed with code %d\n", ret);
         }
     exit:
         /* De-initialize crypto */
         ovsa_crypto_deinit();
     } else {
-        OVSA_DBG(DBG_E, "Error: Wrong command given. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
         ret = OVSA_INVALID_PARAMETER;
     }
 out:
@@ -158,14 +158,14 @@ static ovsa_status_t ovsa_do_cmd_getcert(const char* keystore, const char* cert_
         /* Initialize crypto */
         ret = ovsa_crypto_init();
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Crypto init failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error crypto init failed with code %d\n", ret);
             goto out;
         }
 
         /* Load asymmetric_key */
         ret = ovsa_crypto_load_asymmetric_key(keystore, &asym_keyslot);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Get keyslot failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error get keyslot failed with code %d\n", ret);
             goto exit;
         }
 
@@ -173,13 +173,13 @@ static ovsa_status_t ovsa_do_cmd_getcert(const char* keystore, const char* cert_
         ret = ovsa_crypto_store_certificate_file(asym_keyslot, /* PEER CERT */ false,
                                                  /* lifetime_validity_check */ true, cert_file);
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Reading certificate file failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error reading certificate file failed with code %d\n", ret);
         }
     exit:
         /* De-initialize crypto */
         ovsa_crypto_deinit();
     } else {
-        OVSA_DBG(DBG_E, "Error: Wrong command given. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
         ret = OVSA_INVALID_PARAMETER;
     }
 out:
@@ -187,23 +187,23 @@ out:
 }
 
 static ovsa_status_t ovsa_do_cmd_storecert(const char* keystore, const char* cert_file) {
-    ovsa_status_t ret = OVSA_OK;
-    size_t cert_file_size;
-    char* cert_buff  = NULL;
-    int asym_keyslot = -1;
+    ovsa_status_t ret     = OVSA_OK;
+    size_t cert_file_size = 0;
+    char* cert_buff       = NULL;
+    int asym_keyslot      = -1;
 
     if ((keystore != NULL) && (cert_file != NULL)) {
         /* Initialize crypto */
         ret = ovsa_crypto_init();
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Crypto init failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error crypto init failed with code %d\n", ret);
             goto out;
         }
 
         /* Load asymmetric_key */
         ret = ovsa_crypto_load_asymmetric_key(keystore, &asym_keyslot);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Get keyslot failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error get keyslot failed with code %d\n", ret);
             goto exit;
         }
 
@@ -211,7 +211,7 @@ static ovsa_status_t ovsa_do_cmd_storecert(const char* keystore, const char* cer
         FILE* fptr = fopen(cert_file, "r");
         if (fptr == NULL) {
             ret = OVSA_FILEOPEN_FAIL;
-            OVSA_DBG(DBG_E, "Error: Opening certificate file failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error opening certificate file failed with code %d\n", ret);
             goto exit;
         }
 
@@ -219,7 +219,7 @@ static ovsa_status_t ovsa_do_cmd_storecert(const char* keystore, const char* cer
         cert_file_size = ovsa_crypto_get_file_size(fptr);
         ret            = ovsa_safe_malloc(cert_file_size, &cert_buff);
         if (ret < OVSA_OK || cert_buff == NULL) {
-            OVSA_DBG(DBG_E, "Error: Certificate buffer allocation failed %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error certificate buffer allocation failed %d\n", ret);
             fclose(fptr);
             goto exit;
         }
@@ -227,20 +227,25 @@ static ovsa_status_t ovsa_do_cmd_storecert(const char* keystore, const char* cer
         fclose(fptr);
 
         /* Verify & store certificate */
+        if ((!cert_file_size) || (cert_file_size > MAX_CERT_SIZE)) {
+            OVSA_DBG(DBG_E, "OVSA: Error certificate length is invalid \n");
+            ret = OVSA_INVALID_PARAMETER;
+            goto exit;
+        }
         ret = ovsa_crypto_store_certificate_keystore(asym_keyslot, /* PEER CERT */ false, cert_buff,
                                                      /* lifetime_validity_check */ true, keystore);
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Store certificate failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error store certificate failed with code %d\n", ret);
         }
-        ovsa_safe_free(&cert_buff);
     exit:
         /* De-initialize crypto */
         ovsa_crypto_deinit();
     } else {
-        OVSA_DBG(DBG_E, "Error: Wrong command given. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
         ret = OVSA_INVALID_PARAMETER;
     }
 out:
+    ovsa_safe_free(&cert_buff);
     return ret;
 }
 
@@ -256,19 +261,19 @@ static ovsa_status_t ovsa_do_cmd_storekey(ovsa_key_alg_t alg_type, const char* i
         /* Initialize crypto */
         ret = ovsa_crypto_init();
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Crypto init failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error crypto init failed with code %d\n", ret);
             goto out;
         }
         ret = ovsa_crypto_generate_asymmetric_key_pair(alg_type, subject, isv_name, keystore,
                                                        csr_filename, &asym_keyslot);
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Create keystore/CSR failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error create keystore/CSR failed with code %d\n", ret);
         }
 
         /* De-initialize crypto */
         ovsa_crypto_deinit();
     } else {
-        OVSA_DBG(DBG_E, "Error: Wrong command given. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
@@ -298,8 +303,10 @@ static ovsa_keygen_cmd_t ovsa_get_keygen_cmd(const char* command) {
 }
 
 ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
-    ovsa_status_t ret = OVSA_OK;
-    int c;
+    ovsa_status_t ret        = OVSA_OK;
+    int c                    = 0;
+    int i                    = 0;
+    size_t argv_len          = 0;
     ovsa_key_alg_t alg_type  = INVALID_ALGO;
     ovsa_keygen_cmd_t opcode = INVALID_CMD;
     char* isv_name           = NULL;
@@ -312,10 +319,24 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
     char* csr_filename       = NULL;
 
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
-    if (argc < 3) {
+    if (argc < 3 || argc > MAX_SAFE_ARGC) {
         OVSA_DBG(DBG_E, "OVSA: Wrong command given. Please follow -help for help option\n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
+    }
+
+    for (i = 0; argc > i; i++) {
+        ret = ovsa_get_string_length(argv[i], &argv_len);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of argv string %d\n", ret);
+            goto out;
+        }
+        if (argv_len > RSIZE_MAX_STR) {
+            OVSA_DBG(DBG_E, "OVSA: keygen argument'%s' greater than %ld characters not allowed \n",
+                     argv[i], RSIZE_MAX_STR);
+            ret = OVSA_INVALID_PARAMETER;
+            goto out;
+        }
     }
 
     opcode = ovsa_get_keygen_cmd(argv[2]);
@@ -332,7 +353,7 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
             case 'n':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_NAME_SIZE) {
                     OVSA_DBG(DBG_E,
-                             "Error: Keystore name greater than %d characters not allowed \n",
+                             "OVSA: Error keystore name greater than %d characters not allowed \n",
                              MAX_NAME_SIZE);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
@@ -341,9 +362,10 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                 break;
             case 'k':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
-                    OVSA_DBG(DBG_E,
-                             "Error: Keystore file name greater than %d characters not allowed \n",
-                             MAX_FILE_NAME);
+                    OVSA_DBG(
+                        DBG_E,
+                        "OVSA: Error keystore file name greater than %d characters not allowed \n",
+                        MAX_FILE_NAME);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
                 }
@@ -353,7 +375,7 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
             case 'r':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
                     OVSA_DBG(DBG_E,
-                             "Error: CSR File name greater than %d characters not allowed \n",
+                             "OVSA: Error CSR File name greater than %d characters not allowed \n",
                              MAX_FILE_NAME);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
@@ -367,9 +389,10 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                 break;
             case 'c':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
-                    OVSA_DBG(DBG_E,
-                             "Error: Certificate path greater than %d characters not allowed \n",
-                             MAX_FILE_NAME);
+                    OVSA_DBG(
+                        DBG_E,
+                        "OVSA: Error certificate path greater than %d characters not allowed \n",
+                        MAX_FILE_NAME);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
                 }
@@ -377,9 +400,10 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                 break;
             case 'p':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
-                    OVSA_DBG(DBG_E,
-                             "Error: File to sign path greater than %d characters not allowed \n",
-                             MAX_FILE_NAME);
+                    OVSA_DBG(
+                        DBG_E,
+                        "OVSA: Error file to sign path greater than %d characters not allowed \n",
+                        MAX_FILE_NAME);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
                 }
@@ -388,9 +412,10 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                 break;
             case 'o':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
-                    OVSA_DBG(DBG_E,
-                             "Error: Signature file path greater than %d characters not allowed \n",
-                             MAX_FILE_NAME);
+                    OVSA_DBG(
+                        DBG_E,
+                        "OVSA: Error signature file path greater than %d characters not allowed \n",
+                        MAX_FILE_NAME);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
                 }
@@ -399,9 +424,10 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                 break;
             case 's':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
-                    OVSA_DBG(DBG_E,
-                             "Error: Signature file path greater than %d characters not allowed \n",
-                             MAX_FILE_NAME);
+                    OVSA_DBG(
+                        DBG_E,
+                        "OVSA: Error signature file path greater than %d characters not allowed \n",
+                        MAX_FILE_NAME);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
                 }

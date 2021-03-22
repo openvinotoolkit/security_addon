@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,49 +37,55 @@ ovsa_license_type_t ovsa_json_map_license_type(const char* lictype);
  * \brief ovsa_json_create_license_config
  *
  * \param [in]  lic_conf_sig structure* containing keystore information
- * \param [out] outputBuf Buffer updated with json file contents
- * \return ovsa_status_t
- */
-ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* lic_conf_sig,
-                                              char* outputBuf);
-
-/*!
- * \brief ovsa_json_create_protected_model
- *
- * \param [in]  prot_model_sig structure* containing protected model information
  * \param [in]  size_t size containing size of the ouput buffer
  * \param [out] outputBuf Buffer updated with json file contents
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_json_create_protected_model(const ovsa_protected_model_sig_t* prot_model_sig,
-                                               size_t size, char* outputBuf);
+ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* lic_conf_sig,
+                                              size_t size, char* outputBuf);
+
+/*!
+ * \brief ovsa_json_create_controlled_access_model
+ *
+ * \param [in]  control_access_model_sig structure* containing controlled access model information
+ * \param [in]  size_t size containing size of the ouput buffer
+ * \param [out] outputBuf Buffer updated with json file contents
+ * \return ovsa_status_t
+ */
+ovsa_status_t ovsa_json_create_controlled_access_model(
+    const ovsa_controlled_access_model_sig_t* control_access_model_sig, size_t size,
+    char* outputBuf);
 /*!
  * \brief ovsa_json_create_TCB_signature
  *
  * \param [in]  tsig structure* containing TCB information
+ * \param [in]  size_t size containing size of the ouput buffer
  * \param [out] outputBuf Buffer updated with json file contents
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, char* outputBuf);
+ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, size_t size,
+                                             char* outputBuf);
 /*!
  * \brief ovsa_json_create_customer_license
  *
  * \param [in]  cust_lic_sig structure* containing customer license information
+ * \param [in]  size_t size containing size of the ouput buffer
  * \param [out] outputBuf Buffer updated with json file contents
  * \return ovsa_status_t
  */
 ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_t* cust_lic_sig,
-                                                char* outputBuf);
+                                                size_t size, char* outputBuf);
 
 /*!
  * \brief ovsa_json_create_master_license
  *
  * \param [in]  master_lic_sig structure* containing master license information
+ * \param [in]  size_t size containing size of the ouput buffer
  * \param [out] outputBuf Buffer updated with json file contents
  * \return ovsa_status_t
  */
 ovsa_status_t ovsa_json_create_master_license(const ovsa_master_license_sig_t* master_lic_sig,
-                                              char* outputBuf);
+                                              size_t size, char* outputBuf);
 
 /*!
  * \brief ovsa_json_extract_license_config
@@ -92,14 +98,14 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
                                                ovsa_license_config_sig_t* lic_conf_sig);
 
 /*!
- * \brief ovsa_json_extract_protected_model
+ * \brief ovsa_json_extract_controlled_access_model
  *
  * \param [in]  inputBuf Buffer having json file contents
- * \param [out] prot_model_sig structure* containing protected model information
+ * \param [out] control_access_model_sig structure* containing controlled access model information
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_json_extract_protected_model(const char* inputBuf,
-                                                ovsa_protected_model_sig_t* prot_model_sig);
+ovsa_status_t ovsa_json_extract_controlled_access_model(
+    const char* inputBuf, ovsa_controlled_access_model_sig_t* control_access_model_sig);
 /*!
  * \brief ovsa_json_extract_tcb_signature
  *

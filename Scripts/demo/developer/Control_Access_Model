@@ -1,6 +1,6 @@
 #! /bin/bash
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,15 +54,15 @@ done
 # set positional arguments in their proper place
 eval set -- "$PARAMS"
 
-echo "Protecting model $2. Please wait..."
+echo "Generating controlled access model $2. Please wait..."
        
 cd $OVSA_DEV_ARTEFACTS
 guid=$(uuidgen)
        
-/opt/ovsa/bin/ovsatool protect -i $2.bin $2.xml -n $2 -d $2 -v 0001 -p $2.dat -m $2.m_lic -k $1 -g $guid > $TRACE
+/opt/ovsa/bin/ovsatool controlAccess -i $2.bin $2.xml -n $2 -d $2 -v 0001 -p $2.dat -m $2.m_lic -k $1 -g $guid > $TRACE
 if [ "$?" != 0 ]
 then
-    echo "Protecting model $OVSA_DEV_ARTEFACTS/$2 failed"
+    echo "Generate controlled access model $OVSA_DEV_ARTEFACTS/$2 failed"
     exit 1
 fi       
 
@@ -70,7 +70,7 @@ fi
 /opt/ovsa/bin/ovsaruntime gen-tcb-signature -n $2_tcb -v "1.0" -f $2.tcb -k $1 > $TRACE
 if [ "$?" = 0 ]
 then
-    echo "Successfully protected $OVSA_DEV_ARTEFACTS/$2.dat"
+    echo "Successfully created controlled access model $OVSA_DEV_ARTEFACTS/$2.dat"
     echo "Successfully created $OVSA_DEV_ARTEFACTS/$2.m_lic"
 else
     echo "Generating Reference TCB for $OVSA_DEV_ARTEFACTS/$2 failed"
