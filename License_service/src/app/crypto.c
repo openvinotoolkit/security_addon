@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,23 +37,35 @@
 #include "safe_str_lib.h"
 #include "utils.h"
 
+void ovsa_server_crypto_openssl_free(char** buff) {
+    size_t buff_len = 0;
+
+    if (*buff != NULL) {
+        ovsa_server_get_string_length(*buff, &buff_len);
+        OPENSSL_clear_free(*buff, buff_len);
+        *buff = NULL;
+    }
+
+    return;
+}
+
 EVP_PKEY* ovsa_server_crypto_load_key(const char* p_Key, const char* key_descrip) {
     BIO* key       = NULL;
     EVP_PKEY* pkey = NULL;
 
     if ((p_Key == NULL) || (key_descrip == NULL)) {
-        OVSA_DBG(DBG_E, "Error: loading the key failed with invalid parameter\n");
+        OVSA_DBG(DBG_E, "OVSA: Error loading the key failed with invalid parameter\n");
         return NULL;
     }
 
     key = BIO_new(BIO_s_mem());
     if (key == NULL) {
-        OVSA_DBG(DBG_E, "Error: loading the key failed in getting the new BIO\n");
+        OVSA_DBG(DBG_E, "OVSA: Error loading the key failed in getting the new BIO\n");
         goto end;
     }
 
     if (BIO_puts(key, p_Key) <= 0) {
-        OVSA_DBG(DBG_E, "Error: loading the key failed in writing to key BIO\n");
+        OVSA_DBG(DBG_E, "OVSA: Error loading the key failed in writing to key BIO\n");
         goto end;
     }
 
@@ -66,7 +78,7 @@ EVP_PKEY* ovsa_server_crypto_load_key(const char* p_Key, const char* key_descrip
 end:
     BIO_free_all(key);
     if (pkey == NULL) {
-        OVSA_DBG(DBG_E, "Error: loading the key failed in loading the %s into memory\n",
+        OVSA_DBG(DBG_E, "OVSA: Error loading the key failed in loading the %s into memory\n",
                  key_descrip);
         ERR_print_errors(g_bio_err);
     }
@@ -86,11 +98,11 @@ ovsa_status_t ovsa_server_crypto_do_sign_verify_hash(unsigned char* buf, BIO* in
         read = BIO_read(inp, (char*)buf, BUFSIZE);
         if (read < 0) {
             OVSA_DBG(DBG_E,
-                     "Error: signing/verifying/hashing failed in reading the "
+                     "OVSA: Error signing/verifying/hashing failed in reading the "
                      "input file\n");
             ret = -1;
             OVSA_DBG(DBG_E,
-                     "Error: signing/verifying/hashing failed in reading the "
+                     "OVSA: Error signing/verifying/hashing failed in reading the "
                      "input file\n");
             goto end;
         }
@@ -107,11 +119,11 @@ ovsa_status_t ovsa_server_crypto_do_sign_verify_hash(unsigned char* buf, BIO* in
         if (verify > 0) {
             OVSA_DBG(DBG_I, "Verified OK\n");
         } else if (verify == 0) {
-            OVSA_DBG(DBG_E, "Error: Verification Failure\n");
+            OVSA_DBG(DBG_E, "OVSA: Error verification Failure\n");
             ret = -1;
             goto end;
         } else {
-            OVSA_DBG(DBG_E, "Error: Error Verifying Data\n");
+            OVSA_DBG(DBG_E, "OVSA: Error verifying Data\n");
             ret = -1;
             goto end;
         }
@@ -128,27 +140,27 @@ ovsa_status_t ovsa_server_crypto_do_sign_verify_hash(unsigned char* buf, BIO* in
             ret = ovsa_server_safe_malloc(len, (char**)&sigbuf);
             if (ret < OVSA_OK) {
                 ret = OVSA_MEMORY_ALLOC_FAIL;
-                OVSA_DBG(DBG_E, "Error: Init memory failed with code %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error init memory failed with code %d\n", ret);
                 goto end;
             }
             buf = sigbuf;
         }
 
         if (!EVP_DigestSignFinal(ctx, buf, &len)) {
-            OVSA_DBG(DBG_E, "Error: signing failed to sign the data\n");
+            OVSA_DBG(DBG_E, "OVSA: Error signing failed to sign the data\n");
             ret = -1;
             goto end;
         }
 
         if (!BIO_write(out, buf, len)) {
-            OVSA_DBG(DBG_E, "Error: signing failed in writing the signature\n");
+            OVSA_DBG(DBG_E, "OVSA: Error signing failed in writing the signature\n");
             ret = -1;
             goto end;
         }
     } else {
         len = BIO_gets(inp, (char*)buf, BUFSIZE);
         if ((int)len <= 0) {
-            OVSA_DBG(DBG_E, "Error: hashing failed with invalid input file length\n");
+            OVSA_DBG(DBG_E, "OVSA: Error hashing failed with invalid input file length\n");
             ret = -1;
             goto end;
         }
@@ -158,7 +170,7 @@ ovsa_status_t ovsa_server_crypto_do_sign_verify_hash(unsigned char* buf, BIO* in
     }
 
     if (!BIO_flush(out)) {
-        OVSA_DBG(DBG_E, "Error: signing failed in flushing the signature\n");
+        OVSA_DBG(DBG_E, "OVSA: Error signing failed in flushing the signature\n");
         ret = -1;
         goto end;
     }
@@ -179,19 +191,19 @@ X509* ovsa_server_crypto_load_cert(const char* cert, const char* cert_descrip) {
     X509* xcert   = NULL;
 
     if ((cert == NULL) || (cert_descrip == NULL)) {
-        OVSA_DBG(DBG_E, "Error: loading the certificate failed with invalid parameter\n");
+        OVSA_DBG(DBG_E, "OVSA: Error loading the certificate failed with invalid parameter\n");
         return NULL;
     }
 
     cert_mem = BIO_new(BIO_s_mem());
     if (cert_mem == NULL) {
-        OVSA_DBG(DBG_E, "Error: loading the certificate failed in getting the new BIO\n");
+        OVSA_DBG(DBG_E, "OVSA: Error loading the certificate failed in getting the new BIO\n");
         goto end;
     }
 
     if (BIO_puts(cert_mem, cert) <= 0) {
         OVSA_DBG(DBG_E,
-                 "Error: loading the certificate failed in writing to "
+                 "OVSA: Error loading the certificate failed in writing to "
                  "certificate BIO\n");
         goto end;
     }
@@ -200,7 +212,7 @@ X509* ovsa_server_crypto_load_cert(const char* cert, const char* cert_descrip) {
 
 end:
     if (xcert == NULL) {
-        OVSA_DBG(DBG_E, "Error: in loading the %s into memory\n", cert_descrip);
+        OVSA_DBG(DBG_E, "OVSA: Error in loading the %s into memory\n", cert_descrip);
         ERR_print_errors(g_bio_err);
     }
 
@@ -217,7 +229,7 @@ ovsa_status_t ovsa_server_crypto_extract_pubkey_certificate(const char* cert, ch
 
     if ((cert == NULL) || (public_key == NULL)) {
         OVSA_DBG(DBG_E,
-                 "Error: extracting public key from certificate failed with invalid "
+                 "OVSA: Error extracting public key from certificate failed with invalid "
                  "parameter\n");
         return -1;
     }
@@ -225,7 +237,7 @@ ovsa_status_t ovsa_server_crypto_extract_pubkey_certificate(const char* cert, ch
     pubkey_mem = BIO_new(BIO_s_mem());
     if (pubkey_mem == NULL) {
         OVSA_DBG(DBG_E,
-                 "Error: extracting public key from certificate failed in "
+                 "OVSA: Error extracting public key from certificate failed in "
                  "getting new BIO\n");
         ret = -1;
         goto end;
@@ -234,7 +246,7 @@ ovsa_status_t ovsa_server_crypto_extract_pubkey_certificate(const char* cert, ch
     xcert = ovsa_server_crypto_load_cert(cert, "certificate");
     if (xcert == NULL) {
         OVSA_DBG(DBG_E,
-                 "Error: extracting public key from certificate failed to "
+                 "OVSA: Error extracting public key from certificate failed to "
                  "read certificate\n");
         ret = -1;
         goto end;
@@ -243,14 +255,14 @@ ovsa_status_t ovsa_server_crypto_extract_pubkey_certificate(const char* cert, ch
     /* Extract public key from certificate */
     pkey = X509_get0_pubkey(xcert);
     if (pkey == NULL) {
-        OVSA_DBG(DBG_E, "Error: in extracting the public key from certificate\n");
+        OVSA_DBG(DBG_E, "OVSA: Error in extracting the public key from certificate\n");
         ret = -1;
         goto end;
     }
 
     if (!PEM_write_bio_PUBKEY(pubkey_mem, pkey)) {
         OVSA_DBG(DBG_E,
-                 "Error: extracting public key from certificate failed in writing the "
+                 "OVSA: Error extracting public key from certificate failed in writing the "
                  "public key\n");
         ret = -1;
         goto end;
@@ -259,15 +271,15 @@ ovsa_status_t ovsa_server_crypto_extract_pubkey_certificate(const char* cert, ch
     BIO_get_mem_ptr(pubkey_mem, &pubkey_ptr);
     if (pubkey_ptr == NULL) {
         OVSA_DBG(DBG_E,
-                 "Error: extracting public key from certificate failed to extract the "
+                 "OVSA: Error extracting public key from certificate failed to extract the "
                  "public key\n");
         ret = -1;
         goto end;
     }
 
-    if (memcpy_s(public_key, pubkey_ptr->length, pubkey_ptr->data, pubkey_ptr->length) != EOK) {
+    if (memcpy_s(public_key, MAX_KEY_SIZE, pubkey_ptr->data, pubkey_ptr->length) != EOK) {
         OVSA_DBG(DBG_E,
-                 "Error: extracting public key from certificate failed in getting the "
+                 "OVSA: Error extracting public key from certificate failed in getting the "
                  "public key\n");
         ret = -1;
         goto end;
@@ -300,12 +312,12 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
 
     g_bio_err = BIO_new_fp(stdout, BIO_NOCLOSE);
     if (g_bio_err == NULL) {
-        OVSA_DBG(DBG_E, "Error: crypto Initialization failed in creating a file BIO\n");
+        OVSA_DBG(DBG_E, "OVSA: Error crypto Initialization failed in creating a file BIO\n");
         return -1;
     }
 
     if ((cert == NULL) || (in_buff == NULL) || (in_buff_len == 0) || (signature == NULL)) {
-        OVSA_DBG(DBG_E, "Error: verifying the memory buffer failed with invalid parameter\n");
+        OVSA_DBG(DBG_E, "OVSA: Error verifying the memory buffer failed with invalid parameter\n");
         return -1;
     }
 
@@ -313,7 +325,7 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
     ret = ovsa_server_crypto_extract_pubkey_certificate(cert, public_key);
     if (ret < 0) {
         OVSA_DBG(DBG_E,
-                 "Error: verifying the memory buffer failed in extracting "
+                 "OVSA: Error verifying the memory buffer failed in extracting "
                  "the public key\n");
         goto end;
     }
@@ -331,7 +343,7 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
     bmd = BIO_new(BIO_f_md());
     if (bmd == NULL) {
         OVSA_DBG(DBG_E,
-                 "Error: verifying the memory buffer failed in getting the "
+                 "OVSA: Error verifying the memory buffer failed in getting the "
                  "message digest\n");
         ret = -1;
         goto end;
@@ -339,7 +351,7 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
 
     if ((b64 = BIO_new(BIO_f_base64())) == NULL) {
         OVSA_DBG(DBG_E,
-                 "Error: verifying the memory buffer failed in getting the "
+                 "OVSA: Error verifying the memory buffer failed in getting the "
                  "b64 encode method\n");
         ret = -1;
         goto end;
@@ -348,7 +360,7 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
     input_bio = BIO_push(bmd, read_bio);
     if (BIO_puts(read_bio, in_buff) <= 0) {
         OVSA_DBG(DBG_E,
-                 "Error: verifying the memory buffer failed in writing to "
+                 "OVSA: Error verifying the memory buffer failed in writing to "
                  "input buffer BIO\n");
         ret = -1;
         goto end;
@@ -403,7 +415,7 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
         ret = ovsa_server_safe_malloc(siglen, (char**)&sigbuff);
         if (ret < OVSA_OK) {
             ret = OVSA_MEMORY_ALLOC_FAIL;
-            OVSA_DBG(DBG_E, "Error: Init memory failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error init memory failed with code %d\n", ret);
             goto end;
         }
 
@@ -427,7 +439,7 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
     ret = ovsa_server_safe_malloc(EVP_ENCODE_LENGTH(BUFSIZE), (char**)&verify_mem_buff);
     if (ret < OVSA_OK) {
         ret = OVSA_MEMORY_ALLOC_FAIL;
-        OVSA_DBG(DBG_E, "Error: Init memory failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error init memory failed with code %d\n", ret);
         goto end;
     }
 
@@ -435,7 +447,7 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
                                                  in_buff, NULL);
     if (ret < 0) {
         OVSA_DBG(DBG_E,
-                 "Error: verifying the memory buffer failed in verifying "
+                 "OVSA: Error verifying the memory buffer failed in verifying "
                  "the signature\n");
         goto end;
     }
@@ -457,8 +469,8 @@ end:
     return ret;
 }
 
-ovsa_status_t ovsa_server_crypto_convert_bin_to_pem(const char* in_buff, size_t in_buff_len,
-                                                    char** out_buff) {
+ovsa_status_t ovsa_server_crypto_convert_bin_to_base64(const char* in_buff, size_t in_buff_len,
+                                                       char** out_buff) {
     ovsa_status_t ret      = OVSA_OK;
     BIO* pem_bio           = NULL;
     BIO* write_bio         = NULL;
@@ -599,85 +611,76 @@ ovsa_status_t ovsa_create_nonce(char** nonce_buf) {
     BIO* b64           = NULL;
     BUF_MEM* nonce_ptr = NULL;
     int bytes, rng = 0;
-    size_t length = 0;
+    size_t length             = 0;
+    size_t nonce_bin_buff_len = 0;
     unsigned char nonce[NONCE_SIZE];
+    unsigned char nonce_bin_buff[NONCE_BUF_SIZE];
+    char* nonce_b64_buff = NULL;
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
     memset_s(nonce, sizeof(nonce), 0);
+    memset_s(nonce_bin_buff, sizeof(nonce_bin_buff), 0);
 
-    out_bio = BIO_new(BIO_s_mem());
-    if (out_bio == NULL) {
+    nonce_bio = BIO_new(BIO_s_mem());
+    if (nonce_bio == NULL) {
         OVSA_DBG(DBG_E,
-                 "Error: Generate nonce failed in getting new "
+                 "OVSA: Error generate nonce failed in getting new "
                  "BIO for the output buffer\n");
         ret = -1;
         goto out;
     }
 
-    if ((b64 = BIO_new(BIO_f_base64())) == NULL) {
-        OVSA_DBG(DBG_E,
-                 "Error: Client license check callback failed in getting the "
-                 "b64 encode method\n");
-        ret = -1;
-        goto out;
-    }
-
-    nonce_bio = out_bio;
-    nonce_bio = BIO_push(b64, nonce_bio);
-
     /*Generate nonce for customer validation */
     rng = RAND_bytes(nonce, NONCE_SIZE);
     if (rng <= OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: RAND_bytes() returned %d\n", rng);
+        OVSA_DBG(DBG_E, "OVSA: Error RAND_bytes() returned %d\n", rng);
         return -EINVAL;
     }
-    if (BIO_write(nonce_bio, nonce, NONCE_SIZE) != NONCE_SIZE) {
-        OVSA_DBG(DBG_E, "Error: Client license check callback failed in writing the nonce\n");
-        ret = -1;
-        goto out;
+
+    for (int count = 0; count < NONCE_SIZE; count++) {
+        if (BIO_printf(nonce_bio, "%02x", nonce[count]) != 2) {
+            goto out;
+        }
     }
 
     if (!BIO_flush(nonce_bio)) {
         OVSA_DBG(DBG_E,
-                 "Error: Client license check callback failed in flushing the "
+                 "OVSA: Error client license check callback failed in flushing the "
                  "output buffer\n");
         ret = -1;
         goto out;
     }
 
-    BIO_get_mem_ptr(nonce_bio, &nonce_ptr);
-    if (nonce_ptr == NULL) {
-        OVSA_DBG(DBG_E, "Error: Client license check callback failed to extract the nonce\n");
-        ret = -1;
-        goto out;
-    }
-
-    ret = ovsa_server_safe_malloc((sizeof(char) * NONCE_BUF_SIZE), nonce_buf);
+    ret = ovsa_server_safe_malloc((sizeof(char) * NONCE_SIZE * 2), nonce_buf);
     if (ret < OVSA_OK) {
         ret = OVSA_MEMORY_ALLOC_FAIL;
-        OVSA_DBG(DBG_E, "Error: Memory init failed\n");
+        OVSA_DBG(DBG_E, "OVSA: Error memory init failed\n");
         goto out;
     }
 
-    if (memcpy_s(*nonce_buf, NONCE_BUF_SIZE, nonce_ptr->data, nonce_ptr->length) != EOK) {
-        OVSA_DBG(DBG_E, "Error: Client license check callback failed in getting the nonce\n");
+    ovsa_server_crypto_convert_bin_to_base64(nonce, sizeof(nonce), &nonce_b64_buff);
+    if (nonce_b64_buff == NULL) {
+        OVSA_DBG(DBG_E, "OVSA: Error could not conver nounce to base64\n");
         ret = -1;
         goto out;
     }
+
+    if (memcpy_s(*nonce_buf, strlen(nonce_b64_buff), nonce_b64_buff, strlen(nonce_b64_buff)) !=
+        EOK) {
+        OVSA_DBG(DBG_E, "OVSA: Error generating nonce\n");
+        ret = -1;
+        goto out;
+    }
+
 out:
-    BIO_free(b64);
-    BIO_free_all(out_bio);
+    BIO_free_all(nonce_bio);
+    ovsa_server_safe_free(&nonce_b64_buff);
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }
 ovsa_status_t ovsa_generate_nonce_payload(char** nonce_buf, char** json_payload) {
-    ovsa_status_t ret  = OVSA_OK;
-    BIO* out_bio       = NULL;
-    BIO* nonce_bio     = NULL;
-    BIO* b64           = NULL;
-    BUF_MEM* nonce_ptr = NULL;
-    int bytes, rng = 0, i = 0;
+    ovsa_status_t ret        = OVSA_OK;
     char* nonce_json_buf     = NULL;
     size_t nonce_payload_len = 0;
     size_t length            = 0;
@@ -695,7 +698,7 @@ ovsa_status_t ovsa_generate_nonce_payload(char** nonce_buf, char** json_payload)
     ret =
         ovsa_server_json_create_message_blob(OVSA_SEND_NONCE, *nonce_buf, &nonce_json_buf, &length);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Create message blob failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create message blob failed with error code %d\n", ret);
         goto out;
     }
     /* Append payload length to json blob */
@@ -703,19 +706,146 @@ ovsa_status_t ovsa_generate_nonce_payload(char** nonce_buf, char** json_payload)
     ret               = ovsa_server_safe_malloc((sizeof(char) * nonce_payload_len), json_payload);
     if (ret < OVSA_OK) {
         ret = OVSA_MEMORY_ALLOC_FAIL;
-        OVSA_DBG(DBG_E, "Error: Memory init failed\n");
+        OVSA_DBG(DBG_E, "OVSA: Error memory init failed\n");
         goto out;
     }
     ret = ovsa_append_payload_len_to_blob(nonce_json_buf, json_payload);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error:json blob creation failed with %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error json blob creation failed with %d\n", ret);
         goto out;
     }
     OVSA_DBG(DBG_D, "OVSA:json payload %s\n", *json_payload);
 out:
     ovsa_server_safe_free(&nonce_json_buf);
-    BIO_free(b64);
-    BIO_free_all(out_bio);
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
+
+ovsa_status_t ovsa_server_crypto_compute_hash(const char* in_buff, int hash_alg, char* out_buff,
+                                              bool b64_format) {
+    unsigned char* compute_hash_buff = NULL;
+    ovsa_status_t ret                = OVSA_OK;
+    BUF_MEM* compute_hash_ptr        = NULL;
+    const EVP_MD* md                 = NULL;
+    EVP_MD_CTX* mctx                 = NULL;
+    BIO* write_bio                   = NULL;
+    BIO* input_bio                   = NULL;
+    BIO* read_bio                    = NULL;
+    BIO* out_bio                     = NULL;
+    BIO* bmd                         = NULL;
+    BIO* b64                         = NULL;
+    size_t hash_length               = 0;
+
+    if ((in_buff == NULL) || (out_buff == NULL)) {
+        OVSA_DBG(DBG_E, "OVSA: Error computing hash failed with invalid parameter\n");
+        return OVSA_INVALID_PARAMETER;
+    }
+
+    /* Default HASH Algorithm is SHA512, unless requested for SHA256 */
+    if (hash_alg == HASH_ALG_SHA256) {
+        md          = EVP_sha256();
+        hash_length = 32;
+    } else {
+        md          = EVP_sha512();
+        hash_length = 64;
+    }
+
+    read_bio = BIO_new(BIO_s_mem());
+    if (read_bio == NULL) {
+        OVSA_DBG(DBG_E, "OVSA: Error computing hash failed in getting new BIO");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    bmd = BIO_new(BIO_f_md());
+    if (bmd == NULL) {
+        OVSA_DBG(DBG_E, "OVSA: Error computing hash failed in getting the message digest\n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    if (b64_format == true) {
+        if ((b64 = BIO_new(BIO_f_base64())) == NULL) {
+            OVSA_DBG(DBG_E, "OVSA: Error computing hash failed in getting the b64 encode method\n");
+            ret = OVSA_CRYPTO_BIO_ERROR;
+            goto end;
+        }
+    }
+
+    write_bio = BIO_new(BIO_s_mem());
+    if (write_bio == NULL) {
+        OVSA_DBG(DBG_E,
+                 "OVSA: Error computing hash failed in getting new BIO for the output buffer\n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    out_bio = write_bio;
+    if (b64_format == true)
+        out_bio = BIO_push(b64, out_bio);
+    input_bio = BIO_push(bmd, read_bio);
+    if (BIO_puts(read_bio, in_buff) <= 0) {
+        OVSA_DBG(DBG_E, "OVSA: Error computing hash failed in writing to input buffer BIO\n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    if (!BIO_get_md_ctx(bmd, &mctx)) {
+        OVSA_DBG(DBG_E, "OVSA: Error computing hash failed in getting the context for digest\n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    if (!EVP_DigestInit_ex(mctx, md, NULL)) {
+        OVSA_DBG(DBG_E, "OVSA: Error computing hash failed in setting up the digest context\n");
+        ret = OVSA_CRYPTO_EVP_ERROR;
+        goto end;
+    }
+    ret = ovsa_server_safe_malloc(EVP_ENCODE_LENGTH(BUFSIZE), (char**)&compute_hash_buff);
+    if (ret < OVSA_OK) {
+        ret = OVSA_MEMORY_ALLOC_FAIL;
+        OVSA_DBG(DBG_E, "OVSA: Error init memory failed with code %d\n", ret);
+        goto end;
+    }
+    ret = ovsa_server_crypto_do_sign_verify_hash(compute_hash_buff, input_bio, NULL, NULL, 0,
+                                                 in_buff, out_bio);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error computing hash failed in generating the hash\n");
+        goto end;
+    }
+
+    if (b64_format == true) {
+        BIO_get_mem_ptr(out_bio, &compute_hash_ptr);
+        if (compute_hash_ptr == NULL) {
+            OVSA_DBG(DBG_E, "OVSA: Error computing hash failed to extract the computed hash\n");
+            ret = OVSA_CRYPTO_BIO_ERROR;
+            goto end;
+        }
+        if (memcpy_s(out_buff, HASH_B64_SIZE, compute_hash_ptr->data, compute_hash_ptr->length) !=
+            EOK) {
+            OVSA_DBG(DBG_E, "OVSA: Error computing hash failed in getting the output buffer\n");
+            ret = OVSA_MEMIO_ERROR;
+            goto end;
+        }
+    } else {
+        if (memcpy_s(out_buff, hash_length, compute_hash_buff, hash_length) != EOK) {
+            BIO_printf(g_bio_err,
+                       "LibOVSA: Error computing hash failed in getting the output buffer\n");
+            ret = OVSA_MEMIO_ERROR;
+            goto end;
+        }
+    }
+
+    (void)BIO_reset(bmd);
+end:
+    ovsa_server_crypto_openssl_free((char**)&compute_hash_buff);
+    if (b64_format == true)
+        BIO_free(b64);
+    BIO_free_all(write_bio);
+    BIO_free(bmd);
+    BIO_free_all(read_bio);
+    if (ret < OVSA_OK) {
+        ERR_print_errors(g_bio_err);
+    }
     return ret;
 }

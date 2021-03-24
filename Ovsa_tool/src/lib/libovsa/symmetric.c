@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -142,8 +142,8 @@ end:
 static int ovsa_crypto_setup_peer(EVP_PKEY_CTX* ctx, EVP_PKEY* pkey) {
     int status = -1;
 
-    if (pkey == NULL) {
-        BIO_printf(g_bio_err, "LibOVSA: Error setting up peer key failed in getting the key\n");
+    if ((ctx == NULL) || (pkey == NULL)) {
+        BIO_printf(g_bio_err, "LibOVSA: Error setting up peer key failed with invalid parameter\n");
         return status;
     }
 
@@ -176,7 +176,8 @@ ovsa_status_t ovsa_crypto_create_ecdh_key(int asym_key_slot, int peer_key_slot, 
     unsigned char sha512[SHA512_DIGEST_LENGTH];
 
     if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT) ||
-        (peer_key_slot < MIN_KEY_SLOT) || (peer_key_slot >= MAX_KEY_SLOT)) {
+        (peer_key_slot < MIN_KEY_SLOT) || (peer_key_slot >= MAX_KEY_SLOT) ||
+        (sym_key_slot == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error creating ecdh key failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
@@ -346,7 +347,7 @@ ovsa_status_t ovsa_crypto_add_symmetric_keystore_array(const char* symmetric_key
     int symmetric_index      = 0;
     size_t symmetric_key_len = 0, sym_key_len = 0;
 
-    if (symmetric_key == NULL) {
+    if ((symmetric_key == NULL) || (sym_key_slot == NULL)) {
         BIO_printf(
             g_bio_err,
             "LibOVSA: Error adding to symmetric keystore array failed with invalid parameter\n");
@@ -414,7 +415,7 @@ ovsa_status_t ovsa_crypto_generate_symmetric_key(int key_size, int* sym_key_slot
     ovsa_status_t ret = OVSA_OK;
     char symmetric_key[MAX_EKEY_SIZE];
 
-    if (key_size == 0) {
+    if ((key_size == 0) || (sym_key_slot == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error generating symmetric key failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -462,7 +463,7 @@ ovsa_status_t ovsa_crypto_derive_keyiv_hmac(int sym_key_slot, const char* in_buf
     char keyiv_hmac[MAX_KEYIV_HMAC_LENGTH];
 
     if ((sym_key_slot < MIN_KEY_SLOT) || (sym_key_slot >= MAX_KEY_SLOT) || (in_buff == NULL) ||
-        (in_buff_len == 0)) {
+        (in_buff_len == 0) || (keyiv_hmac_slot == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error generating key/IV/HMAC failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -616,6 +617,11 @@ ovsa_status_t ovsa_crypto_generate_salt(char* salt_buff, char* magic_salt_buff) 
     BIO* b64                  = NULL;
     unsigned char salt[PKCS5_SALT_LEN];
 
+    if (magic_salt_buff == NULL) {
+        BIO_printf(g_bio_err, "LibOVSA: Error generating salt failed with invalid parameter\n");
+        return OVSA_INVALID_PARAMETER;
+    }
+
     memset_s(salt, sizeof(salt), 0);
 
     if ((b64 = BIO_new(BIO_f_base64())) == NULL) {
@@ -718,7 +724,8 @@ ovsa_status_t ovsa_crypto_encrypt_mem(int sym_key_slot, const char* in_buff, siz
     char magic_salt_buff[MAX_MAGIC_SALT_LENGTH];
 
     if ((sym_key_slot < MIN_KEY_SLOT) || (sym_key_slot >= MAX_KEY_SLOT) || (in_buff == NULL) ||
-        (in_buff_len == 0)) {
+        (in_buff_len == 0) || (out_buff == NULL) || (out_buff_len == NULL) ||
+        (keyiv_hmac_slot == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error encrypting the memory buffer failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -1051,7 +1058,8 @@ ovsa_status_t ovsa_crypto_decrypt_mem(int sym_key_slot, const char* in_buff, siz
     char mbuff[sizeof(magic) - 1];
 
     if ((sym_key_slot < 0) || (sym_key_slot >= MAX_KEY_SLOT) || (in_buff == NULL) ||
-        (in_buff_len == 0)) {
+        (in_buff_len == 0) || (out_buff == NULL) || (out_buff_len == NULL) ||
+        (keyiv_hmac_slot == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error decrypting the memory buffer failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -1288,7 +1296,7 @@ ovsa_status_t ovsa_crypto_derive_unsealing_key(char* magic_salt_buff, int* sym_k
     char encryption_key[MAX_EKEY_SIZE];
     char encryption_key_b64[MAX_EKEY_SIZE];
 
-    if (magic_salt_buff == NULL) {
+    if ((magic_salt_buff == NULL) || (sym_key_slot == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error unsealing key failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
@@ -1494,7 +1502,8 @@ ovsa_status_t ovsa_crypto_decrypt_keystore(int sym_key_slot, const char* in_buff
     ovsa_enc_keystore_t enc_keystore;
 
     if ((sym_key_slot < MIN_KEY_SLOT) || (sym_key_slot >= MAX_KEY_SLOT) || (in_buff == NULL) ||
-        (in_buff_len == 0) || (magic_salt_buff == NULL)) {
+        (in_buff_len == 0) || (magic_salt_buff == NULL) || (out_buff == NULL) ||
+        (out_buff_len == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error decrypting keystore failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }

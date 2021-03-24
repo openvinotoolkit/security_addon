@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,7 +73,7 @@ check_status "Create a new sealing object with the authorized policy Failed"
 # Replace the old persistent sealing object with the one we created above
 # with policyauthorize policy associated with signer public key
 echo "Seal newly created persistent sealing object"
-context=`tpm2_getcap handles-persistent -T device:/dev/tpmrm0 | awk 'END{print $2}'`
+context=`tpm2_getcap handles-persistent -T device:/dev/tpmrm0 | awk 'NR==1{print $2}'`
 if [ ! -z "$context" ] && [ $context = "0x81010001" ]
 then
   sudo tpm2_evictcontrol --hierarchy=o --object-context=0x81010001 -T device:/dev/tpmrm0 
@@ -95,3 +95,4 @@ check_status "Signing PCR Policy Failed"
 
 echo "Signing PCR Policy successfully"
 exit 0
+

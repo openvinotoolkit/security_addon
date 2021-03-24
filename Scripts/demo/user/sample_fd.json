@@ -12,7 +12,7 @@
       "config":{
         "name":"fd",
         "base_path":"/sampleloader/artefacts",
-        "custom_loader_options": {"loader_name":  "ovsa", "keystore":  "Cust_Keystore", "protected_file": "face-detection-retail-0004"}
+        "custom_loader_options": {"loader_name":  "ovsa", "keystore":  "Cust_Keystore", "controlled_access_file": "face-detection-retail-0004"}
       }
     }
 

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -180,7 +180,7 @@ ovsa_status_t ovsa_crypto_add_asymmetric_keystore_array(const ovsa_isv_keystore_
     int public_key_indicator = -1, private_key_indicator = -1;
     int key_guid_indicator = -1, cert_indicator = -1;
 
-    if (isv_keystore == NULL) {
+    if ((isv_keystore == NULL) || (asym_key_slot == NULL)) {
         BIO_printf(
             g_bio_err,
             "LibOVSA: Error adding to asymmetric keystore array failed with invalid parameter\n");
@@ -326,7 +326,7 @@ ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, 
     char magic_salt_buff[MAX_MAGIC_SALT_LENGTH];
 
     if ((ECDSA != alg_type) || (subject == NULL) || (isv_name == NULL) || (keystore_name == NULL) ||
-        (csr_file_name == NULL)) {
+        (csr_file_name == NULL) || (asym_key_slot == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error generating asymmetric key pair failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -621,7 +621,7 @@ ovsa_status_t ovsa_crypto_load_asymmetric_key(const char* keystore_name, int* as
     ovsa_status_t ret = OVSA_OK;
     ovsa_isv_keystore_t keystore[MAX_KEYPAIR];
 
-    if (keystore_name == NULL) {
+    if ((keystore_name == NULL) || (asym_key_slot == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error loading asymmetric key failed with invalid file path\n");
         return OVSA_INVALID_FILE_PATH;
@@ -689,7 +689,7 @@ ovsa_status_t ovsa_crypto_get_asymmetric_key_slot(const char* keystore_name, int
     int key_guid_indicator = -1, cert_indicator = -1;
     ovsa_isv_keystore_t keystore[MAX_KEYPAIR];
 
-    if (keystore_name == NULL) {
+    if ((keystore_name == NULL) || (asym_key_slot == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error getting asymmetric key slot failed with invalid file path\n");
         return OVSA_INVALID_FILE_PATH;
@@ -937,7 +937,7 @@ ovsa_status_t ovsa_crypto_get_certificate(int asym_key_slot, char** cert) {
     size_t cert_buff_len = 0;
     char* cert_buff      = NULL;
 
-    if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT)) {
+    if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT) || (cert == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error getting certificate failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
@@ -2298,7 +2298,8 @@ ovsa_status_t ovsa_crypto_wrap_key(int asym_key_slot, int sym_key_slot, char** o
     int shared_key_slot = -1;
 
     if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT) ||
-        (sym_key_slot < MIN_KEY_SLOT) || (sym_key_slot >= MAX_KEY_SLOT)) {
+        (sym_key_slot < MIN_KEY_SLOT) || (sym_key_slot >= MAX_KEY_SLOT) || (out_buff == NULL) ||
+        (out_buff_len == NULL) || (keyiv_hmac_slot == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error wrapping the key failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
@@ -2342,7 +2343,8 @@ ovsa_status_t ovsa_crypto_rewrap_key(int asym_key_slot, int peer_key_slot, const
 
     if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT) ||
         (peer_key_slot < MIN_KEY_SLOT) || (peer_key_slot >= MAX_KEY_SLOT) || (in_buff == NULL) ||
-        (in_buff_len == 0)) {
+        (in_buff_len == 0) || (out_buff == NULL) || (out_buff_len == NULL) ||
+        (keyiv_hmac_slot == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error rewrapping the key failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
@@ -2399,7 +2401,7 @@ ovsa_status_t ovsa_crypto_unwrap_key(int asym_key_slot, int peer_key_slot, const
 
     if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT) ||
         (peer_key_slot < MIN_KEY_SLOT) || (peer_key_slot >= MAX_KEY_SLOT) || (in_buff == NULL) ||
-        (in_buff_len == 0)) {
+        (in_buff_len == 0) || (sym_key_slot == NULL) || (keyiv_hmac_slot == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error unwrapping the key failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }

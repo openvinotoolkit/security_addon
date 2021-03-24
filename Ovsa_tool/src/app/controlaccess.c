@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@
 /* json.h to be included at end due to dependencies */
 #include "json.h"
 
-char g_model_hash[HASH_SIZE];
+unsigned char g_model_hash[HASH_SIZE];
 size_t g_isvcert_len             = 0;
 static char* g_isv_certificate   = NULL;
 static char* g_model_name        = NULL;
@@ -38,24 +38,25 @@ static char* g_model_description = NULL;
 static char* g_model_version     = NULL;
 static char g_model_guid[GUID_SIZE];
 
-static void ovsa_protect_help(const char* argv) {
-    printf("Help for Protect command\n");
+static void ovsa_controlaccess_help(const char* argv) {
+    printf("Help for Control Access command\n");
     printf(
         "-i : List of model files to encrypt(Intermediatefiles/ Modelweights/ additionalfiles)\n");
     printf("-n : Model name\n");
     printf("-d : Model description\n");
     printf("-v : Model version number\n");
-    printf("-p : Protected model file\n");
+    printf("-p : Controlled access model file\n");
     printf("-m : Master license file\n");
     printf("-k : Keystore name\n");
     printf("-g : License GUID\n");
-    printf("Example for protect as below:\n");
+    printf("Example for controllAccess as below:\n");
     printf(
         "-i <Intermediate File> <Model weights file> <additional files> -n <Model name> -d <Model "
-        "Description> -v <Model Version> -p <Protected model  file> -m <Master license file> -k "
+        "Description> -v <Model Version> -p <Controlled access model file> -m <Master license "
+        "file> -k "
         "<key store file>\n\n");
     printf(
-        "%s protect -i face_detection.xml face_detection.bin face_detection.txt -n \"Face "
+        "%s controlAccess -i face_detection.xml face_detection.bin face_detection.txt -n \"Face "
         "Detection\" -d \"Face person detection retail\" -v 0002 -p face_detection_model.json -m "
         "face_detection_model_master.lic -k key_store -g "
         "\"50934a64-5d1b-4655-bcb4-80080fcb8858\"\n",
@@ -79,7 +80,7 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
 
     if ((keyslot < MIN_KEY_SLOT) || (keyslot >= MAX_KEY_SLOT) || input_list == NULL) {
         ret = OVSA_INVALID_PARAMETER;
-        OVSA_DBG(DBG_E, "Error: Invalid input parameters\n");
+        OVSA_DBG(DBG_E, "OVSA: Error invalid input parameters\n");
         goto out;
     }
 
@@ -87,7 +88,7 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
     while (cur_file != NULL) {
         FILE* fcur_file = fopen(cur_file->name, "r");
         if (fcur_file == NULL) {
-            OVSA_DBG(DBG_E, "Error: Opening model file %s\n", cur_file->name);
+            OVSA_DBG(DBG_E, "OVSA: Error opening model file %s\n", cur_file->name);
             ret = OVSA_FILEOPEN_FAIL;
             goto out;
         }
@@ -99,7 +100,7 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
         /* Read the content of the file */
         ret = ovsa_safe_malloc(size + NULL_TERMINATOR, &model_buf);
         if (ret < OVSA_OK || model_buf == NULL) {
-            OVSA_DBG(DBG_E, "Error: Encryption buffer allocation failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error encryption buffer allocation failed with code %d\n", ret);
             fclose(fcur_file);
             goto out;
         }
@@ -109,7 +110,8 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
         if (enc_model_head == NULL) {
             ret = ovsa_safe_malloc(sizeof(ovsa_enc_models_t), (char**)&enc_model_head);
             if (ret < OVSA_OK || enc_model_head == NULL) {
-                OVSA_DBG(DBG_E, "Error: Model encryption list initialization failed with code %d\n",
+                OVSA_DBG(DBG_E,
+                         "OVSA: Error model encryption list initialization failed with code %d\n",
                          ret);
                 goto out;
             }
@@ -118,7 +120,8 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
         } else {
             ret = ovsa_safe_malloc(sizeof(ovsa_enc_models_t), (char**)&enc_model_cur);
             if (ret < OVSA_OK || enc_model_cur == NULL) {
-                OVSA_DBG(DBG_E, "Error: Model encryption list initialization failed with code %d\n",
+                OVSA_DBG(DBG_E,
+                         "OVSA: Error model encryption list initialization failed with code %d\n",
                          ret);
                 goto out;
             }
@@ -126,13 +129,14 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
             enc_model_tail->next = enc_model_cur;
             enc_model_tail       = enc_model_cur;
         }
-        memcpy_s(enc_model_tail->file_name, strnlen_s(cur_file->name, MAX_FILE_NAME),
-                 cur_file->name, strnlen_s(cur_file->name, MAX_FILE_NAME));
+        memcpy_s(enc_model_tail->file_name, MAX_FILE_NAME, cur_file->name,
+                 strnlen_s(cur_file->name, MAX_FILE_NAME));
         /* Encrypt model file */
         ret = ovsa_crypto_encrypt_mem(keyslot, model_buf, size, NULL, &enc_model_tail->enc_model,
                                       &outlen, &keyiv_hmac_slot);
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Encryption of %s failed with code %d\n", cur_file->name, ret);
+            OVSA_DBG(DBG_E, "OVSA: Error encryption of %s failed with code %d\n", cur_file->name,
+                     ret);
             /* Clear key/IV/HMAC from the key slot */
             ovsa_crypto_clear_symmetric_key_slot(keyiv_hmac_slot);
             goto out;
@@ -156,155 +160,173 @@ out:
     return ret;
 }
 
-static ovsa_status_t ovsa_do_create_protected_model_file(int asymm_keyslot, int sym_keyslot,
-                                                         const ovsa_input_files_t* input_list,
-                                                         const char* protect_file) {
-    ovsa_status_t ret            = OVSA_OK;
-    int file_count               = 0;
-    size_t size                  = 0;
-    size_t model_file_len        = 0;
-    size_t protect_buf_len       = 0;
-    char* protect_buf_string     = NULL;
-    char* protect_buf_sig_string = NULL;
-    FILE* fptr                   = NULL;
-    ovsa_protected_model_sig_t protected_sig_model;
+static ovsa_status_t ovsa_do_create_controlled_access_model_file(
+    int asymm_keyslot, int sym_keyslot, const ovsa_input_files_t* input_list,
+    const char* controlled_access_file) {
+    ovsa_status_t ret                  = OVSA_OK;
+    int file_count                     = 0;
+    size_t size                        = 0;
+    size_t model_file_len              = 0;
+    size_t controlaccess_buf_len       = 0;
+    char* controlaccess_buf_string     = NULL;
+    char* controlaccess_buf_sig_string = NULL;
+    FILE* fptr                         = NULL;
+    ovsa_controlled_access_model_sig_t controlled_access_sig_model;
 
     if ((asymm_keyslot < MIN_KEY_SLOT) || (asymm_keyslot >= MAX_KEY_SLOT) ||
         (sym_keyslot < MIN_KEY_SLOT) || (sym_keyslot >= MAX_KEY_SLOT) || input_list == NULL ||
-        protect_file == NULL) {
+        controlled_access_file == NULL) {
         ret = OVSA_INVALID_PARAMETER;
-        OVSA_DBG(DBG_E, "Error: Wrong input parameters to create protected model\n");
+        OVSA_DBG(DBG_E,
+                 "OVSA: Error wrong input parameters to create controlled access model file\n");
         return ret;
     }
 
-    OVSA_DBG(DBG_I, "\nOVSA: Protect model generation\n");
-    memset_s(&protected_sig_model, sizeof(ovsa_protected_model_sig_t), 0);
+    OVSA_DBG(DBG_I, "\nOVSA: Controlled access model file generation\n");
+    memset_s(&controlled_access_sig_model, sizeof(ovsa_controlled_access_model_sig_t), 0);
     /* Validate global parameters and populate the structure */
     if ((g_model_name != NULL) && (g_model_description != NULL) && (g_model_version != NULL)) {
-        /* Protected Model structure */
-        memcpy_s(protected_sig_model.protect_model.model_name, MAX_NAME_SIZE, g_model_name,
-                 strnlen_s(g_model_name, MAX_NAME_SIZE));
-        memcpy_s(protected_sig_model.protect_model.description, MAX_NAME_SIZE, g_model_description,
-                 strnlen_s(g_model_description, MAX_NAME_SIZE));
-        memcpy_s(protected_sig_model.protect_model.version, MAX_VERSION_SIZE, g_model_version,
-                 strnlen_s(g_model_version, MAX_VERSION_SIZE));
+        /* Controlled Access Model structure */
+        memcpy_s(controlled_access_sig_model.controlled_access_model.model_name, MAX_NAME_SIZE,
+                 g_model_name, strnlen_s(g_model_name, MAX_NAME_SIZE));
+        memcpy_s(controlled_access_sig_model.controlled_access_model.description, MAX_NAME_SIZE,
+                 g_model_description, strnlen_s(g_model_description, MAX_NAME_SIZE));
+        memcpy_s(controlled_access_sig_model.controlled_access_model.version, MAX_VERSION_SIZE,
+                 g_model_version, strnlen_s(g_model_version, MAX_VERSION_SIZE));
     } else {
         ret = OVSA_INVALID_PARAMETER;
-        OVSA_DBG(DBG_E, "Error: Wrong global parameters to create protected model\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong global parameters to create controlled access model\n");
         return ret;
     }
 
     /* Extract certificate from key slot */
-    ret = ovsa_crypto_get_certificate(asymm_keyslot,
-                                      &protected_sig_model.protect_model.isv_certificate);
+    ret = ovsa_crypto_get_certificate(
+        asymm_keyslot, &controlled_access_sig_model.controlled_access_model.isv_certificate);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Extract ISV certificate failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error extract ISV certificate failed with error code %d\n", ret);
         goto out;
     }
-    ret = ovsa_get_string_length(protected_sig_model.protect_model.isv_certificate, &g_isvcert_len);
+    ret = ovsa_get_string_length(
+        controlled_access_sig_model.controlled_access_model.isv_certificate, &g_isvcert_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n", ret);
         goto out;
     }
     g_isvcert_len = g_isvcert_len + 1; /* For null termination */
     ret           = ovsa_safe_malloc(g_isvcert_len, &g_isv_certificate);
-    memcpy_s(g_isv_certificate, g_isvcert_len, protected_sig_model.protect_model.isv_certificate,
-             g_isvcert_len);
-    protected_sig_model.protect_model.isv_certificate[g_isvcert_len - 1] = '\0';
+    memcpy_s(g_isv_certificate, g_isvcert_len,
+             controlled_access_sig_model.controlled_access_model.isv_certificate, g_isvcert_len);
+    controlled_access_sig_model.controlled_access_model.isv_certificate[g_isvcert_len - 1] = '\0';
 
     /* Verify certificate */
     OVSA_DBG(DBG_I, "OVSA: Verify ISV Certificate\n ");
-    ret = ovsa_crypto_verify_certificate(asymm_keyslot, /* PEER CERT */ false,
-                                         protected_sig_model.protect_model.isv_certificate,
-                                         /* lifetime_validity_check */ true);
+    if ((!g_isvcert_len) || (g_isvcert_len > MAX_CERT_SIZE)) {
+        OVSA_DBG(DBG_E, "OVSA: Error ISV certificate length is invalid \n");
+        ret = OVSA_INVALID_PARAMETER;
+        goto out;
+    }
+    ret = ovsa_crypto_verify_certificate(
+        asymm_keyslot, /* PEER CERT */ false,
+        controlled_access_sig_model.controlled_access_model.isv_certificate,
+        /* lifetime_validity_check */ true);
     if (ret != OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Certificate verification failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error certificate verification failed with code %d\n", ret);
         goto out;
     }
 
     /* Read and encrypt input model files */
     OVSA_DBG(DBG_I, "OVSA: Encrypt Model Files\n");
     ret = ovsa_encrypt_model_files(sym_keyslot, input_list,
-                                   &protected_sig_model.protect_model.enc_model, &model_file_len,
-                                   &file_count);
+                                   &controlled_access_sig_model.controlled_access_model.enc_model,
+                                   &model_file_len, &file_count);
     if (ret != OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: File Encrption failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error file Encryption failed with code %d\n", ret);
         goto out;
     }
 
     /* Generate model GUID */
     OVSA_DBG(DBG_I, "OVSA: Generate Model GUID\n");
-    ret = ovsa_crypto_generate_guid(protected_sig_model.protect_model.model_guid);
+    ret = ovsa_crypto_generate_guid(controlled_access_sig_model.controlled_access_model.model_guid);
     if (ret != OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Model GUID generation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error model GUID generation failed with code %d\n", ret);
         goto out;
     }
-    memcpy_s(g_model_guid, GUID_SIZE, protected_sig_model.protect_model.model_guid, GUID_SIZE);
+    memcpy_s(g_model_guid, GUID_SIZE,
+             controlled_access_sig_model.controlled_access_model.model_guid, GUID_SIZE);
 
-    /* Create protected model JSON blob */
-    OVSA_DBG(DBG_I, "OVSA: Create Protected Model JSON Blob\n");
-    protect_buf_len = model_file_len + sizeof(ovsa_protected_model_t) +
-                      PROTECT_MODEL_BLOB_TEXT_SIZE + g_isvcert_len +
-                      (file_count * sizeof(ovsa_enc_models_t) * MODEL_FILE_BLOB_TEXT_SIZE);
-    OVSA_DBG(DBG_D, "OVSA: protect_buf_len %d\n", (int)protect_buf_len);
-    ret = ovsa_safe_malloc(protect_buf_len, &protect_buf_string);
-    if (ret < OVSA_OK || protect_buf_string == NULL) {
-        OVSA_DBG(DBG_E, "Error: Protected buffer allocation failed with code %d\n", ret);
+    /* Create controlled access model JSON blob */
+    OVSA_DBG(DBG_I, "OVSA: Create Controlled Access Model JSON Blob\n");
+    controlaccess_buf_len = model_file_len + sizeof(ovsa_controlled_access_model_t) +
+                            CONTROLLED_ACCESS_MODEL_BLOB_TEXT_SIZE + g_isvcert_len +
+                            (file_count * sizeof(ovsa_enc_models_t) * MODEL_FILE_BLOB_TEXT_SIZE);
+    OVSA_DBG(DBG_D, "OVSA: controlaccess_buf_len %d\n", (int)controlaccess_buf_len);
+    ret = ovsa_safe_malloc(controlaccess_buf_len, &controlaccess_buf_string);
+    if (ret < OVSA_OK || controlaccess_buf_string == NULL) {
+        OVSA_DBG(DBG_E, "OVSA: Error controlled access buffer allocation failed with code %d\n",
+                 ret);
         goto out;
     }
-    ret =
-        ovsa_json_create_protected_model(&protected_sig_model, protect_buf_len, protect_buf_string);
+    ret = ovsa_json_create_controlled_access_model(&controlled_access_sig_model,
+                                                   controlaccess_buf_len, controlaccess_buf_string);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Create protect model json failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E,
+                 "OVSA: Error create controlled access model json failed with error code %d\n",
+                 ret);
         goto out;
     }
 
-    /* Generate HASH of protected model */
-    OVSA_DBG(DBG_I, "OVSA: Generate HASH For Protected Model\n");
-    ret = ovsa_crypto_compute_hash(protect_buf_string, g_model_hash);
+    /* Generate HASH of controlled access model */
+    OVSA_DBG(DBG_I, "OVSA: Generate HASH For Controlled Access Model\n");
+    ret = ovsa_crypto_compute_hash(controlaccess_buf_string, HASH_ALG_SHA512, g_model_hash,
+                                   true /*FORMAT_BASE64*/);
     if (ret != OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Model HASH generation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error model HASH generation failed with code %d\n", ret);
         goto out;
     }
 
-    /* Sign protected model JSON blob */
-    OVSA_DBG(DBG_I, "OVSA: Sign Protected Model JSON Blob\n");
-    size = MAX_SIGNATURE_SIZE + SIGNATURE_BLOB_TEXT_SIZE + protect_buf_len;
-    ret  = ovsa_safe_malloc(size, &protect_buf_sig_string);
-    if (ret < OVSA_OK || protect_buf_sig_string == NULL) {
-        OVSA_DBG(DBG_E, "Error: Protect Model signature buffer allocation failed %d\n", ret);
+    /* Sign controlled access model JSON blob */
+    OVSA_DBG(DBG_I, "OVSA: Sign Controlled Access Model JSON Blob\n");
+    size = MAX_SIGNATURE_SIZE + SIGNATURE_BLOB_TEXT_SIZE + controlaccess_buf_len;
+    ret  = ovsa_safe_malloc(size, &controlaccess_buf_sig_string);
+    if (ret < OVSA_OK || controlaccess_buf_sig_string == NULL) {
+        OVSA_DBG(DBG_E,
+                 "OVSA: Error controlled access model signature buffer allocation failed %d\n",
+                 ret);
         goto out;
     }
-    ret =
-        ovsa_crypto_sign_json_blob(asymm_keyslot, protect_buf_string, size, protect_buf_sig_string);
+    ret = ovsa_crypto_sign_json_blob(asymm_keyslot, controlaccess_buf_string, size,
+                                     controlaccess_buf_sig_string);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Protected model signing failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error controlled access model signing failed with error code %d\n",
+                 ret);
         goto out;
     }
 
-    /* Store Protected model JSON blob on specified output file */
-    if (protect_buf_sig_string != NULL) {
-        if ((fptr = fopen(protect_file, "w+")) != NULL) {
-            ret = ovsa_get_string_length(protect_buf_sig_string, &size);
+    /* Store Controlled access model JSON blob on specified output file */
+    if (controlaccess_buf_sig_string != NULL) {
+        if ((fptr = fopen(controlled_access_file, "w+")) != NULL) {
+            ret = ovsa_get_string_length(controlaccess_buf_sig_string, &size);
             if (ret < OVSA_OK) {
-                OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n",
+                         ret);
                 fclose(fptr);
                 goto out;
             }
-            fwrite(protect_buf_sig_string, size, 1, fptr);
+            fwrite(controlaccess_buf_sig_string, size, 1, fptr);
             fclose(fptr);
         } else {
             ret = OVSA_FILEOPEN_FAIL;
-            OVSA_DBG(DBG_E, "Error: Error in creating protected model file %s\n", protect_file);
+            OVSA_DBG(DBG_E, "OVSA: Error in creating controlled access model file %s\n",
+                     controlled_access_file);
             goto out;
         }
     }
 
 out:
-    ovsa_safe_free(&protect_buf_string);
-    ovsa_safe_free(&protect_buf_sig_string);
-    ovsa_safe_free_enc_list(&protected_sig_model.protect_model.enc_model);
-    ovsa_safe_free(&protected_sig_model.protect_model.isv_certificate);
+    ovsa_safe_free(&controlaccess_buf_string);
+    ovsa_safe_free(&controlaccess_buf_sig_string);
+    ovsa_safe_free_enc_list(&controlled_access_sig_model.controlled_access_model.enc_model);
+    ovsa_safe_free(&controlled_access_sig_model.controlled_access_model.isv_certificate);
     return ret;
 }
 
@@ -328,7 +350,7 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
         (sym_keyslot < MIN_KEY_SLOT) || (sym_keyslot >= MAX_KEY_SLOT) || license_guid == NULL ||
         masterlic_file == NULL) {
         ret = OVSA_INVALID_PARAMETER;
-        OVSA_DBG(DBG_E, "Error: Wrong input parameters to create master license\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong input parameters to create master license\n");
         return ret;
     }
 
@@ -342,7 +364,8 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
         /* Set isv certificate */
         ret = ovsa_safe_malloc(g_isvcert_len, &master_sig_license.master_lic.isv_certificate);
         if (ret < OVSA_OK || master_sig_license.master_lic.isv_certificate == NULL) {
-            OVSA_DBG(DBG_E, "Error: Master license signature buffer allocation failed %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error master license signature buffer allocation failed %d\n",
+                     ret);
             goto out;
         }
         memcpy_s(master_sig_license.master_lic.isv_certificate, g_isvcert_len, g_isv_certificate,
@@ -357,7 +380,7 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
         memcpy_s(master_sig_license.master_lic.model_hash, HASH_SIZE, g_model_hash, HASH_SIZE);
     } else {
         ret = OVSA_INVALID_PARAMETER;
-        OVSA_DBG(DBG_E, "Error: Wrong global parameters to create master license\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong global parameters to create master license\n");
         return ret;
     }
 
@@ -365,7 +388,7 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
     OVSA_DBG(DBG_I, "OVSA: Wrap Key\n");
     ret = ovsa_crypto_wrap_key(asymm_keyslot, sym_keyslot, &enc_key, &outlen, &keyiv_hmac_slot);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Master license wrapkey generation failed with error code %d\n",
+        OVSA_DBG(DBG_E, "OVSA: Error master license wrapkey generation failed with error code %d\n",
                  ret);
         goto out;
     }
@@ -377,7 +400,7 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
     time_str           = ctime(&curtime);
     size               = strnlen_s(time_str, MAX_NAME_SIZE);
     time_str[size - 1] = '\0';
-    memcpy_s(master_sig_license.master_lic.creation_date, size, time_str, size);
+    memcpy_s(master_sig_license.master_lic.creation_date, MAX_NAME_SIZE, time_str, size);
 
     /* Create master license JSON blob */
     OVSA_DBG(DBG_I, "OVSA: Create Master License JSON Blob\n");
@@ -385,12 +408,14 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
         g_isvcert_len + sizeof(ovsa_master_license_t) + MASTER_LICENSE_BLOB_TEXT_SIZE;
     ret = ovsa_safe_malloc(master_lic_buf_len, &master_lic_string);
     if (ret < OVSA_OK || master_lic_string == NULL) {
-        OVSA_DBG(DBG_E, "Error: Master license buffer allocation %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error master license buffer allocation %d\n", ret);
         goto out;
     }
-    ret = ovsa_json_create_master_license(&master_sig_license, master_lic_string);
+    ret =
+        ovsa_json_create_master_license(&master_sig_license, master_lic_buf_len, master_lic_string);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Master license json creation failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error master license json creation failed with error code %d\n",
+                 ret);
         goto out;
     }
 
@@ -399,7 +424,7 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
     size = MAX_SIGNATURE_SIZE + SIGNATURE_BLOB_TEXT_SIZE + master_lic_buf_len;
     ret  = ovsa_safe_malloc(size, &master_lic_sig_string);
     if (ret < OVSA_OK || master_lic_sig_string == NULL) {
-        OVSA_DBG(DBG_E, "Error: Master license buffer allocation %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error master license buffer allocation %d\n", ret);
         goto out;
     }
 
@@ -407,7 +432,7 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
     ret = ovsa_crypto_hmac_json_blob(keyiv_hmac_slot, master_lic_string, master_lic_buf_len,
                                      master_lic_sig_string);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Master license signing failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error master license signing failed with error code %d\n", ret);
         goto out;
     }
 
@@ -416,7 +441,7 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
         if ((fptr = fopen(masterlic_file, "w+")) != NULL) {
             ret = ovsa_get_string_length(master_lic_sig_string, &size);
             if (ret < OVSA_OK) {
-                OVSA_DBG(DBG_E, "Error: Could not get length of signature string %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error could not get length of signature string %d\n", ret);
                 fclose(fptr);
                 goto out;
             }
@@ -424,7 +449,7 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
             fclose(fptr);
         } else {
             ret = OVSA_FILEOPEN_FAIL;
-            OVSA_DBG(DBG_E, "Error: Error in creating master license file %s\n", masterlic_file);
+            OVSA_DBG(DBG_E, "OVSA: Error in creating master license file %s\n", masterlic_file);
             goto out;
         }
     }
@@ -442,51 +467,76 @@ out:
     return ret;
 }
 
-ovsa_status_t ovsa_protect_main(int argc, char* argv[]) {
+ovsa_status_t ovsa_controlaccess_main(int argc, char* argv[]) {
     ovsa_status_t ret              = OVSA_OK;
     int asymm_keyslot              = -1;
     int sym_keyslot                = -1;
     int c                          = 0;
+    int i                          = 0;
+    size_t argv_len                = 0;
     ovsa_input_files_t* input_list = NULL;
     char* license_guid             = NULL;
     char* keystore                 = NULL;
     char* masterlic_file           = NULL;
-    char* protect_file             = NULL;
-    char* next_arg                 = NULL;
+    char* controlled_access_file   = NULL;
 
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
+
+    if (argc > MAX_SAFE_ARGC) {
+        ret = OVSA_INVALID_PARAMETER;
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
+        goto out;
+    }
+    for (i = 0; argc > i; i++) {
+        ret = ovsa_get_string_length(argv[i], &argv_len);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of argv string %d\n", ret);
+            goto out;
+        }
+        if (argv_len > RSIZE_MAX_STR) {
+            OVSA_DBG(
+                DBG_E,
+                "OVSA: Error controlAccess argument'%s' greater than %ld characters not allowed \n",
+                argv[i], RSIZE_MAX_STR);
+            ret = OVSA_INVALID_PARAMETER;
+            goto out;
+        }
+    }
 
     while ((c = getopt(argc, argv, "i:n:d:v:p:m:k:g:h")) != -1) {
         switch (c) {
             case 'i': {
-                int index;
+                int index                     = 0;
                 ovsa_input_files_t* list_tail = NULL;
                 index                         = optind - 1;
                 while (index < argc) {
-                    next_arg = strdup(argv[index]);
-                    if (next_arg != NULL) {
-                        if (next_arg[0] != '-') {
-                            index++;
-                            ret = ovsa_store_input_file_list(next_arg, &input_list, &list_tail);
+                    if (strnlen_s(optarg, RSIZE_MAX_STR) < MAX_NAME_SIZE) {
+                        if (argv[index][0] != '-') {
+                            ret = ovsa_store_input_file_list(argv[index], &input_list, &list_tail);
                             if (ret < OVSA_OK) {
-                                OVSA_DBG(DBG_E, "OVSA: Store Model file list failed with code %d\n",
+                                OVSA_DBG(DBG_E,
+                                         "OVSA: Error store Model file list failed with code %d\n",
                                          ret);
-                                ovsa_safe_free(&next_arg);
                                 goto out;
                             }
-                            ovsa_safe_free(&next_arg);
-                            optind = index;
+                            optind = index + 1;
                         } else {
-                            ovsa_safe_free(&next_arg);
                             break;
                         }
-                    } else
-                        break;
+                        index++;
+                    } else {
+                        OVSA_DBG(DBG_E,
+                                 "OVSA: Error name greater than %d characters not allowed \n",
+                                 MAX_NAME_SIZE);
+                        ret = OVSA_INVALID_PARAMETER;
+                        goto out;
+                    }
                 }
             } break;
             case 'n': {
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_NAME_SIZE) {
-                    OVSA_DBG(DBG_E, "OVSA: Model name greater than %d characters not allowed \n",
+                    OVSA_DBG(DBG_E,
+                             "OVSA: Error model name greater than %d characters not allowed \n",
                              MAX_NAME_SIZE);
                     ret = OVSA_INVALID_PARAMETER;
                     goto out;
@@ -507,7 +557,8 @@ ovsa_status_t ovsa_protect_main(int argc, char* argv[]) {
             } break;
             case 'v': {
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_VERSION_SIZE) {
-                    OVSA_DBG(DBG_E, "OVSA: Model version greater than %d characters not allowed \n",
+                    OVSA_DBG(DBG_E,
+                             "OVSA: Error model version greater than %d characters not allowed \n",
                              MAX_VERSION_SIZE);
                     ret = OVSA_INVALID_PARAMETER;
                     goto out;
@@ -517,7 +568,8 @@ ovsa_status_t ovsa_protect_main(int argc, char* argv[]) {
             } break;
             case 'k': {
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
-                    OVSA_DBG(DBG_E, "OVSA: Keystore path greater than %d characters not allowed \n",
+                    OVSA_DBG(DBG_E,
+                             "OVSA: Error keystore path greater than %d characters not allowed \n",
                              MAX_FILE_NAME);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
@@ -528,13 +580,14 @@ ovsa_status_t ovsa_protect_main(int argc, char* argv[]) {
             case 'p': {
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
                     OVSA_DBG(DBG_E,
-                             "OVSA: Protect file path greater than %d characters not allowed \n",
+                             "OVSA: Controlled access model file path greater than %d characters "
+                             "not allowed \n",
                              MAX_FILE_NAME);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
                 }
-                protect_file = optarg;
-                OVSA_DBG(DBG_D, "OVSA: protect_file = %s\n", protect_file);
+                controlled_access_file = optarg;
+                OVSA_DBG(DBG_D, "OVSA: controlled_access_file = %s\n", controlled_access_file);
             } break;
             case 'm': {
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
@@ -550,14 +603,15 @@ ovsa_status_t ovsa_protect_main(int argc, char* argv[]) {
             } break;
             case 'g': {
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > GUID_SIZE) {
-                    OVSA_DBG(DBG_E, "OVSA: Model GUID is greater than %d characters not allowed \n",
+                    OVSA_DBG(DBG_E,
+                             "OVSA: Error model GUID is greater than %d characters not allowed \n",
                              GUID_SIZE);
                     ret = OVSA_INVALID_PARAMETER;
                     goto out;
                 }
                 license_guid = optarg;
-                if (ovsa_is_guid_valid(license_guid) != true) {
-                    OVSA_DBG(DBG_E, "OVSA: Entered GUID is not valid...\n");
+                if (ovsa_is_guid_valid((unsigned char*)license_guid) != true) {
+                    OVSA_DBG(DBG_E, "OVSA: Error entered GUID is not valid...\n");
                     ret = OVSA_INVALID_PARAMETER;
                     goto out;
                 }
@@ -565,11 +619,12 @@ ovsa_status_t ovsa_protect_main(int argc, char* argv[]) {
                 OVSA_DBG(DBG_D, "OVSA: license_guid = %s\n", license_guid);
             } break;
             case 'h': {
-                ovsa_protect_help(argv[0]);
+                ovsa_controlaccess_help(argv[0]);
                 goto out;
             }
             default: {
-                OVSA_DBG(DBG_E, "OVSA: Wrong command given. Please follow -help for help option\n");
+                OVSA_DBG(DBG_E,
+                         "OVSA: Error wrong command given. Please follow -help for help option\n");
                 ret = OVSA_INVALID_PARAMETER;
                 goto out;
             }
@@ -583,17 +638,17 @@ ovsa_status_t ovsa_protect_main(int argc, char* argv[]) {
 
     /* Validate Input parameters */
     if ((input_list != NULL) && (g_model_name != NULL) && (g_model_description != NULL) &&
-        (g_model_version != NULL) && (keystore != NULL) && (protect_file != NULL) &&
+        (g_model_version != NULL) && (keystore != NULL) && (controlled_access_file != NULL) &&
         (masterlic_file != NULL) && (license_guid != NULL)) {
         /* Initialize crypto */
         ret = ovsa_crypto_init();
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "OVSA: Ovsa crypto init failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error ovsa crypto init failed with code %d\n", ret);
             goto out;
         }
 
     } else {
-        OVSA_DBG(DBG_E, "OVSA: Error Wrong command given. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
@@ -602,7 +657,7 @@ ovsa_status_t ovsa_protect_main(int argc, char* argv[]) {
     OVSA_DBG(DBG_I, "OVSA: Load Asymmetric Key\n");
     ret = ovsa_crypto_load_asymmetric_key(keystore, &asymm_keyslot);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Get keyslot failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error get keyslot failed with code %d\n", ret);
         goto out;
     }
 
@@ -610,20 +665,22 @@ ovsa_status_t ovsa_protect_main(int argc, char* argv[]) {
     OVSA_DBG(DBG_I, "OVSA: Generate Symmetric Key\n");
     ret = ovsa_crypto_generate_symmetric_key(SYMMETRIC_KEY_SIZE, &sym_keyslot);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Generation of Encryption key failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error generation of Encryption key failed with code %d\n", ret);
         goto out;
     }
-    ret = ovsa_do_create_protected_model_file(asymm_keyslot, sym_keyslot, input_list, protect_file);
+    ret = ovsa_do_create_controlled_access_model_file(asymm_keyslot, sym_keyslot, input_list,
+                                                      controlled_access_file);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Generation of Protect model failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error generation of controlled access model failed with code %d\n",
+                 ret);
         goto out;
     }
-    OVSA_DBG(DBG_I, "OVSA: Generation of %s file successful.\n", protect_file);
+    OVSA_DBG(DBG_I, "OVSA: Generation of %s file successful.\n", controlled_access_file);
 
     ret = ovsa_do_create_master_license_file(asymm_keyslot, sym_keyslot, masterlic_file,
                                              license_guid);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Generation of Master license failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error generation of Master license failed with code %d\n", ret);
         goto out;
     }
     OVSA_DBG(DBG_I, "OVSA: Generation of %s file successful.\n", masterlic_file);

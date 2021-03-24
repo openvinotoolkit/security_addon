@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,12 +35,36 @@
 #include "mbedtls/ssl.h"
 #include "safe_str_lib.h"
 
+ovsa_status_t ovsa_server_safe_add(size_t* var1, size_t var2) {
+    ovsa_status_t ret = OVSA_OK;
+
+    if (*var1 >= 0) {
+        if (var2 > SIZE_MAX - *var1) {
+            /* overflow */
+            OVSA_DBG(DBG_E, "OVSA: Error integer overflow detected\n");
+            ret = OVSA_INTEGER_OVERFLOW;
+            goto out;
+        }
+    } else {
+        if (var2 < INT_MIN - *var1) {
+            /* underflow */
+            OVSA_DBG(DBG_E, "OVSA: Error integer underflow detected\n");
+            ret = OVSA_INTEGER_UNDERFLOW;
+            goto out;
+        }
+    }
+    *var1 = *var1 + var2;
+
+out:
+    return ret;
+}
+
 ovsa_status_t ovsa_server_get_string_length(const char* in_buff, size_t* in_buff_len) {
     ovsa_status_t ret = OVSA_OK;
     size_t total_len = 0, buff_len = 0;
 
     if (in_buff == NULL) {
-        OVSA_DBG(DBG_E, "Error: Getting string length failed with invalid parameter\n");
+        OVSA_DBG(DBG_E, "OVSA: Error getting string length failed with invalid parameter\n");
         ret = OVSA_INVALID_PARAMETER;
         return ret;
     }
@@ -50,17 +74,23 @@ ovsa_status_t ovsa_server_get_string_length(const char* in_buff, size_t* in_buff
         *in_buff_len = buff_len;
     } else {
         while (buff_len == RSIZE_MAX_STR) {
-            total_len += RSIZE_MAX_STR;
-
+            ret = ovsa_server_safe_add(&total_len, RSIZE_MAX_STR);
+            if (ret < OVSA_OK) {
+                OVSA_DBG(DBG_E, "OVSA: Error ovsa_safe_add failed %d\n", ret);
+                return ret;
+            }
             buff_len = strnlen_s((in_buff + total_len), RSIZE_MAX_STR);
             if (buff_len < RSIZE_MAX_STR) {
-                total_len += buff_len;
+                ret = ovsa_server_safe_add(&total_len, buff_len);
+                if (ret < OVSA_OK) {
+                    OVSA_DBG(DBG_E, "OVSA: Error ovsa_safe_add failed %d\n", ret);
+                    return ret;
+                }
                 break;
             }
         }
         *in_buff_len = total_len;
     }
-
     return ret;
 }
 ovsa_status_t ovsa_server_safe_malloc(size_t size, char** aloc_buf) {
@@ -69,7 +99,7 @@ ovsa_status_t ovsa_server_safe_malloc(size_t size, char** aloc_buf) {
     *aloc_buf = (char*)malloc(size * sizeof(char));
     if (*aloc_buf == NULL) {
         ret = OVSA_MEMORY_ALLOC_FAIL;
-        OVSA_DBG(DBG_E, "Error: Buffer allocation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error buffer allocation failed with code %d\n", ret);
         goto out;
     }
     memset_s(*aloc_buf, (size) * sizeof(char), 0);
@@ -125,7 +155,7 @@ ovsa_status_t ovsa_append_payload_len_to_blob(const char* input_buf, char** json
     memset_s(payload_len, sizeof(payload_len), 0);
     ret = ovsa_server_get_string_length(input_buf, &json_payload_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of input_buf string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of input_buf string %d\n", ret);
         return ret;
     }
     snprintf(payload_len, (PAYLOAD_LENGTH + 1), "%08ld", json_payload_len);
@@ -144,7 +174,7 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
     if (filename == NULL || filesize == NULL) {
-        OVSA_DBG(DBG_E, "Error: Invalid parameter while reading Quote info\n");
+        OVSA_DBG(DBG_E, "OVSA: Error invalid parameter while reading Quote info\n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
@@ -152,13 +182,13 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
     fptr = fopen(filename, "rb");
     if (fptr == NULL) {
         ret = OVSA_FILEOPEN_FAIL;
-        OVSA_DBG(DBG_E, "Error: Opening file %s failed with code %d\n", filename, ret);
+        OVSA_DBG(DBG_E, "OVSA: Error opening file %s failed with code %d\n", filename, ret);
         goto out;
     }
 
     file_size = ovsa_server_crypto_get_file_size(fptr);
     if (file_size == 0) {
-        OVSA_DBG(DBG_E, "Error: Getting file size for %s failed\n", filename);
+        OVSA_DBG(DBG_E, "OVSA: Error getting file size for %s failed\n", filename);
         ret = OVSA_FILEIO_FAIL;
         fclose(fptr);
         goto out;
@@ -166,13 +196,13 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
 
     ret = ovsa_server_safe_malloc((sizeof(char) * file_size), filecontent);
     if ((ret < OVSA_OK) || (*filecontent == NULL)) {
-        OVSA_DBG(DBG_E, "Error: PCR quote buffer allocation failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error PCR quote buffer allocation failed %d\n", ret);
         fclose(fptr);
         goto out;
     }
 
     if (!fread(*filecontent, 1, file_size - 1, fptr)) {
-        OVSA_DBG(DBG_E, "Error: Reading pcr quote failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error reading pcr quote failed %d\n", ret);
         ret = OVSA_FILEIO_FAIL;
         fclose(fptr);
         goto out;
@@ -188,13 +218,13 @@ int ovsa_server_crypto_get_file_size(FILE* fp) {
     int ret          = 0;
 
     if (fp == NULL) {
-        BIO_printf(g_bio_err, "Error: Getting file size failed with invalid parameter\n");
+        BIO_printf(g_bio_err, "OVSA: Error getting file size failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
 
     if (!(fseek(fp, 0L, SEEK_END) == 0)) {
         BIO_printf(g_bio_err,
-                   "Error: Getting file size failed in setting the fp to "
+                   "OVSA: Error getting file size failed in setting the fp to "
                    "end of the file\n");
         goto end;
     }
@@ -202,14 +232,14 @@ int ovsa_server_crypto_get_file_size(FILE* fp) {
     file_size = ftell(fp);
     if (file_size == 0) {
         BIO_printf(g_bio_err,
-                   "Error: Getting file size failed in giving the current "
+                   "OVSA: Error getting file size failed in giving the current "
                    "position of the fp\n");
         goto end;
     }
 
     if (fseek(fp, 0L, SEEK_SET) != 0) {
         BIO_printf(g_bio_err,
-                   "Error: Getting file size failed in setting the fp to "
+                   "OVSA: Error getting file size failed in setting the fp to "
                    "beginning of the file\n");
         goto end;
     }

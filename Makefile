@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ export DEBUG=1
 export MV
 
 .PHONY: all
-all: ovsatool_build ovsaruntime_build license_service_build ovsa_kvm_host_build
+all: ovsatool_build ovsaruntime_build license_service_build
 
 ovsatool_build:
 	$(MAKE) all -C $(SRC_BUILD_DIR)/Ovsa_tool
@@ -57,30 +57,23 @@ ovsaruntime_build:
 license_service_build:
 	$(MAKE) all -C $(SRC_BUILD_DIR)/License_service
 
-ovsa_kvm_host_build:
-	$(MAKE) all -C $(SRC_BUILD_DIR)/Ovsa_kvm_host
-
 .PHONY: clean
 clean:
 	$(MAKE) -C $(SRC_BUILD_DIR)/Ovsa_tool clean
 	$(MAKE) -C $(SRC_BUILD_DIR)/Ovsa_runtime clean
 	$(MAKE) -C $(SRC_BUILD_DIR)/License_service clean
-	$(MAKE) -C $(SRC_BUILD_DIR)/Ovsa_kvm_host clean
 
-	
 .PHONY: format
 format:
 	$(MAKE) -C $(SRC_BUILD_DIR)/Ovsa_tool format
 	$(MAKE) -C $(SRC_BUILD_DIR)/Ovsa_runtime format
 	$(MAKE) -C $(SRC_BUILD_DIR)/License_service format
-	$(MAKE) -C $(SRC_BUILD_DIR)/Ovsa_kvm_host format
 
 .PHONY: distclean
 distclean: clean
 	$(MAKE) -C $(SRC_BUILD_DIR)/Ovsa_tool distclean
 	$(MAKE) -C $(SRC_BUILD_DIR)/Ovsa_runtime distclean
 	$(MAKE) -C $(SRC_BUILD_DIR)/License_service distclean
-	$(MAKE) -C $(SRC_BUILD_DIR)/Ovsa_kvm_host distclean
 
 .PHONY: package
 package:
@@ -88,7 +81,7 @@ package:
                 --build-arg http_proxy="http://proxy-chain.intel.com:911"  \
                 --build-arg https_proxy="http://proxy-chain.intel.com:911" \
                 --build-arg no_proxy="localhost" \
-                -t ovsa/modelserver-build-tpm:latest	
+                -t ovsa/modelserver-build-tpm:latest
 
 	rm -vrf $(DIST_DIR)/ && mkdir -vp $(DIST_DIR)/ && cd $(DIST_DIR)/ && \
                 docker run ovsa/modelserver-build-tpm:latest bash -c \
@@ -114,7 +107,7 @@ package:
 	cp -vR Ovsa_tool/bin/* $(DIST_MODEL_HOSTING_DIR)/bin
 	cp -vR Example/client/* $(DIST_MODEL_HOSTING_DIR)/example_client/
 	cp -vR Example/runtime/* $(DIST_MODEL_HOSTING_DIR)/example_runtime/
-	cp -vR Scripts/common/OVSA_create_ek_ak_keys.sh $(DIST_MODEL_HOSTING_DIR)/scripts/
+	cp -vR Scripts/guest/OVSA_create_ek_ak_keys.sh $(DIST_MODEL_HOSTING_DIR)/scripts/
 	cp -vR Scripts/guest/OVSA_Seal_Key_TPM_Policy_Authorize.sh $(DIST_MODEL_HOSTING_DIR)/scripts/
 	cp -vR Scripts/install/setupvars.sh  $(DIST_MODEL_HOSTING_DIR)/scripts/
 	cp -vR Scripts/install/install_model_hosting.sh $(DIST_MODEL_HOSTING_DIR)/install.sh
@@ -129,8 +122,8 @@ package:
 	cp -vR Ovsa_runtime/lib/* $(DIST_DEV_DIR)/lib
 	cp -vR License_service/lib/* $(DIST_DEV_DIR)/lib
 	cp -vR DB/* $(DIST_DEV_DIR)/DB
-	cp -vR Scripts/common/generate_server_license_cert.sh $(DIST_DEV_DIR)/scripts/
-	cp -vR Scripts/common/OVSA_create_ek_ak_keys.sh $(DIST_DEV_DIR)/scripts/
+	cp -vR Scripts/guest/generate_server_license_cert.sh $(DIST_DEV_DIR)/scripts/
+	cp -vR Scripts/guest/OVSA_create_ek_ak_keys.sh $(DIST_DEV_DIR)/scripts/
 	cp -vR Scripts/guest/OVSA_Seal_Key_TPM_Policy_Authorize.sh $(DIST_DEV_DIR)/scripts/
 	cp -vR Scripts/install/setupvars.sh $(DIST_DEV_DIR)/scripts/
 	cp -vR Scripts/install/install_developer.sh $(DIST_DEV_DIR)/install.sh
@@ -138,12 +131,11 @@ package:
 	cd $(DIST_DIR) && rm -rf $(DEV_DIR)
 
 	mkdir -vp $(DIST_HOST_DIR)
-	cd $(DIST_HOST_DIR) && mkdir -vp bin && mkdir -vp scripts
-	cp -vR Ovsa_kvm_host/bin/* $(DIST_HOST_DIR)/bin
-	cp -vR Scripts/common/OVSA_create_ek_ak_keys.sh $(DIST_HOST_DIR)/scripts/
-	cp -vR Scripts/install/setupvars.sh $(DIST_HOST_DIR)/scripts/
+	cd $(DIST_HOST_DIR) && mkdir -vp scripts
+	cp -vR Scripts/host/OVSA_provision_ekcert_swtpm.sh $(DIST_HOST_DIR)/scripts/
+	cp -vR Scripts/host/OVSA_write_hwquote_swtpm_nvram.py  $(DIST_HOST_DIR)/scripts/
 	cp -vR Scripts/install/install_host.sh $(DIST_HOST_DIR)/install.sh
-	cd $(DIST_DIR) && tar cvzf $(HOST_DIR).tar.gz $(HOST_DIR)        
+	cd $(DIST_DIR) && tar cvzf $(HOST_DIR).tar.gz $(HOST_DIR)
 	cd $(DIST_DIR) && rm -rf $(HOST_DIR)
 
 	echo "Done"

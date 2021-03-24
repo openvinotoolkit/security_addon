@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,15 +23,22 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "tss2/tss2_tpm2_types.h"
+
 #define MAX_NAME_SIZE           256
 #define MAX_LEN                 5
 #define MESSAGE_BLOB_TEXT_SIZE  34
 #define GUID_SIZE               36
 #define PAYLOAD_LENGTH          8 /* BYTE */
 #define MAX_COMMAND_TYPE_LENGTH 50
+#define MAX_FILE_NAME_LEN       10
+
+#define mbedtls_printf      printf
+#define READ_TIMEOUT_MS     300000 /* 30 seconds */
+#define MBEDTLS_DEBUG_LEVEL 0
 
 /* ! Size of the HASH key Considering SHA512 for HASHING */
-#define HASH_SIZE                64
+#define HASH_B64_SIZE            192 /* Actual 130: Considering the length for B64 */
 #define NONCE_SIZE               32
 #define NONCE_BUF_SIZE           (NONCE_SIZE * 2) /* In B64 format */
 #define MAX_SIGNATURE_SIZE       128
@@ -46,6 +53,16 @@
 #define DEFAULT_PORT             "4451"
 #define MAX_BUF_SIZE             4096
 #define MAX_FILE_LEN             64
+#define TPM2_TPMU_HA_SIZE        64
+#define DEFAULT_PCR_ID_SET       "0xFFFFFF" /*Set all PCR ID's 0:23 */
+#define HASH_ALG_SHA256          1
+#define HASH_ALG_SHA512          2
+#define QUOTE_NONCE_HASH_SIZE    32
+
+/* As per the ASN1_STRING_TABLE, computed max size of the attribute types
+   found in the Distinguished Name are around ~129K and added certain buffer
+   to accomadate the attributes where max size is not available. */
+#define MAX_CERT_SIZE (256UL << 10) /* 256KB */
 
 /* self signed server certificate based on sha384 */
 #define CERTIFICATE_PATH "/opt/ovsa/certs/server.crt"
@@ -54,19 +71,22 @@
 #define CURVE_LIST_SIZE   2
 #define CIPHER_SUITE_SIZE 1
 
-#define TPM2_SWQUOTE_MSG      "SW_pcr_quote.plain"
-#define TPM2_AK_HWPUB_PEM_KEY "HW_pub_key.pub"
-#define TPM2_HWQUOTE_SIG      "HW_pcr_quote.signature"
-#define TPM2_HWQUOTE_MSG      "HW_pcr_quote.plain"
-#define TPM2_HWQUOTE_PCR      "HW_pcr.bin"
-#define TPM2_CREDOUT_FILE     "cred.out"
-#define TPM2_SWQUOTE_PCR      "SW_pcr.bin"
-#define TPM2_SWQUOTE_SIG      "SW_pcr_quote.signature"
-#define TPM2_AK_PUB_PEM_KEY   "SW_pub_key.pub"
-#define TPM2_EK_PUB_KEY       "tpm_ek.pub"
-#define TPM2_AK_NAME_HEX      "tpm_ak.name.hex"
-#define QUOTE_NONCE           "server_quote_nonce.bin"
-#define SECRET_NONCE          "secret.bin"
+#define TPM2_SWQUOTE_MSG        "SW_pcr_quote.plain"
+#define TPM2_AK_HWPUB_PEM_KEY   "HW_pub_key.pub"
+#define TPM2_HWQUOTE_SIG        "HW_pcr_quote.signature"
+#define TPM2_HWQUOTE_MSG        "HW_pcr_quote.plain"
+#define TPM2_HWQUOTE_PCR        "HW_pcr.bin"
+#define TPM2_CREDOUT_FILE       "cred.out"
+#define TPM2_SWQUOTE_PCR        "SW_pcr.bin"
+#define TPM2_SWQUOTE_SIG        "SW_pcr_quote.signature"
+#define TPM2_AK_PUB_PEM_KEY     "SW_pub_key.pub"
+#define TPM2_EK_PUB_KEY         "tpm_ek.pub"
+#define TPM2_SWQUOTE_EK_CERT    "tpm_ek_cert.bin"
+#define TPM2_AK_NAME_HEX        "tpm_ak.name.hex"
+#define QUOTE_NONCE             "server_quote_nonce.bin"
+#define SECRET_NONCE            "secret.bin"
+#define TPM2_HWQUOTE_NONCE_FILE "hw_quote_nonce.bin"
+#define TPM2_SWQUOTE_NONCE_FILE "sw_quote_nonce.bin"
 
 #define DBG_E 0x01
 #define DBG_I 0x02
@@ -119,6 +139,11 @@ typedef struct ovsa_sw_ek_ak_bind_info {
     char* sw_ek_cert_sig;
     char* platform_cert;
 } ovsa_sw_ek_ak_bind_info_t;
+
+typedef struct {
+    size_t count;
+    TPML_DIGEST pcr_values[TPM2_MAX_PCRS];
+} tpm2_pcrs;
 
 typedef enum {
     OVSA_SEND_NONCE = 0,
@@ -202,6 +227,11 @@ typedef enum {
     OVSA_RMFILE_FAIL            = -52,
     OVSA_CLOSEDIR_FAIL          = -53,
 
+    OVSA_INTEGER_OVERFLOW      = -54,
+    OVSA_INTEGER_UNDERFLOW     = -55,
+    OVSA_PCR_VALIDATION_FAILED = -56,
+    OVSA_PCR_ID_NOT_VALID      = -57,
+
     OVSA_FAIL = -99
 } ovsa_status_t;
 
@@ -242,7 +272,7 @@ typedef struct ovsa_customer_license {
     char license_name[MAX_NAME_SIZE];
     char license_version[MAX_VERSION_SIZE];
     char creation_date[MAX_NAME_SIZE];
-    char model_hash[HASH_SIZE];
+    char model_hash[HASH_B64_SIZE];
     char encryption_key[MAX_EKEY_SIZE];
     ovsa_license_type_t license_type;
     int usage_count;
@@ -380,5 +410,27 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
 ovsa_status_t ovsa_server_crypto_extract_pubkey_certificate(const char* cert, char* public_key);
+
+/** \brief This function computes the hash of the memory buffer.
+ *
+ * \param[in]  in_buff   Input buffer for hashing.
+ * \param[in]  hash_alg  Hashing algorithm.
+ * \param[out] out_buff  Output buffer to store the computed hashed.
+ *
+ * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
+ */
+ovsa_status_t ovsa_server_crypto_compute_hash(const char* in_buff, int hash_alg, char* out_buff,
+                                              bool b64_format);
+
+/** \brief This function converts binary to base64 format of the buffer.
+ *
+ * \param[in]  in_buff      Input buffer in binary.
+ * \param[in]  in_buff_len  Buffer length.
+ * \param[out] out_buff     Output buffer in base64.
+ *
+ * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
+ */
+ovsa_status_t ovsa_server_crypto_convert_bin_to_base64(const char* in_buff, size_t in_buff_len,
+                                                       char** out_buff);
 
 #endif

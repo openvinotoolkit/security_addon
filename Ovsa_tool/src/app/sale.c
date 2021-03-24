@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ static ovsa_status_t ovsa_check_is_master_license_expired(const char* master_lic
                                                           int req_lic_days) {
     /* Get the current time in UTC */
     time_t max_master_lic_time, current_time;
-    struct tm max_master_lic_tm, *current_time_tm;
+    struct tm max_master_lic_tm, *current_time_tm = NULL;
     int elapsedtime = 0;
 
     if (ovsa_get_current_time(&current_time, &current_time_tm) != OVSA_OK)
@@ -71,7 +71,7 @@ static ovsa_status_t ovsa_check_is_master_license_expired(const char* master_lic
     memset_s(&max_master_lic_tm, sizeof(struct tm), 0);
     /* Convert master license creation time in time_t format by adding MAX Model validity period */
     strptime(master_lic_time_str, "%a %b %d %H:%M:%S %Y", &max_master_lic_tm);
-    max_master_lic_tm.tm_year += MAX_PROTECTED_MODEL_VALIDITY_TIME_PERIOD;
+    max_master_lic_tm.tm_year += MAX_CONTROLLED_ACCESS_MODEL_VALIDITY_TIME_PERIOD;
     max_master_lic_time = mktime(&max_master_lic_tm);
     OVSA_DBG(DBG_D, "OVSA: master license req time: %s", asctime(&max_master_lic_tm));
 
@@ -194,7 +194,7 @@ static ovsa_status_t ovsa_verify_artefacts(int asymm_keyslot, const char* input_
 
     if ((asymm_keyslot < MIN_KEY_SLOT) || (asymm_keyslot >= MAX_KEY_SLOT) || input_file == NULL) {
         ret = OVSA_INVALID_PARAMETER;
-        OVSA_DBG(DBG_E, "Error: Wrong input parameters to verify file\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong input parameters to verify file\n");
         return ret;
     }
 
@@ -202,13 +202,13 @@ static ovsa_status_t ovsa_verify_artefacts(int asymm_keyslot, const char* input_
     fptr = fopen(input_file, "r");
     if (fptr == NULL) {
         ret = OVSA_FILEOPEN_FAIL;
-        OVSA_DBG(DBG_E, "Error: Opening file %s failed with code %d\n", input_file, ret);
+        OVSA_DBG(DBG_E, "OVSA: Error opening file %s failed with code %d\n", input_file, ret);
         goto out;
     }
     size = ovsa_crypto_get_file_size(fptr);
     ret  = ovsa_safe_malloc(size, &sig_buf);
     if (ret < OVSA_OK || sig_buf == NULL) {
-        OVSA_DBG(DBG_E, "Error: Buffer allocation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error buffer allocation failed with code %d\n", ret);
         fclose(fptr);
         goto out;
     }
@@ -218,7 +218,7 @@ static ovsa_status_t ovsa_verify_artefacts(int asymm_keyslot, const char* input_
 
     ret = ovsa_safe_malloc(size, &file_buf);
     if (ret < OVSA_OK || file_buf == NULL) {
-        OVSA_DBG(DBG_E, "Error: Buffer allocation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error buffer allocation failed with code %d\n", ret);
         ovsa_safe_free(&sig_buf);
         goto out;
     }
@@ -229,14 +229,14 @@ static ovsa_status_t ovsa_verify_artefacts(int asymm_keyslot, const char* input_
         /* Extract encryption_key from master license */
         ret = ovsa_json_extract_element(sig_buf, "encryption_key", (void**)&encryption_key);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Extract json element failed with error code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error extract json element failed with error code %d\n", ret);
             goto out;
         }
 
         /* Compute shared key using ISV's secondary private key and ISV primary public key */
         ret = ovsa_crypto_create_ecdh_key(asymm_keyslot + 1, asymm_keyslot, &shared_key_slot);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Generating shared key failed with error code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error generating shared key failed with error code %d\n", ret);
             goto out;
         }
 
@@ -245,7 +245,7 @@ static ovsa_status_t ovsa_verify_artefacts(int asymm_keyslot, const char* input_
                                             strnlen_s(encryption_key, MAX_EKEY_SIZE),
                                             &keyiv_hmac_slot);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Deriving key/IV/HAMC failed with error code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error deriving key/IV/HAMC failed with error code %d\n", ret);
             goto out;
         }
 
@@ -253,7 +253,7 @@ static ovsa_status_t ovsa_verify_artefacts(int asymm_keyslot, const char* input_
         ret = ovsa_crypto_verify_hmac_json_blob(keyiv_hmac_slot, sig_buf, size, file_buf);
     }
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Verify json failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error verify json failed with error code %d\n", ret);
         goto out;
     }
     *output_sig_buf = sig_buf;
@@ -280,6 +280,8 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     int file_count                    = 0;
     int tcb_signature_size            = 0;
     int url_file_count                = 0;
+    int i                             = 0;
+    size_t argv_len                   = 0;
     size_t outlen                     = 0;
     size_t size                       = 0;
     size_t cert_size                  = 0;
@@ -302,7 +304,6 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     time_t today                      = time(NULL);
     char* time_str                    = NULL;
     char* enc_key                     = NULL;
-    char* next_arg                    = NULL;
     ovsa_tcb_sig_list_t* tcb_list     = NULL;
     ovsa_customer_license_sig_t customer_license;
     ovsa_license_config_sig_t lic_conf_sig;
@@ -313,6 +314,26 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     memset_s(&customer_license, sizeof(ovsa_customer_license_sig_t), 0);
 
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
+
+    if (argc > MAX_SAFE_ARGC) {
+        ret = OVSA_INVALID_PARAMETER;
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
+        goto out;
+    }
+    for (i = 0; argc > i; i++) {
+        ret = ovsa_get_string_length(argv[i], &argv_len);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of argv string %d\n", ret);
+            goto out;
+        }
+        if (argv_len > RSIZE_MAX_STR) {
+            OVSA_DBG(DBG_E,
+                     "OVSA: Error sale argument'%s' greater than %ld characters not allowed \n",
+                     argv[i], RSIZE_MAX_STR);
+            ret = OVSA_INVALID_PARAMETER;
+            goto out;
+        }
+    }
 
     while ((c = getopt(argc, argv, "m:k:l:t:p:c:h")) != -1) {
         switch (c) {
@@ -330,7 +351,8 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
             } break;
             case 'k': {
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
-                    OVSA_DBG(DBG_E, "OVSA: Keystore path greater than %d characters not allowed \n",
+                    OVSA_DBG(DBG_E,
+                             "OVSA: Error keystore path greater than %d characters not allowed \n",
                              MAX_FILE_NAME);
                     ret = OVSA_INVALID_FILE_PATH;
                     goto out;
@@ -355,26 +377,28 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
                 ovsa_input_files_t* tcb_list_tail = NULL;
                 index                             = optind - 1;
                 while (index < argc) {
-                    next_arg = strdup(argv[index]);
-                    if (next_arg != NULL) {
-                        index++;
-                        if (next_arg[0] != '-') {
-                            ret = ovsa_store_input_file_list(next_arg, &tcb_list_head,
+                    if (strnlen_s(argv[index], RSIZE_MAX_STR) < MAX_FILE_NAME) {
+                        if (argv[index][0] != '-') {
+                            ret = ovsa_store_input_file_list(argv[index], &tcb_list_head,
                                                              &tcb_list_tail);
                             if (ret < OVSA_OK) {
-                                OVSA_DBG(DBG_E, "OVSA: Store TCB file list failed with code %d\n",
+                                OVSA_DBG(DBG_E,
+                                         "OVSA: Error store TCB file list failed with code %d\n",
                                          ret);
-                                ovsa_safe_free(&next_arg);
                                 goto out;
                             }
-                            ovsa_safe_free(&next_arg);
-                            optind = index;
+                            optind = index + 1;
                         } else {
-                            ovsa_safe_free(&next_arg);
                             break;
                         }
-                    } else
-                        break;
+                        index++;
+                    } else {
+                        OVSA_DBG(DBG_E,
+                                 "OVSA: Error name greater than %d characters not allowed \n",
+                                 MAX_FILE_NAME);
+                        ret = OVSA_INVALID_PARAMETER;
+                        goto out;
+                    }
                 }
             } break;
             case 'p': {
@@ -407,7 +431,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
             }
             default: {
                 OVSA_DBG(DBG_E,
-                         "OVSA: Default: Wrong command given. Please follow -help for help option "
+                         "OVSA: Error wrong command given. Please follow -help for help option "
                          "c = %d\n",
                          c);
                 ret = OVSA_INVALID_PARAMETER;
@@ -424,14 +448,14 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     if ((masterlic_file == NULL) || (keystore == NULL) || (lic_cnf_file == NULL) ||
         (tcb_list_head == NULL) || (customer_cert_file == NULL) || (customer_lic_file == NULL)) {
         ret = OVSA_INVALID_PARAMETER;
-        OVSA_DBG(DBG_E, "OVSA: Error Wrong command given. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
         goto out;
     }
 
     /* Initialize crypto */
     ret = ovsa_crypto_init();
     if (ret != OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Ovsa crypto init failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error ovsa crypto init failed with code %d\n", ret);
         goto out;
     }
 
@@ -439,7 +463,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     OVSA_DBG(DBG_I, "OVSA: Load Asymmetric Key\n");
     ret = ovsa_crypto_load_asymmetric_key(keystore, &asymm_keyslot);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Get keyslot failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error get keyslot failed with code %d\n", ret);
         goto out;
     }
 
@@ -447,7 +471,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     FILE* fptr = fopen(customer_cert_file, "r");
     if (fptr == NULL) {
         ret = OVSA_FILEOPEN_FAIL;
-        OVSA_DBG(DBG_E, "OVSA: Opening certificate file failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error opening certificate file failed with code %d\n", ret);
         goto out;
     }
 
@@ -455,7 +479,8 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     size = ovsa_crypto_get_file_size(fptr);
     ret  = ovsa_safe_malloc(size, &cert_buff);
     if (ret < OVSA_OK || cert_buff == NULL) {
-        OVSA_DBG(DBG_E, "Error: Certificate file buffer allocation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error certificate file buffer allocation failed with code %d\n",
+                 ret);
         fclose(fptr);
         goto out;
     }
@@ -463,39 +488,56 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     fclose(fptr);
 
     OVSA_DBG(DBG_I, "OVSA: Verify Input Certificate\n");
+
+    if ((!size) || (size > MAX_CERT_SIZE)) {
+        OVSA_DBG(DBG_E, "OVSA: Error customer certificate length is invalid \n");
+        ret = OVSA_INVALID_PARAMETER;
+        goto out;
+    }
     ret = ovsa_crypto_extract_pubkey_verify_cert(/*PEER Cert*/ true, cert_buff,
                                                  /* lifetime_validity_check */ true, &peer_slot);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Verify customer certificate failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error verify customer certificate failed with code %d\n", ret);
         goto out;
     }
 
     /* Extract ISV certificate from key slot */
     ret = ovsa_crypto_get_certificate(asymm_keyslot, &isv_certificate);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Extract ISV certificate failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error extract ISV certificate failed with error code %d\n", ret);
         goto out;
     }
 
     /* Verify ISV certificate */
+    size_t certlen = 0;
+    ret            = ovsa_get_string_length(isv_certificate, &certlen);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of ISV certificate %d\n", ret);
+        goto out;
+    }
+    if ((!certlen) || (certlen > MAX_CERT_SIZE)) {
+        OVSA_DBG(DBG_E, "OVSA: Error ISV certificate length is invalid \n");
+        ret = OVSA_INVALID_PARAMETER;
+        goto out;
+    }
     ret = ovsa_crypto_verify_certificate(asymm_keyslot, /*PEER Cert*/ false, isv_certificate,
                                          /* lifetime_validity_check */ true);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Verify certificate failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error verify certificate failed with code %d\n", ret);
         goto out;
     }
 
     /* Verify License config file */
     ret = ovsa_verify_artefacts(asymm_keyslot, lic_cnf_file, SIGN_VERIFY, &lic_cnf_sig_buf);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Verify certificate failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error verify certificate failed with code %d\n", ret);
         goto out;
     }
 
     /* Verify Master License config file */
     ret = ovsa_verify_artefacts(asymm_keyslot, masterlic_file, HMAC_VERIFY, &master_lic_sig_buf);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Verify certificate failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error verify certificate failed with code %d\n", ret);
         goto out;
     }
 
@@ -508,19 +550,19 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
         /* Verify TCB Signature file */
         ret = ovsa_verify_artefacts(asymm_keyslot, tcb_file->name, SIGN_VERIFY, &tcb_sig_buf);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "OVSA: Verify certificate failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error verify certificate failed with code %d\n", ret);
             goto out;
         }
 
         ret = ovsa_get_string_length(tcb_sig_buf, &size);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Could not get length of tcb_sig_buf string %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of tcb_sig_buf string %d\n", ret);
             goto out;
         }
         if (tcb_list == NULL) {
             ret = ovsa_safe_malloc(sizeof(ovsa_tcb_sig_list_t), (char**)&tcb_list);
             if (ret < OVSA_OK || tcb_list == NULL) {
-                OVSA_DBG(DBG_E, "OVSA: Init encoded list failed %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error init encoded list failed %d\n", ret);
                 goto out;
             }
             tcb_list->next = NULL;
@@ -528,7 +570,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
         } else {
             ret = ovsa_safe_malloc(sizeof(ovsa_tcb_sig_list_t), (char**)&tcb_cur_list);
             if (ret < OVSA_OK || tcb_cur_list == NULL) {
-                OVSA_DBG(DBG_E, "OVSA: Init encoded list failed %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error init encoded list failed %d\n", ret);
                 goto out;
             }
             tcb_cur_list->next  = NULL;
@@ -537,7 +579,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
         }
         ret = ovsa_safe_malloc(size + 1, &tcb_tail_list->tcb_signature);
         if (ret < OVSA_OK || tcb_tail_list->tcb_signature == NULL) {
-            OVSA_DBG(DBG_E, "OVSA: Init encoded list failed %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error init encoded list failed %d\n", ret);
             goto out;
         }
         memcpy_s(tcb_tail_list->tcb_signature, size, tcb_sig_buf, size);
@@ -552,7 +594,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     OVSA_DBG(DBG_I, "OVSA: Extract License Config\n");
     ret = ovsa_json_extract_license_config(lic_cnf_sig_buf, &lic_conf_sig);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Extract license config failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error extract license config failed with error code %d\n", ret);
         goto out;
     }
 
@@ -560,7 +602,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     OVSA_DBG(DBG_I, "OVSA: Extract Master License\n");
     ret = ovsa_json_extract_master_license(master_lic_sig_buf, &master_lic_sig);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Extract master license failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error extract master license failed with error code %d\n", ret);
         goto out;
     }
 
@@ -574,7 +616,8 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
         ret = ovsa_check_is_master_license_expired(master_lic_sig.master_lic.creation_date,
                                                    req_lic_days);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "OVSA: Master license time check failed with error code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error master license time check failed with error code %d\n",
+                     ret);
             goto out;
         }
         /*
@@ -583,7 +626,8 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
          */
         ret = ovsa_check_cert_validity(isv_certificate, cert_buff, req_lic_days);
         if (ret < OVSA_OK) {
-            OVSA_DBG(DBG_E, "OVSA: Master license validity check failed with error code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error master license validity check failed with error code %d\n",
+                     ret);
             goto out;
         }
         OVSA_DBG(DBG_I, "OVSA: Approved Model license duration is %d days\n", req_lic_days);
@@ -595,53 +639,49 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
                                  strnlen_s(master_lic_sig.master_lic.encryption_key, MAX_EKEY_SIZE),
                                  &enc_key, &outlen, &keyiv_hmac_slot);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Master license wrapkey failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error master license wrapkey failed with error code %d\n", ret);
         goto out;
     }
-    memcpy_s(customer_license.customer_lic.encryption_key, strnlen_s(enc_key, MAX_EKEY_SIZE),
-             enc_key, strnlen_s(enc_key, MAX_EKEY_SIZE));
+    memcpy_s(customer_license.customer_lic.encryption_key, MAX_EKEY_SIZE, enc_key,
+             strnlen_s(enc_key, MAX_EKEY_SIZE));
 
     /* Set creation date and time */
     time_str           = ctime(&today);
     size               = strnlen_s(time_str, MAX_NAME_SIZE);
     time_str[size - 1] = '\0';
-    memcpy_s(customer_license.customer_lic.creation_date, size, time_str, size);
+    memcpy_s(customer_license.customer_lic.creation_date, MAX_NAME_SIZE, time_str, size);
 
     /* Set all values of Customer License from master license */
     ret = ovsa_get_string_length(master_lic_sig.master_lic.isv_certificate, &cert_size);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n", ret);
         goto out;
     }
     ret = ovsa_safe_malloc(cert_size + 1, &customer_license.customer_lic.isv_certificate);
     if (ret < OVSA_OK || customer_license.customer_lic.isv_certificate == NULL) {
-        OVSA_DBG(DBG_E, "OVSA: Customer license isv certificate allocation failed with code %d\n",
+        OVSA_DBG(DBG_E,
+                 "OVSA: Error customer license isv certificate allocation failed with code %d\n",
                  ret);
         goto out;
     }
     memcpy_s(customer_license.customer_lic.isv_certificate, cert_size,
              master_lic_sig.master_lic.isv_certificate, cert_size);
     customer_license.customer_lic.isv_certificate[cert_size - 1] = '\0';
-    memcpy_s(customer_license.customer_lic.model_hash,
-             strnlen_s(master_lic_sig.master_lic.model_hash, HASH_SIZE),
+    memcpy_s(customer_license.customer_lic.model_hash, HASH_SIZE,
              master_lic_sig.master_lic.model_hash,
              strnlen_s(master_lic_sig.master_lic.model_hash, HASH_SIZE));
-    memcpy_s(customer_license.customer_lic.model_guid,
-             strnlen_s(master_lic_sig.master_lic.model_guid, GUID_SIZE),
+    memcpy_s(customer_license.customer_lic.model_guid, GUID_SIZE,
              master_lic_sig.master_lic.model_guid,
              strnlen_s(master_lic_sig.master_lic.model_guid, GUID_SIZE));
-    memcpy_s(customer_license.customer_lic.license_guid,
-             strnlen_s(master_lic_sig.master_lic.license_guid, GUID_SIZE),
+    memcpy_s(customer_license.customer_lic.license_guid, GUID_SIZE,
              master_lic_sig.master_lic.license_guid,
              strnlen_s(master_lic_sig.master_lic.license_guid, GUID_SIZE));
 
     /* Set all values of Customer License from license config */
-    memcpy_s(customer_license.customer_lic.license_name,
-             strnlen_s(lic_conf_sig.lic_config.license_name, MAX_NAME_SIZE),
+    memcpy_s(customer_license.customer_lic.license_name, MAX_NAME_SIZE,
              lic_conf_sig.lic_config.license_name,
              strnlen_s(lic_conf_sig.lic_config.license_name, MAX_NAME_SIZE));
-    memcpy_s(customer_license.customer_lic.license_version,
-             strnlen_s(lic_conf_sig.lic_config.license_version, MAX_VERSION_SIZE),
+    memcpy_s(customer_license.customer_lic.license_version, MAX_VERSION_SIZE,
              lic_conf_sig.lic_config.license_version,
              strnlen_s(lic_conf_sig.lic_config.license_version, MAX_VERSION_SIZE));
     customer_license.customer_lic.license_type     = lic_conf_sig.lic_config.license_type;
@@ -661,12 +701,13 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
 
     ret = ovsa_safe_malloc(cust_lic_size, &customer_lic_string);
     if (ret < OVSA_OK || customer_lic_string == NULL) {
-        OVSA_DBG(DBG_E, "OVSA: Customer license buffer allocation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error customer license buffer allocation failed with code %d\n",
+                 ret);
         goto out;
     }
-    ret = ovsa_json_create_customer_license(&customer_license, customer_lic_string);
+    ret = ovsa_json_create_customer_license(&customer_license, cust_lic_size, customer_lic_string);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Create customer license failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create customer license failed with error code %d\n", ret);
         goto out;
     }
 
@@ -675,7 +716,8 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     size = MAX_SIGNATURE_SIZE + SIGNATURE_BLOB_TEXT_SIZE + cust_lic_size;
     ret  = ovsa_safe_malloc(size, &customer_lic_sig_string);
     if (ret < OVSA_OK || customer_lic_sig_string == NULL) {
-        OVSA_DBG(DBG_E, "OVSA: Customer license signature buffer allocation failed with code %d\n",
+        OVSA_DBG(DBG_E,
+                 "OVSA: Error customer license signature buffer allocation failed with code %d\n",
                  ret);
         goto out;
     }
@@ -684,7 +726,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     ret = ovsa_crypto_hmac_json_blob(keyiv_hmac_slot, customer_lic_string, cust_lic_size,
                                      customer_lic_sig_string);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: customer license signing failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error customer license signing failed with error code %d\n", ret);
         goto out;
     }
 
@@ -694,7 +736,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
         if ((fptr = fopen(customer_lic_file, "w+")) != NULL) {
             ret = ovsa_get_string_length(customer_lic_sig_string, &size);
             if (ret < OVSA_OK) {
-                OVSA_DBG(DBG_E, "Error: Could not get length of signature string %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error could not get length of signature string %d\n", ret);
                 fclose(fptr);
                 goto out;
             }
@@ -704,8 +746,8 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
                      customer_lic_file);
         } else {
             ret = OVSA_FILEOPEN_FAIL;
-            OVSA_DBG(DBG_E, "OVSA: Create file %s failed with error code %d\n", customer_lic_file,
-                     ret);
+            OVSA_DBG(DBG_E, "OVSA: Error create file %s failed with error code %d\n",
+                     customer_lic_file, ret);
             goto out;
         }
     }

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,11 +62,13 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
     ovsa_status_t ret            = OVSA_OK;
     int asymm_keyslot            = -1;
     int c                        = 0;
-    int usage_limit              = 0;
+    int i                        = 0;
+    int usage_limit              = -1;
     size_t lic_buf_size          = 0;
     size_t lic_sig_buf_size      = 0;
     size_t list_count            = 0;
     size_t cert_len              = 0;
+    size_t argv_len              = 0;
     ovsa_license_type_t lic_type = MAXLICENSETYPE;
     ovsa_license_config_sig_t license_info;
     license_info.lic_config.isv_certificate = NULL;
@@ -78,10 +80,29 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
     char* licconf_file                      = NULL;
     char* lic_buf_string                    = NULL;
     char* lic_buf_sig_string                = NULL;
-    char* next_arg                          = NULL;
     FILE* fptr                              = NULL;
 
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
+
+    if (argc > MAX_SAFE_ARGC) {
+        ret = OVSA_INVALID_PARAMETER;
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
+        goto out;
+    }
+    for (i = 0; argc > i; i++) {
+        ret = ovsa_get_string_length(argv[i], &argv_len);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of argv string %d\n", ret);
+            goto out;
+        }
+        if (argv_len > RSIZE_MAX_STR) {
+            OVSA_DBG(DBG_E,
+                     "OVSA: Error licgen argument'%s' greater than %ld characters not allowed \n",
+                     argv[i], RSIZE_MAX_STR);
+            ret = OVSA_INVALID_PARAMETER;
+            goto out;
+        }
+    }
 
     while ((c = getopt(argc, argv, "t:l:n:v:u:k:o:h")) != -1) {
         switch (c) {
@@ -98,7 +119,8 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
             } break;
             case 'n': {
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_NAME_SIZE) {
-                    OVSA_DBG(DBG_E, "OVSA: License name greater than %d characters not allowed \n",
+                    OVSA_DBG(DBG_E,
+                             "OVSA: Error license name greater than %d characters not allowed \n",
                              MAX_NAME_SIZE);
                     ret = OVSA_INVALID_PARAMETER;
                     goto out;
@@ -107,32 +129,25 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
                 OVSA_DBG(DBG_D, "LicGen: license_name = %s\n", lic_name);
             } break;
             case 'u': {
-                int index;
-                index = optind - 1;
+                int index = 0;
+                index     = optind - 1;
                 while (index < argc) {
                     if (strnlen_s(optarg, RSIZE_MAX_STR) < MAX_URL_SIZE) {
-                        next_arg = strdup(argv[index]);
-                        if (next_arg != NULL) {
-                            index++;
-                            if (next_arg[0] != '-') {
-                                ret = ovsa_store_license_url_list(next_arg, &list_head, &list_tail);
-                                if (ret < OVSA_OK) {
-                                    OVSA_DBG(DBG_E, "OVSA: Load URL list failed with code %d\n",
-                                             ret);
-                                    ovsa_safe_free(&next_arg);
-                                    goto out;
-                                }
-                                list_count++;
-                                ovsa_safe_free(&next_arg);
-                                optind = index;
-                            } else {
-                                ovsa_safe_free(&next_arg);
-                                break;
+                        if (argv[index][0] != '-') {
+                            ret = ovsa_store_license_url_list(argv[index], &list_head, &list_tail);
+                            if (ret < OVSA_OK) {
+                                OVSA_DBG(DBG_E, "OVSA: Error load URL list failed with code %d\n",
+                                         ret);
+                                goto out;
                             }
-                        } else
+                            list_count++;
+                            optind = index + 1;
+                        } else {
                             break;
+                        }
+                        index++;
                     } else {
-                        OVSA_DBG(DBG_E, "OVSA: URL greater than %d characters not allowed \n",
+                        OVSA_DBG(DBG_E, "OVSA: Error URL greater than %d characters not allowed \n",
                                  MAX_URL_SIZE);
                         ret = OVSA_INVALID_PARAMETER;
                         goto out;
@@ -176,9 +191,9 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
                 if (isdigit((int)(unsigned char)*optarg)) {
                     usage_limit = atoi(optarg);
                     OVSA_DBG(DBG_D, "LicGen: usage_limit = %d\n", usage_limit);
-                    if (usage_limit < 0) {
+                    if (usage_limit <= 0) {
                         OVSA_DBG(DBG_E,
-                                 "OVSA: Usage limit should be a positive integer."
+                                 "OVSA: Usage limit should be greater than zero."
                                  " Please follow -help for help option\n");
                         ret = OVSA_INVALID_PARAMETER;
                         goto out;
@@ -196,7 +211,8 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
                 goto out;
             }
             default: {
-                OVSA_DBG(DBG_E, "OVSA: Wrong command given. Please follow -help for help option\n");
+                OVSA_DBG(DBG_E,
+                         "OVSA: Error wrong command given. Please follow -help for help option\n");
                 ret = OVSA_INVALID_PARAMETER;
                 goto out;
             }
@@ -210,18 +226,23 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
 
     /* Set input values license configuration structure */
     if ((lic_name != NULL) && (list_head != NULL) && (lic_version != NULL) &&
-        (licconf_file != NULL) && (keystore != NULL)) {
+        (lic_type != MAXLICENSETYPE) && (licconf_file != NULL) && (keystore != NULL)) {
         /* Initialize crypto */
         ret = ovsa_crypto_init();
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "OVSA: Ovsa crypto init failed with code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error ovsa crypto init failed with code %d\n", ret);
             goto out;
         }
 
         memset_s(&license_info, sizeof(ovsa_license_config_sig_t), 0);
-        memcpy_s(license_info.lic_config.license_name, strnlen_s(lic_name, MAX_NAME_SIZE), lic_name,
-                 strnlen_s(lic_name, MAX_NAME_SIZE));
         license_info.lic_config.license_type = lic_type;
+
+        if ((license_info.lic_config.license_type != SALE) && (usage_limit <= 0)) {
+            OVSA_DBG(DBG_E,
+                     "OVSA: Error invalid usage limit. Please follow -help for help option\n");
+            ret = OVSA_INVALID_PARAMETER;
+            goto out;
+        }
 
         if (license_info.lic_config.license_type == INSTANCELIMIT) {
             license_info.lic_config.usage_count = usage_limit;
@@ -234,11 +255,13 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
             license_info.lic_config.usage_count = 0;
         }
 
-        memcpy_s(license_info.lic_config.license_version, strnlen_s(lic_version, MAX_VERSION_SIZE),
-                 lic_version, strnlen_s(lic_version, MAX_VERSION_SIZE));
+        memcpy_s(license_info.lic_config.license_name, MAX_NAME_SIZE, lic_name,
+                 strnlen_s(lic_name, MAX_NAME_SIZE));
+        memcpy_s(license_info.lic_config.license_version, MAX_VERSION_SIZE, lic_version,
+                 strnlen_s(lic_version, MAX_VERSION_SIZE));
         license_info.lic_config.license_url_list = list_head;
     } else {
-        OVSA_DBG(DBG_E, "OVSA: Error: Wrong command given. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
@@ -247,20 +270,21 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
     OVSA_DBG(DBG_I, "OVSA: Load Asymmetric Key\n");
     ret = ovsa_crypto_load_asymmetric_key(keystore, &asymm_keyslot);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Get keyslot failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error get keyslot failed with code %d\n", ret);
         goto out;
     }
 
     ret = ovsa_crypto_get_certificate(asymm_keyslot, &license_info.lic_config.isv_certificate);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: License config get certificate failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error license config get certificate failed with error code %d\n",
+                 ret);
         goto out;
     }
 
     /* Create license config JSON blob */
     ret = ovsa_get_string_length(license_info.lic_config.isv_certificate, &cert_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n", ret);
         goto out;
     }
     lic_buf_size =
@@ -269,12 +293,12 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
          cert_len);
     ret = ovsa_safe_malloc(lic_buf_size, &lic_buf_string);
     if (ret < OVSA_OK || lic_buf_string == NULL) {
-        OVSA_DBG(DBG_E, "Error: License config buffer allocation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error license config buffer allocation failed with code %d\n", ret);
         goto out;
     }
-    ret = ovsa_json_create_license_config(&license_info, lic_buf_string);
+    ret = ovsa_json_create_license_config(&license_info, lic_buf_size, lic_buf_string);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Create license config failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create license config failed with error code %d\n", ret);
         goto out;
     }
 
@@ -282,14 +306,14 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
     lic_sig_buf_size = MAX_SIGNATURE_SIZE + SIGNATURE_BLOB_TEXT_SIZE + lic_buf_size;
     ret              = ovsa_safe_malloc(lic_sig_buf_size, &lic_buf_sig_string);
     if (ret < OVSA_OK || lic_buf_sig_string == NULL) {
-        OVSA_DBG(DBG_E, "Error: License config signature buffer allocation failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error license config signature buffer allocation failed %d\n", ret);
         goto out;
     }
     OVSA_DBG(DBG_I, "OVSA: Sign License Config JSON Blob\n");
     ret =
         ovsa_crypto_sign_json_blob(asymm_keyslot, lic_buf_string, lic_buf_size, lic_buf_sig_string);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: License config signing failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error license config signing failed with error code %d\n", ret);
         goto out;
     }
 
@@ -299,7 +323,8 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
         if ((fptr = fopen(licconf_file, "w+")) != NULL) {
             ret = ovsa_get_string_length(lic_buf_sig_string, &lic_sig_buf_size);
             if (ret < OVSA_OK) {
-                OVSA_DBG(DBG_E, "Error: Could not get length of isv_certificate string %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error could not get length of isv_certificate string %d\n",
+                         ret);
                 fclose(fptr);
                 goto out;
             }
@@ -308,7 +333,8 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
             OVSA_DBG(DBG_I, "OVSA: License config file %s generated successfully\n", licconf_file);
         } else {
             ret = OVSA_FILEOPEN_FAIL;
-            OVSA_DBG(DBG_E, "OVSA: Create file %s failed with error code %d\n", licconf_file, ret);
+            OVSA_DBG(DBG_E, "OVSA: Error create file %s failed with error code %d\n", licconf_file,
+                     ret);
             goto out;
         }
     }

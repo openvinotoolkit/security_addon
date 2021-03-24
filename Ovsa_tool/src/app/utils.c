@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
     if (filename == NULL || filesize == NULL) {
-        OVSA_DBG(DBG_E, "Error: Invalid parameter while reading Quote info\n");
+        OVSA_DBG(DBG_E, "OVSA: Error invalid input parameter\n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
@@ -49,13 +49,13 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
     fptr = fopen(filename, "rb");
     if (fptr == NULL) {
         ret = OVSA_FILEOPEN_FAIL;
-        OVSA_DBG(DBG_E, "Error: Opening file %s failed with code %d\n", filename, ret);
+        OVSA_DBG(DBG_E, "OVSA: Error opening file %s failed with code %d\n", filename, ret);
         goto out;
     }
 
     file_size = ovsa_crypto_get_file_size(fptr);
     if (file_size == 0) {
-        OVSA_DBG(DBG_E, "Error: Getting file size for %s failed\n", filename);
+        OVSA_DBG(DBG_E, "OVSA: Error getting file size for %s failed\n", filename);
         ret = OVSA_FILEIO_FAIL;
         fclose(fptr);
         goto out;
@@ -63,13 +63,13 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
 
     ret = ovsa_safe_malloc((sizeof(char) * file_size), filecontent);
     if ((ret < OVSA_OK) || (*filecontent == NULL)) {
-        OVSA_DBG(DBG_E, "Error: PCR quote buffer allocation failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error memory allocation failed %d\n", ret);
         fclose(fptr);
         goto out;
     }
 
     if (!fread(*filecontent, 1, file_size - 1, fptr)) {
-        OVSA_DBG(DBG_E, "Error: Reading pcr quote failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error in reading file content%d\n", ret);
         ret = OVSA_FILEIO_FAIL;
         fclose(fptr);
         goto out;
@@ -81,7 +81,7 @@ out:
     return ret;
 }
 
-bool ovsa_is_guid_valid(char* guid) {
+bool ovsa_is_guid_valid(unsigned char* guid) {
     unsigned int i;
 
     /* Check GUID is valid */
@@ -115,7 +115,7 @@ ovsa_status_t ovsa_safe_malloc(size_t size, char** aloc_buf) {
     *aloc_buf = (char*)malloc(size * sizeof(char));
     if (*aloc_buf == NULL) {
         ret = OVSA_MEMORY_ALLOC_FAIL;
-        OVSA_DBG(DBG_E, "Error: Buffer allocation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error buffer allocation failed with code %d\n", ret);
         goto out;
     }
     memset_s(*aloc_buf, (size) * sizeof(char), 0);
@@ -138,26 +138,24 @@ ovsa_status_t ovsa_store_license_url_list(char* optarg, ovsa_license_serv_url_li
     if (*listhead == NULL) {
         ret = ovsa_safe_malloc(sizeof(ovsa_license_serv_url_list_t), (char**)&head);
         if (ret < OVSA_OK || head == NULL) {
-            OVSA_DBG(DBG_E, "Error: Init URL list failed\n");
+            OVSA_DBG(DBG_E, "OVSA: Error init URL list failed\n");
             goto out;
         }
         head->next = NULL;
         memset_s(head->license_serv_url, MAX_URL_SIZE, 0);
-        memcpy_s(head->license_serv_url, strnlen_s(optarg, MAX_URL_SIZE), optarg,
-                 strnlen_s(optarg, MAX_URL_SIZE));
+        memcpy_s(head->license_serv_url, MAX_URL_SIZE, optarg, strnlen_s(optarg, MAX_URL_SIZE));
         OVSA_DBG(DBG_D, "LicGen: head->license_serv_url is %s\n", head->license_serv_url);
         *listhead = head;
         *listtail = head;
     } else {
         ret = ovsa_safe_malloc(sizeof(ovsa_license_serv_url_list_t), (char**)&cur);
         if (ret < OVSA_OK || cur == NULL) {
-            OVSA_DBG(DBG_E, "Error: Init URL list failed\n");
+            OVSA_DBG(DBG_E, "OVSA: Error init URL list failed\n");
             goto out;
         }
         cur->next = NULL;
         memset_s(cur->license_serv_url, MAX_URL_SIZE, 0);
-        memcpy_s(cur->license_serv_url, strnlen_s(optarg, MAX_URL_SIZE), optarg,
-                 strnlen_s(optarg, MAX_URL_SIZE));
+        memcpy_s(cur->license_serv_url, MAX_URL_SIZE, optarg, strnlen_s(optarg, MAX_URL_SIZE));
         OVSA_DBG(DBG_D, "LicGen: cur->license_serv_url is %s\n", cur->license_serv_url);
         tail->next = cur;
         tail       = cur;
@@ -176,31 +174,29 @@ ovsa_status_t ovsa_store_input_file_list(const char* optarg, ovsa_input_files_t*
     ovsa_input_files_t* tail = NULL;
 
     if (optarg != NULL)
-        OVSA_DBG(DBG_D, "Protect: Arg is %s\n", optarg);
+        OVSA_DBG(DBG_D, "Control Access: Arg is %s\n", optarg);
 
     tail = *listtail;
     if (*listhead == NULL) {
         ret = ovsa_safe_malloc(sizeof(ovsa_input_files_t), (char**)&head);
         if (ret < OVSA_OK || head == NULL) {
-            OVSA_DBG(DBG_E, "Error: Init input files list failed\n");
+            OVSA_DBG(DBG_E, "OVSA: Error init input files list failed\n");
             goto out;
         }
         head->next = NULL;
-        memcpy_s(head->name, strnlen_s(optarg, MAX_NAME_SIZE), optarg,
-                 strnlen_s(optarg, MAX_NAME_SIZE));
-        OVSA_DBG(DBG_D, "Protect: head->name is %s\n", head->name);
+        memcpy_s(head->name, MAX_FILE_NAME, optarg, strnlen_s(optarg, MAX_FILE_NAME));
+        OVSA_DBG(DBG_D, "Control Access: head->name is %s\n", head->name);
         *listhead = head;
         *listtail = head;
     } else {
         ret = ovsa_safe_malloc(sizeof(ovsa_input_files_t), (char**)&cur);
         if (ret < OVSA_OK || cur == NULL) {
-            OVSA_DBG(DBG_E, "Error: Init input files list failed\n");
+            OVSA_DBG(DBG_E, "OVSA: Error init input files list failed\n");
             goto out;
         }
         cur->next = NULL;
-        memcpy_s(cur->name, strnlen_s(optarg, MAX_NAME_SIZE), optarg,
-                 strnlen_s(optarg, MAX_NAME_SIZE));
-        OVSA_DBG(DBG_D, "Protect: cur->name is %s\n", cur->name);
+        memcpy_s(cur->name, MAX_FILE_NAME, optarg, strnlen_s(optarg, MAX_FILE_NAME));
+        OVSA_DBG(DBG_D, "Control Access: cur->name is %s\n", cur->name);
         tail->next = cur;
         tail       = cur;
         *listtail  = tail;

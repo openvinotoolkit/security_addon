@@ -1,5 +1,5 @@
 //*****************************************************************************
-// Copyright 2020 Intel Corporation
+// Copyright 2020-2021 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ OvsaModelInstance::OvsaModelInstance(const std::string modelName, const std::str
                                      const std::string& licFile, const std::string& datFile,
                                      bool licState, std::mutex& mutex)
     : mutex_lock(mutex) {
-    OVSA_DBG(DBG_I, " OvsaModelInstance: Instance of Custom OvsaModelInstance created\n");
+    OVSA_DBG(DBG_I, "OvsaModelInstance: Instance of Custom OvsaModelInstance created\n");
     model_ksFile         = std::move(ksFile);
     model_name           = std::move(modelName);
     model_licFile        = std::move(licFile);
@@ -42,7 +42,9 @@ OvsaModelInstance::OvsaModelInstance(const std::string modelName, const std::str
 }
 
 OvsaModelInstance::~OvsaModelInstance() {
-    watcherJoin();
+    if (watcherStarted) {
+        watcherJoin();
+    }
     OVSA_DBG(DBG_I, "OvsaModelInstance: Instance of Custom OvsaModelInstance deleted\n");
 }
 
@@ -52,44 +54,59 @@ bool OvsaModelInstance::getBlackListStatus() {
 }
 
 void OvsaModelInstance::releaseResources() {
-    watcherJoin();
+    OVSA_DBG(DBG_I, "OvsaModelInstance: releaseResources\n");
+    if (watcherStarted) {
+        watcherJoin();
+    }
 }
 
 void OvsaModelInstance::threadFunction(std::future<void> futureObj) {
     OVSA_DBG(DBG_I, "OvsaModelInstance: Thread Start\n");
-    int count   = 1;
-    bool status = false;
+    int count        = 1;
+    bool status      = false;
+    int asym_keyslot = -1;
     while (futureObj.wait_for(std::chrono::milliseconds(1)) == std::future_status::timeout) {
-        OVSA_DBG(DBG_E, "OvsaModelInstance: Doing Some Work %d\n", count++);
+        OVSA_DBG(DBG_I, "OvsaModelInstance: Doing Some Work %d\n", count++);
         std::this_thread::sleep_for(std::chrono::milliseconds(watchIntervalSecs));
         // query license check service
         std::unique_lock<std::mutex> lockGuard(mutex_lock);
-        int asym_keyslot = -1;
+        asym_keyslot = -1;
+        status       = false;
         ovsa_status_t ret =
             ovsa_crypto_load_asymmetric_key((char*)model_ksFile.c_str(), &asym_keyslot);
         if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "Error: Get asymmetric keyslot failed with code %d\n", ret);
+            OVSA_DBG(DBG_E,
+                     "OvsaModelInstance: Error load asymmetric keyslot failed with code %d\n", ret);
+            lockGuard.unlock();
+            goto blacklist;
         }
-        status = false;
         ret = ovsa_perform_tls_license_check(asym_keyslot, (char*)model_licFile.c_str(), &status);
         if (ret != OVSA_OK) {
             if (ret == OVSA_LICENSE_SERVER_CONNECT_FAIL)
                 OVSA_DBG(DBG_E,
-                         "Error: TLS license check service failed, Could not connect to server with %d\n",
-                         ret);
+                         "OvsaModelInstance: Error TLS license check service connection failed\n");
             else if (ret == OVSA_LICENSE_CHECK_FAIL)
-                OVSA_DBG(DBG_E, "Error: TLS license check service failed, License check failed with %d\n",
-                         ret);
+                OVSA_DBG(DBG_E,
+                         "OvsaModelInstance: Error TLS license check service failed with License "
+                         "expiry\n");
             else
-                OVSA_DBG(DBG_E, "Error: TLS license check service failed with code %d\n", ret);
+                OVSA_DBG(DBG_E,
+                         "OvsaModelInstance: Error TLS license check service failed with code %d\n",
+                         ret);
         }
+    blacklist:
         model_is_blacklisted = !status;
         if (!status) {
             OVSA_DBG(DBG_D, "Status will be updated to: %d\n", status);
-            break;
+            lockGuard.unlock();
+            goto out;
         }
         ovsa_crypto_clear_asymmetric_key_slot(asym_keyslot);
         lockGuard.unlock();
+    }
+out:
+    if (asym_keyslot != -1) {
+        ovsa_crypto_clear_asymmetric_key_slot(asym_keyslot);
     }
     OVSA_DBG(DBG_I, "OvsaModelInstance: Thread END\n");
     watcherJoin();

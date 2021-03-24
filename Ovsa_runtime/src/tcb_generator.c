@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,19 +56,21 @@ static ovsa_status_t ovsa_do_read_quote_pubkey(ovsa_quote_info_t* sw_quote_info)
     /* read pcr */
     ret = ovsa_read_file_content(TPM2_SWQUOTE_PCR, &pcr_buf, &file_size);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Reading TPM2_SWQUOTE_PCR file failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error reading TPM2_SWQUOTE_PCR file failed with error code %d\n",
+                 ret);
         goto out;
     }
     /* convert pcr bin to pem*/
     ret = ovsa_crypto_convert_bin_to_base64(pcr_buf, file_size - 1, &sw_quote_info->quote_pcr);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Crypto convert_bin_to_pem failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error crypto convert_bin_to_pem failed with code %d\n", ret);
         goto out;
     }
     /*read public key */
     ret = ovsa_read_file_content(TPM2_AK_PUB_PEM_KEY, &sw_quote_info->ak_pub_key, &file_size);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Reading TPM2_AK_PUB_PEM_KEY file failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error reading TPM2_AK_PUB_PEM_KEY file failed with error code %d\n",
+                 ret);
         goto out;
     }
 out:
@@ -85,62 +87,18 @@ static ovsa_status_t ovsa_get_tpm2_SW_quote(ovsa_quote_info_t* sw_quote_info) {
     /* Generate tpm2 quote */
     ret = ovsa_tpm2_generatequote(nonce);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: ovsa_tpm2_generatequote failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error ovsa_tpm2_generatequote failed with code %d\n", ret);
         goto out;
     }
     ret = ovsa_do_read_quote_pubkey(sw_quote_info);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: read_SW_quote failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error read_SW_quote failed with code %d\n", ret);
         goto out;
     }
 out:
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }
-
-#ifndef DISABLE_TPM2_HWQUOTE
-
-static ovsa_status_t ovsa_get_tpm2_HW_quote(ovsa_quote_info_t* hw_quote_info) {
-    ovsa_status_t ret = OVSA_OK;
-    char* nonce       = NULL;
-    int sockfd;
-
-    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
-
-    /********************************************/
-    /*       GET HW QUOTE using SSL connection  */
-    /********************************************/
-    /* Establish host connection */
-    ret = ovsa_establish_host_connection(&sockfd);
-    if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: ovsa_establish_host_connection failed with code %d\n", ret);
-        goto out;
-    }
-
-    /* Generate nonce for HWquote */
-    ret = ovsa_create_nonce(&nonce);
-    if (ret < OVSA_OK) {
-        close(sockfd);
-        OVSA_DBG(DBG_E, "Error ovsa_generate_nonce failed with code %d\n", ret);
-        goto out;
-    }
-    /* Get HWQuote */
-    ret = ovsa_get_hw_quote(sockfd, nonce, hw_quote_info);
-
-    if (ret < OVSA_OK) {
-        close(sockfd);
-        OVSA_DBG(DBG_E, "Error ovsa_establish_host_connection failed with code %d\n", ret);
-        goto out;
-    }
-    close(sockfd);
-
-    OVSA_DBG(DBG_I, "OVSA:Generated HW quote successfully \n");
-out:
-    ovsa_safe_free(&nonce);
-    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
-    return ret;
-}
-#endif
 
 static ovsa_status_t ovsa_tpm2_generate_golden_quote(ovsa_quote_info_t* sw_quote_info,
                                                      ovsa_quote_info_t* hw_quote_info) {
@@ -154,9 +112,11 @@ static ovsa_status_t ovsa_tpm2_generate_golden_quote(ovsa_quote_info_t* sw_quote
         goto out;
     }
 #ifndef DISABLE_TPM2_HWQUOTE
+
+    /* Read hw quote from NV memory  */
     ret = ovsa_get_tpm2_HW_quote(hw_quote_info);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error : Get tpm2 HW quote failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error read hw quote from NV memory failed with code %d\n", ret);
         goto out;
     }
 #endif
@@ -181,7 +141,7 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
     size_t file_size = 0;
     ovsa_quote_info_t sw_quote_info;
     ovsa_quote_info_t hw_quote_info;
-    int c;
+    int c = 0;
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
     memset_s(&tcb_sig_info, sizeof(ovsa_tcb_sig_t), 0);
@@ -191,7 +151,8 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
         switch (c) {
             case 'v':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_VERSION_SIZE) {
-                    OVSA_DBG(DBG_E, "OVSA: TCB version greater than %d characters not allowed \n",
+                    OVSA_DBG(DBG_E,
+                             "OVSA: Error TCB version greater than %d characters not allowed \n",
                              MAX_VERSION_SIZE);
                     ret = OVSA_INVALID_PARAMETER;
                     goto out;
@@ -201,7 +162,8 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
                 break;
             case 'n':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_NAME_SIZE) {
-                    OVSA_DBG(DBG_E, "OVSA: TCB name greater than %d characters not allowed \n",
+                    OVSA_DBG(DBG_E,
+                             "OVSA: Error TCB name greater than %d characters not allowed \n",
                              MAX_NAME_SIZE);
                     ret = OVSA_INVALID_PARAMETER;
                     goto out;
@@ -211,7 +173,8 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
                 break;
             case 'f':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_NAME_SIZE) {
-                    OVSA_DBG(DBG_E, "OVSA: TCB filename greater than %d characters not allowed \n",
+                    OVSA_DBG(DBG_E,
+                             "OVSA: Error TCB filename greater than %d characters not allowed \n",
                              MAX_NAME_SIZE);
                     ret = OVSA_INVALID_PARAMETER;
                     goto out;
@@ -238,26 +201,27 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
         }
     }
     if (tcb_version == NULL || tcb_file == NULL || tcb_name == NULL || keystore == NULL) {
-        OVSA_DBG(DBG_E, "OVSA: Invalid input parameters \n");
+        OVSA_DBG(DBG_E, "OVSA: Error invalid input parameters \n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
 
     ret = ovsa_tpm2_generate_golden_quote(&sw_quote_info, &hw_quote_info);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Get quote measurements failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error get golden quote measurements failed with error code %d\n",
+                 ret);
         goto out;
     }
     ret = ovsa_get_string_length(sw_quote_info.quote_pcr, &file_size);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of sw_quote_pcr string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of sw_quote_pcr string %d\n", ret);
         goto out;
     }
     memcpy_s(tcb_sig_info.tcbinfo.sw_quote, TPM2_QUOTE_SIZE, sw_quote_info.quote_pcr, file_size);
 
     ret = ovsa_get_string_length(sw_quote_info.ak_pub_key, &file_size);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of sw_pub_key string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of sw_pub_key string %d\n", ret);
         goto out;
     }
     memcpy_s(tcb_sig_info.tcbinfo.sw_pub_key, TPM2_PUBKEY_SIZE, sw_quote_info.ak_pub_key,
@@ -265,14 +229,14 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
 #ifndef DISABLE_TPM2_HWQUOTE
     ret = ovsa_get_string_length(hw_quote_info.quote_pcr, &file_size);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of HW_quote_pcr string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of HW_quote_pcr string %d\n", ret);
         goto out;
     }
     memcpy_s(tcb_sig_info.tcbinfo.hw_quote, TPM2_QUOTE_SIZE, hw_quote_info.quote_pcr, file_size);
 
     ret = ovsa_get_string_length(hw_quote_info.ak_pub_key, &file_size);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of HW_ak_pub_key string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of HW_ak_pub_key string %d\n", ret);
         goto out;
     }
     memcpy_s(tcb_sig_info.tcbinfo.hw_pub_key, TPM2_PUBKEY_SIZE, hw_quote_info.ak_pub_key,
@@ -284,7 +248,7 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
     /* crypto init */
     ret = ovsa_crypto_init();
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Crypto init failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error crypto init failed with code %d\n", ret);
         goto out;
     }
 
@@ -292,14 +256,14 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
     /* Get Asym Key Slot from Key store */
     ret = ovsa_crypto_load_asymmetric_key(keystore, &asymm_keyslot);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Get keyslot failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error get keyslot failed with code %d\n", ret);
         goto out;
     }
 
     /* Get customer certificate from key slot */
     ret = ovsa_crypto_get_certificate(asymm_keyslot, &tcb_sig_info.tcbinfo.isv_certificate);
     if (ret != OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Get customer certificate failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error get customer certificate failed with code %d\n", ret);
         goto out;
     }
 
@@ -307,18 +271,18 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
     size_t cert_len = 0;
     ret             = ovsa_get_string_length(tcb_sig_info.tcbinfo.isv_certificate, &cert_len);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "Error: Could not get length of certificate string %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of certificate string %d\n", ret);
         goto out;
     }
     tcb_buf_size = (sizeof(ovsa_tcb_sig_t) + TPM2_BLOB_TEXT_SIZE + cert_len);
     ret          = ovsa_safe_malloc(tcb_buf_size, &tcb_buf);
     if (ret < OVSA_OK || tcb_buf == NULL) {
-        OVSA_DBG(DBG_E, "OVSA: TCB info buffer allocation failed with code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error TCB info buffer allocation failed with code %d\n", ret);
         goto out;
     }
-    ret = ovsa_json_create_tcb_signature(&tcb_sig_info, tcb_buf);
+    ret = ovsa_json_create_tcb_signature(&tcb_sig_info, tcb_buf_size, tcb_buf);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Create TCB buffer failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create TCB buffer failed with error code %d\n", ret);
         goto out;
     }
 
@@ -326,13 +290,13 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
     size = MAX_SIGNATURE_SIZE + SIGNATURE_BLOB_TEXT_SIZE + tcb_buf_size;
     ret  = ovsa_safe_malloc(size, &tcb_sig_buf);
     if (ret < OVSA_OK || tcb_sig_buf == NULL) {
-        OVSA_DBG(DBG_E, "OVSA: TCB signature buffer allocation failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error TCB signature buffer allocation failed %d\n", ret);
         goto out;
     }
     OVSA_DBG(DBG_I, "OVSA: Sign TCB JSON Blob\n");
     ret = ovsa_crypto_sign_json_blob(asymm_keyslot, tcb_buf, tcb_buf_size, tcb_sig_buf);
     if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: TCB signing failed with error code %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error TCB signing failed with error code %d\n", ret);
         goto out;
     }
 
@@ -342,7 +306,7 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
         if ((tcb_file != NULL) && (fptr = fopen(tcb_file, "w+")) != NULL) {
             ret = ovsa_get_string_length(tcb_sig_buf, &size);
             if (ret < OVSA_OK) {
-                OVSA_DBG(DBG_E, "Error: Could not get length of tcb_sig_buf string %d\n", ret);
+                OVSA_DBG(DBG_E, "OVSA: Error could not get length of tcb_sig_buf string %d\n", ret);
                 fclose(fptr);
                 goto out;
             }
@@ -351,7 +315,7 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
             OVSA_DBG(DBG_I, "OVSA: TCB signature file %s generated successfully\n", tcb_file);
         } else {
             ret = OVSA_FILEOPEN_FAIL;
-            OVSA_DBG(DBG_E, "OVSA: Opening TCB file failed with error code %d\n", ret);
+            OVSA_DBG(DBG_E, "OVSA: Error opening TCB file failed with error code %d\n", ret);
             goto out;
         }
     }

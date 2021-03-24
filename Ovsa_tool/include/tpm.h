@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,12 +23,13 @@
 #define TPM2_CREDOUT_FILE "/tmp/cred.out.bin"
 #define TPM2_ACTCRED_OUT  "/tmp/actcred.out"
 #define SERVER_NONCE      "/tmp/quote_nonce.bin"
+#define CHALLENGE_NONCE   "/tmp/challenge_nonce.bin"
 
 #define TPM2_SWQUOTE_PCR "/tmp/pcr.bin"
 #define TPM2_SWQUOTE_MSG "/tmp/pcr_quote.plain"
 #define TPM2_SWQUOTE_SIG "/tmp/pcr_quote.signature"
 
-#define TPM2_SW_EK_CERT       "/var/OVSA/Quote/sw_ek_cert.bin"
+#define TPM2_SW_EK_CERT       "/var/OVSA/Quote/tpm_ek_cert.pem"
 #define TPM2_EK_PUB_KEY       "/var/OVSA/Quote/tpm_ek.pub"
 #define TPM2_AK_NAME_HEX      "/var/OVSA/Quote/tpm_ak.name.hex"
 #define TPM2_AK_PUB_PEM_KEY   "/var/OVSA/Quote/tpm_ak.pub.pem"

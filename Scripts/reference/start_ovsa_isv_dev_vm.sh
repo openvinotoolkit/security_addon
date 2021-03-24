@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,17 @@
 # limitations under the License.
 #
 
+sudo swtpm socket --tpm2 --server port=8280 \
+                  --ctrl type=tcp,port=8281 \
+                  --flags not-need-init --tpmstate dir=/var/OVSA/vtpm/vtpm_isv_dev &
+
+sudo -u tss tpm2-abrmd --tcti=swtpm:port=8280
+
+sudo tpm2_startup --clear -T swtpm:port=8280
+sudo tpm2_startup -T swtpm:port=8280
+python3 OVSA_write_hwquote_swtpm_nvram.py 8280
+sudo pkill -f vtpm_isv_dev
+
 sudo swtpm socket --tpmstate dir=/var/OVSA/vtpm/vtpm_isv_dev \
      --tpm2 \
      --ctrl type=unixio,path=/var/OVSA/vtpm/vtpm_isv_dev/swtpm-sock &
@@ -28,3 +39,4 @@ sudo qemu-system-x86_64 -m 8192 -enable-kvm \
     -tpmdev emulator,id=tpm0,chardev=chrtpm \
     -device tpm-tis,tpmdev=tpm0 \
     -vnc :1
+

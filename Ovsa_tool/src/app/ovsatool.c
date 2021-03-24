@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@
 #include "libovsa.h"
 #include "ovsa_tool.h"
 
-static ovsa_handle_cmd_t ovsa_cmd_handler[MAX_OVSA_CMDS];
-static char* ovsa_cmd[] = {"keygen", "licgen", "protect", "sale"};
+static ovsa_handle_cmd_t g_ovsa_cmd_handler[MAX_OVSA_CMDS];
+static char* g_ovsa_cmd[] = {"keygen", "licgen", "controlAccess", "sale"};
 
-static ovsa_status_t (*ovsa_fptr[])(int argc, char* argv[]) = {ovsa_keygen_main, ovsa_licgen_main,
-                                                               ovsa_protect_main, ovsa_sale_main};
+static ovsa_status_t (*ovsa_fptr[])(int argc, char* argv[]) = {
+    ovsa_keygen_main, ovsa_licgen_main, ovsa_controlaccess_main, ovsa_sale_main};
 
 /* Help options for Ovsa_tool */
 static void ovsa_help(const char* argv) {
@@ -34,7 +34,7 @@ static void ovsa_help(const char* argv) {
     printf("Supported commands:\n");
     printf("    keygen\n");
     printf("    licgen\n");
-    printf("    protect\n");
+    printf("    controlAccess\n");
     printf("    sale\n");
     printf("Supported subcommands for keygen:\n");
     printf("    -storekey\n");
@@ -56,9 +56,10 @@ static void ovsa_help(const char* argv) {
         "file>\n\n",
         argv);
     printf(
-        "%s protect -i <Intermediate File> <Model weighs file> <additional files> -n "
+        "%s controlAccess -i <Intermediate File> <Model weighs file> <additional files> -n "
         "<Model name> -d <Model "
-        "Description> -v <Model Vesrion> -p <Protected model  file> -m <Master license file> -k "
+        "Description> -v <Model Vesrion> -p <Controlled access model file> -m <Master license "
+        "file> -k "
         "<key store file>\n\n",
         argv);
     printf(
@@ -73,8 +74,8 @@ static void ovsa_cmd_handler_init(void) {
     int i = 0;
 
     for (i = 0; i < MAX_OVSA_CMDS; i++) {
-        ovsa_cmd_handler[i].command = ovsa_cmd[i];
-        ovsa_cmd_handler[i].funcptr = ovsa_fptr[i];
+        g_ovsa_cmd_handler[i].command = g_ovsa_cmd[i];
+        g_ovsa_cmd_handler[i].funcptr = ovsa_fptr[i];
     }
 }
 
@@ -96,9 +97,9 @@ int main(int argc, char* argv[]) {
     }
 
     for (i = 0; i < MAX_OVSA_CMDS; i++) {
-        if (!strcmp(ovsa_cmd_handler[i].command, argv[1])) {
+        if (!strcmp(g_ovsa_cmd_handler[i].command, argv[1])) {
             optind++;
-            ret = (*ovsa_cmd_handler[i].funcptr)(argc, argv);
+            ret = (*g_ovsa_cmd_handler[i].funcptr)(argc, argv);
             if (ret < OVSA_OK) {
                 OVSA_DBG(DBG_E, "OVSA: %s command failed with error code %d\n", argv[1], ret);
             }

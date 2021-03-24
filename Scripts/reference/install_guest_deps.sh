@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,9 +29,9 @@ sudo apt install -y build-essential automake libtool libssl-dev python3 python3-
 #TSS
 echo "Installing TPM Pacakages"
 sudo apt-get install -y libjson-c-dev libcurl4-openssl-dev doxygen pkg-config uuid-dev
-wget https://github.com/tpm2-software/tpm2-tss/releases/download/2.4.4/tpm2-tss-2.4.4.tar.gz
-tar -xvzf tpm2-tss-2.4.4.tar.gz
-pushd tpm2-tss-2.4.4
+wget https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz
+tar -xvzf tpm2-tss-3.0.3.tar.gz
+pushd tpm2-tss-3.0.3
 ./configure  --with-udevrulesdir=/etc/udev/rules.d/ --prefix=/usr
 if [ $? != 0 ];then
  echo "ERROR: Missing package dependencies for tss installation."
@@ -53,9 +53,9 @@ popd
 
 #ABRMD
 sudo apt-get install -y libglib2.0-dev
-wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.3.3/tpm2-abrmd-2.3.3.tar.gz
-tar -xvzf tpm2-abrmd-2.3.3.tar.gz
-pushd tpm2-abrmd-2.3.3
+wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz
+tar -xvzf tpm2-abrmd-2.4.0.tar.gz
+pushd tpm2-abrmd-2.4.0
 ./configure --with-dbuspolicydir=/etc/dbus-1/system.d --prefix=/usr
 if [ $? != 0 ];then
  echo "ERROR: Missing package dependencies for tpm2-abrmd installation."
@@ -73,9 +73,9 @@ popd
 
 #TOOLS
 sudo apt-get install -y pandoc
-wget https://github.com/tpm2-software/tpm2-tools/releases/download/4.3.0/tpm2-tools-4.3.0.tar.gz
-tar -xvzf tpm2-tools-4.3.0.tar.gz
-pushd tpm2-tools-4.3.0
+wget https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz
+tar -xvzf tpm2-tools-5.0.tar.gz
+pushd tpm2-tools-5.0
 ./configure --prefix=/usr
 if [ $? != 0 ];then
  echo "ERROR: Missing package dependencies for tpm2-tools installation."

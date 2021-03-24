@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020 Intel Corporation
+ * Copyright 2020-2021 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -188,6 +188,11 @@ static int ovsa_crypto_cert_check(X509_STORE* ctx, const char* cert) {
     static int vflags   = 0;
     int verify_cert     = 0;
 
+    if ((ctx == NULL) || (cert == NULL)) {
+        BIO_printf(g_bio_err, "LibOVSA: Error certificate check failed with invalid parameter\n");
+        return OVSA_INVALID_PARAMETER;
+    }
+
     xcert = ovsa_crypto_load_cert(cert, "certificate");
     if (xcert == NULL) {
         BIO_printf(g_bio_err, "LibOVSA: Error certificate check failed to read certificate\n");
@@ -265,6 +270,11 @@ static void ovsa_crypto_nodes_print(const char* name, STACK_OF(X509_POLICY_NODE)
     X509_POLICY_NODE* node = NULL;
     int index              = 0;
 
+    if ((name == NULL) || (nodes == NULL)) {
+        BIO_printf(g_bio_err, "LibOVSA: Explicit certificate policies not found\n");
+        return;
+    }
+
     BIO_printf(g_bio_err, "%s Policies:", name);
     if (nodes) {
         BIO_puts(g_bio_err, "\n");
@@ -275,25 +285,46 @@ static void ovsa_crypto_nodes_print(const char* name, STACK_OF(X509_POLICY_NODE)
     } else {
         BIO_puts(g_bio_err, " <empty>\n");
     }
+
+    return;
 }
 
 static void ovsa_crypto_policies_print(X509_STORE_CTX* ctx) {
     X509_POLICY_TREE* tree = NULL;
     int explicit_policy    = 0;
-    tree                   = X509_STORE_CTX_get0_policy_tree(ctx);
-    explicit_policy        = X509_STORE_CTX_get_explicit_policy(ctx);
+
+    if (ctx == NULL) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error printing explicit policies failed with invalid parameter\n");
+        return;
+    }
+
+    tree            = X509_STORE_CTX_get0_policy_tree(ctx);
+    explicit_policy = X509_STORE_CTX_get_explicit_policy(ctx);
 
     BIO_printf(g_bio_err, "LibOVSA: Require explicit Policy: %s\n",
                explicit_policy ? "True" : "False");
 
     ovsa_crypto_nodes_print("LibOVSA: Authority", X509_policy_tree_get0_policies(tree));
     ovsa_crypto_nodes_print("LibOVSA: User", X509_policy_tree_get0_user_policies(tree));
+
+    return;
 }
 
 static int ovsa_crypto_verify_cb(int ok, X509_STORE_CTX* ctx) {
-    int cert_error       = X509_STORE_CTX_get_error(ctx);
-    X509* current_cert   = X509_STORE_CTX_get_current_cert(ctx);
+    int cert_error       = 0;
+    X509* current_cert   = NULL;
     static int v_verbose = 0;
+
+    if (ctx == NULL) {
+        BIO_printf(
+            g_bio_err,
+            "LibOVSA: Error certificate verification callback failed with invalid parameter\n");
+        return 0;
+    }
+
+    cert_error   = X509_STORE_CTX_get_error(ctx);
+    current_cert = X509_STORE_CTX_get_current_cert(ctx);
 
     if (!ok) {
         if (current_cert != NULL) {
@@ -349,7 +380,8 @@ static ovsa_status_t ovsa_crypto_add_ocsp_cert(OCSP_REQUEST** req, const X509* x
     ovsa_status_t ret = OVSA_OK;
     OCSP_CERTID* id   = NULL;
 
-    if ((xcert == NULL) || (cert_id_md == NULL) || (issuer == NULL) || (ids == NULL)) {
+    if ((req == NULL) || (xcert == NULL) || (cert_id_md == NULL) || (issuer == NULL) ||
+        (ids == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error adding ocsp certificate failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -497,7 +529,7 @@ static OCSP_RESPONSE* ovsa_crypto_process_responder(OCSP_REQUEST* req, const cha
     SSL_CTX* ctx        = NULL;
     OCSP_RESPONSE* resp = NULL;
 
-    if (host == NULL) {
+    if ((req == NULL) || (host == NULL) || (path == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error process responder failed with invalid parameter\n");
         return NULL;
     }
@@ -550,8 +582,8 @@ static ovsa_status_t ovsa_crypto_print_ocsp_summary(BIO* out, OCSP_BASICRESP* ba
     const char* name                  = NULL;
     int cert_id_count = 0, status = 0, reason = 0;
 
-    if (basic_response == NULL || req == NULL || !sk_OPENSSL_STRING_num(names) ||
-        !sk_OCSP_CERTID_num(ids)) {
+    if ((out == NULL) || (basic_response == NULL) || (req == NULL) ||
+        (!sk_OPENSSL_STRING_num(names)) || (!sk_OCSP_CERTID_num(ids))) {
         BIO_printf(out, "LibOVSA: Error, no OCSP summary found\n");
         return OVSA_INVALID_PARAMETER;
     }
@@ -621,7 +653,7 @@ static ovsa_status_t ovsa_crypto_print_x509v3_exts(BIO* bio, const X509* xcert,
     int ext_num = 0, ext_name_size = 1;
     int indicator = 0, ext_found = 0;
 
-    if ((xcert == NULL) || (ext_name == NULL)) {
+    if ((bio == NULL) || (xcert == NULL) || (ext_name == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error printing x509v3 extensions failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -738,6 +770,12 @@ static void ovsa_crypto_print_name(BIO* out, const char* title, const X509_NAME*
     char mline      = 0;
     int indent      = 0;
 
+    if ((out == NULL) || (name == NULL)) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error printing certificate fields failed with invalid parameter\n");
+        return OVSA_INVALID_PARAMETER;
+    }
+
     if (title) {
         BIO_puts(out, title);
     }
@@ -768,6 +806,12 @@ static void ovsa_crypto_print_name(BIO* out, const char* title, const X509_NAME*
 /* Write the received certificate into issuer_fp */
 static size_t ovsa_crypto_write_callback(void* data, size_t size, size_t num_items,
                                          FILE* issuer_fp) {
+    if ((data == NULL) || (issuer_fp == NULL)) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error writing the issuer certificate failed with invalid parameter\n");
+        return OVSA_INVALID_PARAMETER;
+    }
+
     return fwrite(data, size, num_items, issuer_fp);
 }
 
@@ -842,7 +886,7 @@ static ovsa_status_t ovsa_crypto_check_issuer_subject_match(const X509* issuer_c
     char* subject        = NULL;
     int indicator        = 0;
 
-    if ((issuer_cert == NULL) || (xcert == NULL)) {
+    if ((issuer_cert == NULL) || (xcert == NULL) || (ca_cert == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error checking whether issuer and subject match failed with invalid "
                    "parameter\n");
@@ -1100,6 +1144,7 @@ static ovsa_status_t ovsa_crypto_extract_ca_cert(X509* xcert, char** ca_cert) {
                 goto end;
             }
 #endif
+            break;
         }
     }
 end:
@@ -1374,7 +1419,7 @@ static ovsa_status_t ovsa_crypto_extract_ocsp_uri(X509* xcert, char** ocsp_uri) 
     BUF_MEM* ocsp_ptr                       = NULL;
     int ocsp_uri_count                      = 0;
 
-    if (xcert == NULL) {
+    if ((xcert == NULL) || (ocsp_uri == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error extracting ocsp uri failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }

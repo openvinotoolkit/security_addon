@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,14 +24,17 @@ ARG build_type=dbg
 #TPM Tool Specific installs
 RUN yum install -y \
         autoconf-archive \
+        bison \
         dbus-devel \
-        doxygen \
+        flex \
         glib2-devel \
-	glibc-static \
+        glibc-static \
         json-c-devel \
+        libiconv \
         libstdc++-devel  \
         libgcrypt-devel \
         openssl-devel \
+        strip \
         uriparser-devel && \
         yum clean all
 
@@ -39,29 +42,38 @@ SHELL [ "/usr/bin/scl", "enable", "devtoolset-8" ]
 ENV CC=/opt/rh/devtoolset-8/root/bin/gcc
 ENV CXX=/opt/rh/devtoolset-8/root/bin/g++
 
+#DOXYGEN
+WORKDIR /doxygen
+RUN git clone https://github.com/doxygen/doxygen.git  && \
+    cd doxygen  && \
+    git checkout Release_1_8_7 && \
+    ./configure && \
+    make && \
+    make install
+
 #TPM2 TSS Build
 WORKDIR /tpm2-tss-build
 
-RUN wget https://github.com/tpm2-software/tpm2-tss/releases/download/2.4.4/tpm2-tss-2.4.4.tar.gz && \
-    tar -xzf tpm2-tss-2.4.4.tar.gz && \
-    cd tpm2-tss-2.4.4 && \
-    ./configure --disable-doxygen-man --prefix=/opt/tpm2-tools && \
+RUN wget https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz && \
+    tar -xvzf tpm2-tss-3.0.3.tar.gz && \
+    cd tpm2-tss-3.0.3 && \
+    ./configure  --with-udevrulesdir=/etc/udev/rules.d/ --prefix=/opt/tpm2-tools && \
     make -j8 && \
     make install
 
 ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/lib/pkgconfig:/opt/tpm2-tools/lib/pkgconfig
 WORKDIR /tpm2-abrmd
-RUN wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.3.3/tpm2-abrmd-2.3.3.tar.gz && \
-    tar -xvzf tpm2-abrmd-2.3.3.tar.gz && \
-    pushd tpm2-abrmd-2.3.3 && \
+RUN wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz && \
+    tar -xvzf tpm2-abrmd-2.4.0.tar.gz && \
+    pushd tpm2-abrmd-2.4.0 && \
     ./configure --with-dbuspolicydir=/etc/dbus-1/system.d --prefix=/opt/tpm2-tools && \
     make -j8 && \
     make install
 
 WORKDIR /tpm2-tools-build
-RUN wget https://github.com/tpm2-software/tpm2-tools/releases/download/4.3.0/tpm2-tools-4.3.0.tar.gz && \
-        tar -xzf tpm2-tools-4.3.0.tar.gz && \
-        cd tpm2-tools-4.3.0 && \
+RUN wget https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz && \
+        tar -xzf tpm2-tools-5.0.tar.gz && \
+        cd tpm2-tools-5.0 && \
         ./configure --prefix=/opt/tpm2-tools && \
         make -j8 && \
         make install
@@ -85,5 +97,3 @@ RUN cp -rv /opt/tpm2-tools/* /ovsa-runtime/tpm2-tools/
 
 WORKDIR /
 RUN tar cvzf ovsa-runtime.tar.gz /ovsa-runtime
-
-

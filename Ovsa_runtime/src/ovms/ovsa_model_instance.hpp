@@ -1,5 +1,5 @@
 //*****************************************************************************
-// Copyright 2020 Intel Corporation
+// Copyright 2020-2021 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@
 
 extern "C" {
 ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char* customer_license,
-                                              bool* status);
+                                             bool* status);
 ovsa_status_t ovsa_crypto_load_asymmetric_key(const char* keystore_name, int* asym_key_slot);
 void ovsa_crypto_clear_asymmetric_key_slot(int asym_key_slot);
 ovsa_status_t ovsa_crypto_init();

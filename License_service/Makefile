@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation
+# Copyright (c) 2020-2021 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ openssl_build: openssl/libcrypto.a
 openssl/libcrypto.a:
 ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/openssl),)
 	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/openssl/openssl.git
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1h
+	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1j
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && ./config --prefix=$(shell readlink -f crypto/) shared -fPIC
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && $(MAKE) && $(MAKE) -j1 install
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libcrypto.a ../../../lib
@@ -107,10 +107,10 @@ endif
 
 
 ############################# MBEDTLS DEPENDENCY ##############################
-MBEDTLS_VERSION ?= 2.21.0
+MBEDTLS_VERSION ?= 2.26.0
 MBEDTLS_SRC ?= mbedtls-$(MBEDTLS_VERSION).tar.gz
 MBEDTLS_URI ?= https://github.com/ARMmbed/mbedtls/archive/
-MBEDTLS_CHECKSUM ?= 320e930b7596ade650ae4fc9ba94b510d05e3a7d63520e121d8fdc7a21602db9
+MBEDTLS_CHECKSUM ?= 35d8d87509cd0d002bddbd5508b9d2b931c5e83747d087234cc7ad551d53fe05
 
 # mbedTLS uses a submodule mbedcrypto, need to download it and move under mbedtls/crypto
 MBEDCRYPTO_VERSION ?= 3.1.0
