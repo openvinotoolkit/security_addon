@@ -1039,6 +1039,9 @@ ovsa_status_t ovsa_crypto_compute_hash(const char* in_buff, int hash_alg, unsign
     if (hash_alg == HASH_ALG_SHA256) {
         md          = EVP_sha256();
         hash_length = 32;
+    } else if (hash_alg == HASH_ALG_SHA384) {
+        md          = EVP_sha384();
+        hash_length = 48;
     } else {
         md          = EVP_sha512();
         hash_length = 64;

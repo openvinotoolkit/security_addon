@@ -47,7 +47,8 @@ static void ovsa_server_crypto_policies_print(X509_STORE_CTX* ctx);
 static int ovsa_server_crypto_verify_cb(int ok, X509_STORE_CTX* ctx);
 
 static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cert,
-                                                                 const char* chain_file);
+                                                                 const char* chain_file,
+                                                                 const char* chain_cert);
 
 static size_t ovsa_server_crypto_write_callback(void* data, size_t size, size_t num_items,
                                                 FILE* issuer_fp);
@@ -708,6 +709,12 @@ static ovsa_status_t ovsa_server_crypto_get_issuer_cert(const char* issuer_file_
 
     curl_easy_setopt(curl, CURLOPT_URL, ca_issuers_uri);
 
+    /* Complete the transfer operation within 1 second */
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1L);
+
+    /* Fail the request if the HTTP code returned is equal to or larger than 400 */
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+
     /* If the specified URL is redirected, tell curl to follow redirection */
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
@@ -1351,7 +1358,8 @@ end:
 #endif
 
 static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cert,
-                                                                 const char* chain_file) {
+                                                                 const char* chain_file,
+                                                                 const char* chain_cert) {
     ovsa_status_t ret        = OVSA_OK;
     BIO* ca_issuers_bio      = NULL;
     BIO* issuer_cert_bio     = NULL;
@@ -1374,7 +1382,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
     int safe_exit            = 0;
     size_t ca_cert_len = 0, cert_len = 0;
     size_t issuer_cert_len = 0, cert_file_size = 0;
-    char* issuer_file_name      = "issuer_cert.der";
+    char* issuer_file_name      = "/tmp/issuer_cert.der";
     size_t ca_issuers_field_len = 0;
     int ca_issuers_uri_len = 0, count = 0;
     char ca_issuers_uri[MAX_URL_SIZE];
@@ -1404,14 +1412,6 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
         goto end;
     }
 
-    ret = ovsa_server_get_string_length(cert, &cert_len);
-    if ((ret < OVSA_OK) || (cert_len == EOK)) {
-        BIO_printf(g_bio_err,
-                   "OVSA: Error forming chain failed in getting the size of the certificate\n");
-        ret = OVSA_INVALID_FILE_PATH;
-        goto end;
-    }
-
     /* Write the client certificate to chain file */
     chain_fp = fopen(chain_file, "w");
     if (chain_fp == NULL) {
@@ -1420,8 +1420,35 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
         goto end;
     }
 
+    if (chain_cert != NULL) {
+        ret = ovsa_server_get_string_length(chain_cert, &cert_len);
+        if ((ret < OVSA_OK) || (cert_len == EOK)) {
+            BIO_printf(
+                g_bio_err,
+                "OVSA: Error forming chain failed in getting the size of the certificate chain\n");
+            ret = OVSA_INVALID_FILE_PATH;
+            fclose(chain_fp);
+            goto end;
+        }
+        if (!fwrite(chain_cert, cert_len, 1, chain_fp)) {
+            BIO_printf(g_bio_err, "OVSA: Error in writing to certificate chain to chain file\n");
+            fclose(chain_fp);
+            ret = OVSA_FILEIO_FAIL;
+            goto end;
+        }
+    }
+
+    ret = ovsa_server_get_string_length(cert, &cert_len);
+    if ((ret < OVSA_OK) || (cert_len == EOK)) {
+        BIO_printf(g_bio_err,
+                   "OVSA: Error forming chain failed in getting the size of the certificate\n");
+        ret = OVSA_INVALID_FILE_PATH;
+        fclose(chain_fp);
+        goto end;
+    }
+
     if (!fwrite(cert, cert_len, 1, chain_fp)) {
-        BIO_printf(g_bio_err, "OVSA: Error forming chain failed in writing to chain file\n");
+        BIO_printf(g_bio_err, "OVSA: Error in writing certificate to chain file\n");
         fclose(chain_fp);
         ret = OVSA_FILEIO_FAIL;
         goto end;
@@ -1742,17 +1769,20 @@ end:
     BIO_free_all(issuer_cert_bio);
     X509_free(xcert);
     xcert = NULL;
+    if (remove(issuer_file_name) != 0) {
+        BIO_printf(g_bio_err, "OVSA: Warning could not delete %s file\n", issuer_file_name);
+    }
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);
     }
     return ret;
 }
 
-ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert) {
+ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert, const char* chain_cert) {
     ovsa_status_t ret = OVSA_OK;
     X509_STORE* store = NULL;
     X509* xcert       = NULL;
-    char* chain_file  = "chain.pem";
+    char* chain_file  = "/tmp/chain.pem";
 
     g_bio_err = BIO_new_fp(stdout, BIO_NOCLOSE);
     if (g_bio_err == NULL) {
@@ -1773,7 +1803,7 @@ ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert) {
         goto end;
     }
 
-    ret = ovsa_server_crypto_form_chain_do_ocsp_check(cert, chain_file);
+    ret = ovsa_server_crypto_form_chain_do_ocsp_check(cert, chain_file, chain_cert);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "OVSA: Error verifying certificate failed since chain file "
@@ -1801,9 +1831,15 @@ ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert) {
 end:
     X509_free(xcert);
     X509_STORE_free(store);
+    if (remove(chain_file) != 0) {
+        BIO_printf(g_bio_err, "OVSA: Warning could not delete %s file\n", chain_file);
+    }
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);
     }
-    BIO_free_all(g_bio_err);
+    if (g_bio_err != NULL) {
+        BIO_free_all(g_bio_err);
+        g_bio_err = NULL;
+    }
     return ret;
 }

@@ -666,7 +666,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     }
     memcpy_s(customer_license.customer_lic.isv_certificate, cert_size,
              master_lic_sig.master_lic.isv_certificate, cert_size);
-    customer_license.customer_lic.isv_certificate[cert_size - 1] = '\0';
+    customer_license.customer_lic.isv_certificate[cert_size] = '\0';
     memcpy_s(customer_license.customer_lic.model_hash, HASH_SIZE,
              master_lic_sig.master_lic.model_hash,
              strnlen_s(master_lic_sig.master_lic.model_hash, HASH_SIZE));

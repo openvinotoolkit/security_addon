@@ -169,7 +169,7 @@ ovsa_status_t ovsa_server_json_extract_customer_license(const char* inputBuf,
         i             = 0;
         while (device) {
             snprintf_s_i(fname, MAX_FILE_NAME_LEN, "url_%d", (i++) % 100u);
-            cJSON* url = cJSON_GetObjectItemCaseSensitive(svrurl, fname);
+            cJSON* url_struct = cJSON_GetObjectItemCaseSensitive(svrurl, fname);
             if (head == NULL) {
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_server_safe_malloc(sizeof(ovsa_license_serv_url_list_t), (char**)&head);
@@ -190,10 +190,24 @@ ovsa_status_t ovsa_server_json_extract_customer_license(const char* inputBuf,
                 tail->next = cur;
                 tail       = cur;
             }
+            cJSON* url = cJSON_GetObjectItemCaseSensitive(url_struct, "url");
             if (cJSON_IsString(url) && (url->valuestring != NULL)) {
+                memset_s(tail->license_serv_url, MAX_URL_SIZE, 0);
                 memcpy_s(tail->license_serv_url, MAX_URL_SIZE, url->valuestring,
                          strnlen_s(url->valuestring, MAX_URL_SIZE));
                 OVSA_DBG(DBG_D, "OVSA:%s\n", fname);
+            }
+            cJSON* cur_cert_hash = cJSON_GetObjectItemCaseSensitive(url_struct, "cur_cert_hash");
+            if (cJSON_IsString(cur_cert_hash) && (cur_cert_hash->valuestring != NULL)) {
+                memset_s(tail->cur_cert_hash, HASH_SIZE, 0);
+                memcpy_s(tail->cur_cert_hash, HASH_SIZE, cur_cert_hash->valuestring,
+                         strnlen_s(cur_cert_hash->valuestring, HASH_SIZE));
+            }
+            cJSON* fut_cert_hash = cJSON_GetObjectItemCaseSensitive(url_struct, "fut_cert_hash");
+            if (cJSON_IsString(fut_cert_hash) && (fut_cert_hash->valuestring != NULL)) {
+                memset_s(tail->fut_cert_hash, HASH_SIZE, 0);
+                memcpy_s(tail->fut_cert_hash, HASH_SIZE, fut_cert_hash->valuestring,
+                         strnlen_s(fut_cert_hash->valuestring, HASH_SIZE));
             }
             device = device->next;
         }
@@ -425,12 +439,19 @@ ovsa_status_t ovsa_server_json_create_message_blob(ovsa_command_type_t cmdtype, 
     ovsa_status_t ret = OVSA_OK;
     cJSON* message    = NULL;
     size_t len        = 0;
+    size_t str_len    = 0;
     char command[MAX_COMMAND_TYPE_LENGTH];
     char* str_print            = NULL;
-    const char* command_type[] = {"OVSA_SEND_NONCE",           "OVSA_SEND_EK_AK_BIND",
-                                  "OVSA_SEND_EK_AK_BIND_INFO", "OVSA_SEND_QUOTE_NONCE",
-                                  "OVSA_SEND_SIGN_NONCE",      "OVSA_SEND_QUOTE_INFO",
-                                  "OVSA_SEND_CUST_LICENSE",    "OVSA_SEND_LICENSE_CHECK_RESP"};
+    const char* command_type[] = {"OVSA_SEND_NONCE",
+                                  "OVSA_SEND_EK_AK_BIND",
+                                  "OVSA_SEND_EK_AK_BIND_INFO",
+                                  "OVSA_SEND_QUOTE_NONCE",
+                                  "OVSA_SEND_SIGN_NONCE",
+                                  "OVSA_SEND_QUOTE_INFO",
+                                  "OVSA_SEND_CUST_LICENSE",
+                                  "OVSA_SEND_UPDATE_CUST_LICENSE",
+                                  "OVSA_SEND_UPDATE_CUST_LICENSE_ACK",
+                                  "OVSA_SEND_LICENSE_CHECK_RESP"};
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
@@ -440,7 +461,6 @@ ovsa_status_t ovsa_server_json_create_message_blob(ovsa_command_type_t cmdtype, 
         goto end;
     }
     memset_s(command, sizeof(command), 0);
-
     switch (cmdtype) {
         case OVSA_SEND_NONCE:
             memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, command_type[OVSA_SEND_NONCE],
@@ -454,20 +474,18 @@ ovsa_status_t ovsa_server_json_create_message_blob(ovsa_command_type_t cmdtype, 
             memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, command_type[OVSA_SEND_QUOTE_NONCE],
                      strnlen_s(command_type[OVSA_SEND_QUOTE_NONCE], MAX_COMMAND_TYPE_LENGTH));
             break;
-        case OVSA_SEND_LICENSE_CHECK_RESP: {
-            size_t str_len = 0;
-            ret = ovsa_server_get_string_length((char*)command_type[OVSA_SEND_LICENSE_CHECK_RESP],
-                                                &str_len);
-            if (ret < OVSA_OK) {
-                OVSA_DBG(DBG_E,
-                         "OVSA: Error could not get length of "
-                         "command_type[OVSA_SEND_LICENSE_CHECK_RESP] %d\n",
-                         ret);
-                goto end;
-            }
+
+        case OVSA_SEND_UPDATE_CUST_LICENSE:
+            memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, command_type[OVSA_SEND_UPDATE_CUST_LICENSE],
+                     strnlen_s((char*)command_type[OVSA_SEND_UPDATE_CUST_LICENSE],
+                               MAX_COMMAND_TYPE_LENGTH));
+            break;
+
+        case OVSA_SEND_LICENSE_CHECK_RESP:
             memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, command_type[OVSA_SEND_LICENSE_CHECK_RESP],
-                     str_len);
-        } break;
+                     strnlen_s((char*)command_type[OVSA_SEND_LICENSE_CHECK_RESP],
+                               MAX_COMMAND_TYPE_LENGTH));
+            break;
         default:
             OVSA_DBG(DBG_E, "OVSA: Error json message command not valid \n");
             goto end;

@@ -51,7 +51,8 @@
 #define MAX_CONTROLLED_ACCESS_MODEL_VALIDITY_TIME_PERIOD 5  /* 5 years */
 #define TIMECONVERT_SECSTODAYS(timeSecs)                 ((timeSecs % (86400 * 30)) / 86400)
 #define HASH_ALG_SHA256                                  1
-#define HASH_ALG_SHA512                                  2
+#define HASH_ALG_SHA384                                  2
+#define HASH_ALG_SHA512                                  3
 
 /* As per the ASN1_STRING_TABLE, computed max size of the attribute types
    found in the Distinguished Name are around ~129K and added certain buffer

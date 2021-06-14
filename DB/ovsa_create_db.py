@@ -58,16 +58,17 @@ def main():
 
     # create table customer_license_info
     sql_customer_license = """create table if not exists customer_license_info (
-        customer_license_id integer primary key autoincrement, 
-        license_guid text, 
-        model_guid text, 
-        isv_certificate text, 
-        customer_certificate text, 
-        license_type integer, 
-        limit_count integer, 
-        usage_count numeric, 
-        time_limit numeric, 
-        created_date numeric, 
+        customer_license_id integer primary key autoincrement,
+        license_guid text,
+        model_guid text,
+        isv_certificate text,
+        customer_certificate text,
+	customer_license_blob text,
+        license_type integer,
+        limit_count integer,
+        usage_count numeric,
+        time_limit numeric,
+        created_date numeric,
         updated_date numeric) """
     print("Creating customer_license_info table...")
     conn.execute(sql_customer_license)

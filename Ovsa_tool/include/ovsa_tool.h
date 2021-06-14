@@ -18,11 +18,11 @@
 #ifndef __OVSA_TOOL_H_
 #define __OVSA_TOOL_H_
 
-#define MAX_OVSA_CMDS 4
+#define MAX_OVSA_CMDS 5
 
 /* Needs to be updated based on the json blob key names */
 #define LICENSE_CONFIG_BLOB_TEXT_SIZE          147
-#define LICENSE_URL_BLOB_TEXT_SIZE             15
+#define LICENSE_URL_BLOB_TEXT_SIZE             190
 #define CONTROLLED_ACCESS_MODEL_BLOB_TEXT_SIZE 110
 #define MODEL_FILE_BLOB_TEXT_SIZE              15
 #define MASTER_LICENSE_BLOB_TEXT_SIZE          131
@@ -56,6 +56,8 @@ typedef enum { SALE = 0, INSTANCELIMIT, TIMELIMIT, MAXLICENSETYPE } ovsa_license
 /* To Store list of License Server URL for License Config Struct */
 typedef struct ovsa_license_serv_url_list {
     char license_serv_url[MAX_URL_SIZE];
+    char cur_cert_hash[HASH_SIZE];
+    char fut_cert_hash[HASH_SIZE];
     struct ovsa_license_serv_url_list* next;
 } ovsa_license_serv_url_list_t;
 
@@ -218,5 +220,15 @@ ovsa_status_t ovsa_controlaccess_main(int argc, char* argv[]);
  * \return ovsa_status_t
  */
 ovsa_status_t ovsa_sale_main(int argc, char* argv[]);
+
+/* update APIs */
+/*!
+ * \brief initiates update of customer license config generation
+ *
+ * \param [in] count of command line params
+ * \param [in] command line params
+ * \return ovsa_status_t
+ */
+ovsa_status_t ovsa_update_custlicense_main(int argc, char* argv[]);
 
 #endif /* __OVSA_TOOL_H_ */

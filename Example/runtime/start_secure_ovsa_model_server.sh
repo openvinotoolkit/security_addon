@@ -20,22 +20,8 @@ GRPC_PORT=3335
 
 MTLS_IMAGE=${1:-"ovsa/runtime-tpm-nginx"}
 
-#echo "Loading configuration file from test_config.sh..."
-#source test_config.sh
-
-
-if [ -f './client.pem' ] ; then
-        echo "certificates are ready - no need to generate."
-else
-        echo "generating certificates..."
-        set -e
-        ./generate_certs.sh
-        set +e
-	echo "Certificates are up to date."
-fi
-
 echo "Starting container. Hit CTRL+C to stop it. Use another terminal to send some requests, e.g. via using test_rest.sh or test_grpc.sh scripts."
-docker run --rm -ti \
+docker run -d --rm -ti \
 	--device=/dev/tpm0:/dev/tpm0 \
 	--device=/dev/tpmrm0:/dev/tpmrm0 \
 	-e KVM_HOST_IP -e KVM_TCP_PORT_NUMBER \
@@ -43,11 +29,11 @@ docker run --rm -ti \
         -p $GRPC_PORT:$GRPC_PORT \
 	-v ${PWD}:/sampleloader \
 	-v /var/OVSA:/var/OVSA \
-        -v $(pwd)/server.pem:/certs/server.pem:ro \
-        -v $(pwd)/server.key:/certs/server.key:ro \
-        -v $(pwd)/client_cert_ca.pem:/certs/client_cert_ca.pem:ro \
-        -v $(pwd)/dhparam.pem:/certs/dhparam.pem:ro \
-        -v $(pwd)/client_cert_ca.crl:/certs/client_cert_ca.crl:ro \
+        -v /var/OVSA/Modelserver/server.pem:/certs/server.pem:ro \
+        -v /var/OVSA/Modelserver/server.key:/certs/server.key:ro \
+        -v /var/OVSA/Modelserver/client_cert_ca.pem:/certs/client_cert_ca.pem:ro \
+        -v /var/OVSA/Modelserver/dhparam.pem:/certs/dhparam.pem:ro \
+        -v /var/OVSA/Modelserver/client_cert_ca.crl:/certs/client_cert_ca.crl:ro \
         $MTLS_IMAGE \
         --config_path /sampleloader/sample.json \
 	--grpc_bind_address 8.8.8.8 --port $GRPC_PORT --rest_bind_address 1.1.1.1 --rest_port $REST_PORT

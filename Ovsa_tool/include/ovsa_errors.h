@@ -101,8 +101,9 @@ typedef enum {
     OVSA_SOCKET_WRITE_FAIL  = -44,
     OVSA_SOCKET_CONN_CLOSED = -45,
 
-    OVSA_INTEGER_OVERFLOW  = -46,
-    OVSA_INTEGER_UNDERFLOW = -47,
+    OVSA_INTEGER_OVERFLOW                 = -46,
+    OVSA_INTEGER_UNDERFLOW                = -47,
+    OVSA_PEER_CERT_HASH_VALIDATION_FAILED = -48,
 
     OVSA_FAIL = -99
 } ovsa_status_t;

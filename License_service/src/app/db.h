@@ -37,6 +37,19 @@ ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* 
                                                const char* model_guid, char** customer_certificate);
 
 /*!
+ * \brief ovsa_db_get_customer_license_blob
+ *
+ * \param [in]  db_name buffer pointing to the database name
+ * \param [in]  license_guid buffer pointing to the license guid
+ * \param [in]  model_guid buffer pointing to the model guid
+ * \param [out]  customer_license_blob buffer pointing to retrieve the customer
+ * license blob \return ovsa_status_t
+ */
+
+ovsa_status_t ovsa_db_get_customer_license_blob(const char* db_name, const char* license_guid,
+                                                const char* model_guid,
+                                                char** customer_license_blob);
+/*!
  * \brief ovsa_db_validate_license_usage
  *
  * \param [in]  db_name buffer pointing to the database name
