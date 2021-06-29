@@ -46,7 +46,7 @@ cd /opt/ovsa/example_runtime/ && ./generate_certs.sh -p /var/OVSA/Modelserver
 cd -
 sudo chown -R ovsa /var/OVSA
 
-if [[ "$(docker images -q ovsa/runtime-tpm-nginx:latest 2> /dev/null)" == "" ]]; then
+if [ -z "$(docker images -q ovsa/runtime-tpm-nginx:latest)" ]; then
         echo "Docker does not exist."
 else
         sudo docker image rm -f ovsa/runtime-tpm-nginx:latest

@@ -1,6 +1,6 @@
-# OpenVINO™ Toolkit Security Add-on Fingerprint Changes for Release 2021.3
+# OpenVINO™ Toolkit Security Add-on Fingerprint 
 
-The format of the Platform Quote used in the Runtime Reference Fingerprint has changed in release 2021.3 of the OpenVINO™ Security Add-on. The Guest Quote (virtual machine) and Host Quote (physical machine) are now bound to each other as shown in the diagram below.
+This document explains the format of the Platform Quote used in the Runtime Reference Fingerprint for the OpenVINO™ Security Add-on. The Guest Quote (virtual machine) and Host Quote (physical machine) are now bound to each other as shown in the diagram below.
 
 ![](fingerprint-drawing.png)
 

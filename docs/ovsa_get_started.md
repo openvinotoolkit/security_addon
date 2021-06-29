@@ -1,3 +1,4 @@
+
 # OpenVINO™ Security Add-on
 
 This guide provides instructions for people who use the OpenVINO™ Security Add-on to create, distribute, and use models that are created with the OpenVINO™ toolkit:
@@ -557,7 +558,6 @@ This step is for the combined role of Model Developer and Independent Software V
 	cd ovsa-kvm-host
 	./install.sh
 	```
-
 If you are using more than one Host Machine repeat Step 3 on each.
 
 ### Step 4: Install the OpenVINO™ Security Add-on Model Developer / ISV Components
@@ -577,7 +577,7 @@ This step is for the combined role of Model Developer and Independent Software V
     ```
 5. Go to the Guest VM.
 
-6.	Create `OVSA` user
+6.	Create `ovsa` user
 	```sh
 	sudo useradd -m ovsa
 	sudo passwd ovsa
@@ -589,7 +589,7 @@ This step is for the combined role of Model Developer and Independent Software V
 	cd ovsa-developer
 	sudo ./install.sh
 	```
-8. Start the license server on a separate terminal.
+8. Start the license server on a separate terminal as `ovsa` user.
 	```sh
 	source /opt/ovsa/scripts/setupvars.sh
 	cd /opt/ovsa/bin
@@ -612,11 +612,11 @@ The Model Hosting components install the OpenVINO™ Security Add-on Runtime Doc
 3. While on the Host Machine copy the ovsa-model-hosting.tar.gz from release_files to the Guest VM:
 	```sh
     cd $OVSA_RELEASE_PATH
-    scp ovsa-model-hosting.tar.gz username@<isv-developer-vm-ip-address>:/<username-home-directory>/OVSA
+    scp ovsa-model-hosting.tar.gz username@<runtime-vm-ip-address>:/<username-home-directory>/OVSA
     ```
 4. Go to the Guest VM
 
-5.	Create `OVSA` user
+5.	Create `ovsa` user
 	```sh
 	sudo useradd -m ovsa
 	sudo passwd ovsa
@@ -646,7 +646,7 @@ The following figure describes the interactions between the Model Developer, Ind
 
 The Model Developer creates model, defines access control and creates the user license. After the model is created, access control enabled, and the license is ready, the Model Developer provides the license details to the Independent Software Vendor before sharing to the Model User.
 
-References to the Guest VM are to `ovsa_isv_dev`. Log on to the Guest VM as `OVSA` user.
+References to the Guest VM are to `ovsa_isv_dev`. Log on to the Guest VM as `ovsa` user.
 
 #### Step 1: Setup up the artefacts directory
 Create a directory named artefacts. This directory will hold artefacts required to create licenses:
@@ -735,7 +735,7 @@ The access controlled model is ready to be shared with the User and the referenc
 	* `face_detection_model.lic`
 
 ### Model User Instructions
-References to the Guest VM are to `ovsa_rumtime`. Log on to the Guest VM as `OVSA` user.
+References to the Guest VM are to `ovsa_rumtime`. Log on to the Guest VM as `ovsa` user.
 
 #### Step 1: Setup up the artefacts directory
 
