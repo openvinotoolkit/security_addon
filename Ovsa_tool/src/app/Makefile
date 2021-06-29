@@ -44,6 +44,7 @@ C_SRC_FILES := \
 	licgen.c \
 	controlaccess.c \
 	sale.c \
+	updatecustlicense.c \
 	json.c \
 	utils.c
 

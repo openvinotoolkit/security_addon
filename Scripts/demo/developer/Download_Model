@@ -36,7 +36,7 @@ else
 		   -o model/$1.xml \
 		   -o model/$1.bin
 
-	   chown intel:intel $OVSA_DEV_ARTEFACTS/model
+	   chown ovsa $OVSA_DEV_ARTEFACTS/model
 	   echo "Model $1 downloaded to $OVSA_DEV_ARTEFACTS/model"
 	else
 	   echo "Model $1 does not exist"

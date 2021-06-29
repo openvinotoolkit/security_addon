@@ -8,14 +8,6 @@
      }
    ],
   "model_config_list":[
-    {
-      "config":{
-        "name":"controlled-access-model",
-        "base_path":"/sampleloader/model/fd",
-        "custom_loader_options": {"loader_name":  "ovsa", "keystore":  "custkeystore", "controlled_access_file": "face_detection_model"}
-      }
-    }
-
   ]
 }
 

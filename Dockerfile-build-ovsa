@@ -57,16 +57,16 @@ WORKDIR /tpm2-tss-build
 RUN wget https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz && \
     tar -xvzf tpm2-tss-3.0.3.tar.gz && \
     cd tpm2-tss-3.0.3 && \
-    ./configure  --with-udevrulesdir=/etc/udev/rules.d/ --prefix=/opt/tpm2-tools && \
+    ./configure  --with-udevrulesdir=/etc/udev/rules.d/ --prefix=/usr && \
     make -j8 && \
     make install
 
-ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/lib/pkgconfig:/opt/tpm2-tools/lib/pkgconfig
+ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/lib/pkgconfig
 WORKDIR /tpm2-abrmd
 RUN wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz && \
     tar -xvzf tpm2-abrmd-2.4.0.tar.gz && \
     pushd tpm2-abrmd-2.4.0 && \
-    ./configure --with-dbuspolicydir=/etc/dbus-1/system.d --prefix=/opt/tpm2-tools && \
+    ./configure --with-dbuspolicydir=/etc/dbus-1/system.d --prefix=/usr && \
     make -j8 && \
     make install
 
@@ -74,7 +74,7 @@ WORKDIR /tpm2-tools-build
 RUN wget https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz && \
         tar -xzf tpm2-tools-5.0.tar.gz && \
         cd tpm2-tools-5.0 && \
-        ./configure --prefix=/opt/tpm2-tools && \
+        ./configure --prefix=/usr && \
         make -j8 && \
         make install
 
@@ -91,9 +91,31 @@ RUN cp /ovsa/Ovsa_runtime/src/ovms/libovsaruntime.so /ovsa/Ovsa_runtime/lib/
 
 # Copy packages
 RUN mkdir -vp /ovsa-runtime/lib
-RUN mkdir -vp /ovsa-runtime/tpm2-tools
+RUN mkdir -vp /ovsa-runtime/usr
+RUN mkdir -vp /ovsa-runtime/usr/bin
+RUN mkdir -vp /ovsa-runtime/usr/etc
+RUN mkdir -vp /ovsa-runtime/usr/include
+RUN mkdir -vp /ovsa-runtime/usr/lib
+RUN mkdir -vp /ovsa-runtime/usr/sbin
+RUN mkdir -vp /ovsa-runtime/usr/share
+RUN mkdir -vp /ovsa-runtime/usr/var
+RUN mkdir -vp /ovsa-runtime/tpm2-abrmd
 RUN cp -rv /ovsa/Ovsa_runtime/lib/* /ovsa-runtime/lib/
-RUN cp -rv /opt/tpm2-tools/* /ovsa-runtime/tpm2-tools/
+RUN cp -rv /usr/bin/tpm2* /ovsa-runtime/usr/bin
+RUN cp -rv /usr/bin/tss2* /ovsa-runtime/usr/bin
+RUN cp -rv /usr/etc/sysusers.d /ovsa-runtime/usr/etc
+RUN cp -rv /usr/etc/tmpfiles.d /ovsa-runtime/usr/etc
+RUN cp -rv /usr/etc/tpm2-tss /ovsa-runtime/usr/etc
+RUN cp -rv /usr/include/tss2 /ovsa-runtime/usr/include
+RUN cp -rv /usr/lib/libtss2* /ovsa-runtime/usr/lib
+RUN cp -rv /usr/lib/pkgconfig /ovsa-runtime/usr/lib
+RUN cp -rv /usr/lib/systemd /ovsa-runtime/usr/lib
+RUN cp -rv /usr/sbin/tpm2-abrmd /ovsa-runtime/usr/sbin
+RUN cp -rv /usr/share/dbus-1 /ovsa-runtime/usr/share
+RUN cp -rv /usr/share/man /ovsa-runtime/usr/share
+RUN cp -rv /usr/share/bash-completion /ovsa-runtime/usr/share
+RUN cp -rv /usr/var /ovsa-runtime/usr/var
+RUN cp -rv /etc/dbus-1/system.d/tpm2-abrmd.conf /ovsa-runtime/tpm2-abrmd/
 
 WORKDIR /
 RUN tar cvzf ovsa-runtime.tar.gz /ovsa-runtime

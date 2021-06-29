@@ -122,6 +122,13 @@ ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* l
         int i = 0;
         char fname[MAX_FILE_NAME_LEN];
         while (list->license_serv_url != NULL) {
+            cJSON* struct_url = cJSON_CreateObject();
+            if (struct_url == NULL) {
+                ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+                OVSA_DBG(DBG_E, "OVSA: Error could not create object struct_url\n");
+                goto end;
+            }
+
             snprintf_s_i(fname, MAX_FILE_NAME_LEN, "url_%d", (i++) % 100u);
             cJSON* url = cJSON_CreateString(list->license_serv_url);
             if (url == NULL) {
@@ -130,7 +137,24 @@ ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* l
                 goto end;
             }
             OVSA_DBG(DBG_D, "%s\n", fname);
-            cJSON_AddItemToObject(srvurl, fname, url);
+            cJSON_AddItemToObject(struct_url, "url", url);
+            cJSON* certhash = cJSON_CreateString(list->cur_cert_hash);
+            if (certhash == NULL) {
+                ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+                OVSA_DBG(DBG_E, "OVSA: Error could not create string certhash\n");
+                goto end;
+            }
+            cJSON_AddItemToObject(struct_url, "cur_cert_hash", certhash);
+            cJSON* futurecerthash = cJSON_CreateString(list->fut_cert_hash);
+            if (futurecerthash == NULL) {
+                ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+                OVSA_DBG(DBG_E, "OVSA: Error could not create string futurecerthash\n");
+                goto end;
+            }
+            OVSA_DBG(DBG_D, "%s\n", fname);
+            cJSON_AddItemToObject(struct_url, "fut_cert_hash", futurecerthash);
+            cJSON_AddItemToObject(srvurl, fname, struct_url);
+
             if (list->next != NULL) {
                 list = list->next;
             } else {
@@ -587,6 +611,13 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
         char fname[MAX_FILE_NAME_LEN];
         memset_s(fname, sizeof(fname), 0);
         while (list->license_serv_url != NULL) {
+            cJSON* struct_url = cJSON_CreateObject();
+            if (struct_url == NULL) {
+                ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+                OVSA_DBG(DBG_E, "OVSA: Error could not create object struct_url\n");
+                goto end;
+            }
+
             snprintf_s_i(fname, MAX_FILE_NAME_LEN, "url_%d", (i++) % 100u);
             cJSON* url = cJSON_CreateString(list->license_serv_url);
             if (url == NULL) {
@@ -595,7 +626,24 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
                 goto end;
             }
             OVSA_DBG(DBG_D, "%s\n", fname);
-            cJSON_AddItemToObject(srvurl, fname, url);
+            cJSON_AddItemToObject(struct_url, "url", url);
+            cJSON* certhash = cJSON_CreateString(list->cur_cert_hash);
+            if (certhash == NULL) {
+                ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+                OVSA_DBG(DBG_E, "OVSA: Error could not create string certhash\n");
+                goto end;
+            }
+            cJSON_AddItemToObject(struct_url, "cur_cert_hash", certhash);
+            cJSON* futurecerthash = cJSON_CreateString(list->fut_cert_hash);
+            if (futurecerthash == NULL) {
+                ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+                OVSA_DBG(DBG_E, "OVSA: Error could not create string futurecerthash\n");
+                goto end;
+            }
+            OVSA_DBG(DBG_D, "%s\n", fname);
+            cJSON_AddItemToObject(struct_url, "fut_cert_hash", futurecerthash);
+            cJSON_AddItemToObject(srvurl, fname, struct_url);
+
             if (list->next != NULL) {
                 list = list->next;
             } else {
@@ -748,7 +796,7 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
         i             = 0;
         while (device) {
             snprintf_s_i(fname, MAX_FILE_NAME_LEN, "url_%d", (i++) % 100u);
-            cJSON* url = cJSON_GetObjectItemCaseSensitive(svrurl, fname);
+            cJSON* url_struct = cJSON_GetObjectItemCaseSensitive(svrurl, fname);
             if (head == NULL) {
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_license_serv_url_list_t), (char**)&head);
@@ -769,11 +817,24 @@ ovsa_status_t ovsa_json_extract_license_config(const char* inputBuf,
                 tail->next = cur;
                 tail       = cur;
             }
+            cJSON* url = cJSON_GetObjectItemCaseSensitive(url_struct, "url");
             if (cJSON_IsString(url) && (url->valuestring != NULL)) {
                 memset_s(tail->license_serv_url, MAX_URL_SIZE, 0);
                 memcpy_s(tail->license_serv_url, MAX_URL_SIZE, url->valuestring,
                          strnlen_s(url->valuestring, MAX_URL_SIZE));
                 OVSA_DBG(DBG_D, "%s\n", fname);
+            }
+            cJSON* cur_cert_hash = cJSON_GetObjectItemCaseSensitive(url_struct, "cur_cert_hash");
+            if (cJSON_IsString(cur_cert_hash) && (cur_cert_hash->valuestring != NULL)) {
+                memset_s(tail->cur_cert_hash, HASH_SIZE, 0);
+                memcpy_s(tail->cur_cert_hash, HASH_SIZE, cur_cert_hash->valuestring,
+                         strnlen_s(cur_cert_hash->valuestring, HASH_SIZE));
+            }
+            cJSON* fut_cert_hash = cJSON_GetObjectItemCaseSensitive(url_struct, "fut_cert_hash");
+            if (cJSON_IsString(fut_cert_hash) && (fut_cert_hash->valuestring != NULL)) {
+                memset_s(tail->fut_cert_hash, HASH_SIZE, 0);
+                memcpy_s(tail->fut_cert_hash, HASH_SIZE, fut_cert_hash->valuestring,
+                         strnlen_s(fut_cert_hash->valuestring, HASH_SIZE));
             }
             device = device->next;
         }
@@ -1205,7 +1266,6 @@ end:
     return ret;
 }
 
-#ifdef OVSA_RUNTIME
 ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
                                                  ovsa_customer_license_sig_t* cust_lic_sig) {
     ovsa_status_t ret      = OVSA_OK;
@@ -1329,7 +1389,7 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
         i             = 0;
         while (device) {
             snprintf_s_i(fname, MAX_FILE_NAME_LEN, "url_%d", (i++) % 100u);
-            cJSON* url = cJSON_GetObjectItemCaseSensitive(svrurl, fname);
+            cJSON* url_struct = cJSON_GetObjectItemCaseSensitive(svrurl, fname);
             if (head == NULL) {
                 /* Memory allocated and this needs to be freed by consumer */
                 ret = ovsa_safe_malloc(sizeof(ovsa_license_serv_url_list_t), (char**)&head);
@@ -1350,10 +1410,24 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
                 tail->next = cur;
                 tail       = cur;
             }
+            cJSON* url = cJSON_GetObjectItemCaseSensitive(url_struct, "url");
             if (cJSON_IsString(url) && (url->valuestring != NULL)) {
+                memset_s(tail->license_serv_url, MAX_URL_SIZE, 0);
                 memcpy_s(tail->license_serv_url, MAX_URL_SIZE, url->valuestring,
                          strnlen_s(url->valuestring, MAX_URL_SIZE));
                 OVSA_DBG(DBG_D, "%s\n", fname);
+            }
+            cJSON* cur_cert_hash = cJSON_GetObjectItemCaseSensitive(url_struct, "cur_cert_hash");
+            if (cJSON_IsString(cur_cert_hash) && (cur_cert_hash->valuestring != NULL)) {
+                memset_s(tail->cur_cert_hash, HASH_SIZE, 0);
+                memcpy_s(tail->cur_cert_hash, HASH_SIZE, cur_cert_hash->valuestring,
+                         strnlen_s(cur_cert_hash->valuestring, HASH_SIZE));
+            }
+            cJSON* fut_cert_hash = cJSON_GetObjectItemCaseSensitive(url_struct, "fut_cert_hash");
+            if (cJSON_IsString(fut_cert_hash) && (fut_cert_hash->valuestring != NULL)) {
+                memset_s(tail->fut_cert_hash, HASH_SIZE, 0);
+                memcpy_s(tail->fut_cert_hash, HASH_SIZE, fut_cert_hash->valuestring,
+                         strnlen_s(fut_cert_hash->valuestring, HASH_SIZE));
             }
             device = device->next;
         }
@@ -1434,6 +1508,7 @@ end:
     return ret;
 }
 
+#ifdef OVSA_RUNTIME
 ovsa_status_t ovsa_append_json_payload_len_to_blob(const char* input_buf, char** json_payload) {
     ovsa_status_t ret         = OVSA_OK;
     uint64_t json_payload_len = 0;
@@ -1482,6 +1557,9 @@ ovsa_status_t ovsa_json_create_message_blob(ovsa_command_type_t cmdtype, const c
     } else if (cmdtype == OVSA_SEND_CUST_LICENSE) {
         memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_CUST_LICENSE",
                  strnlen_s("OVSA_SEND_CUST_LICENSE", RSIZE_MAX_STR));
+    } else if (cmdtype == OVSA_SEND_UPDATE_CUST_LICENSE_ACK) {
+        memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_UPDATE_CUST_LICENSE_ACK",
+                 strnlen_s("OVSA_SEND_UPDATE_CUST_LICENSE_ACK", RSIZE_MAX_STR));
     } else {
         OVSA_DBG(DBG_E, "OVSA: Error json message command not valid \n");
         goto end;
@@ -1535,7 +1613,7 @@ end:
     return ret;
 }
 
-ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_sw_ek_ak_bind_info_t sw_ek_ak_bind_info,
+ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_ek_ak_bind_info_t ek_ak_bind_info,
                                                        char** outputBuf, size_t* valuelen) {
     ovsa_status_t ret = OVSA_OK;
     cJSON* message    = NULL;
@@ -1552,18 +1630,18 @@ ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_sw_ek_ak_bind_info_t
         goto end;
     }
     /* Populate the json */
-    if (sw_ek_ak_bind_info.sw_ek_cert == NULL) {
+    if (ek_ak_bind_info.ek_cert == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
         OVSA_DBG(DBG_E, "OVSA: Error SW EK certificate in empty %d\n", ret);
         goto end;
     } else {
-        if (cJSON_AddStringToObject(message, "EK_cert", sw_ek_ak_bind_info.sw_ek_cert) == NULL) {
+        if (cJSON_AddStringToObject(message, "EK_cert", ek_ak_bind_info.ek_cert) == NULL) {
             ret = OVSA_JSON_ERROR_ADD_ELEMENT;
             OVSA_DBG(DBG_E, "OVSA: Error add EK_cert to message info failed %d\n", ret);
             goto end;
         }
-        if (cJSON_AddStringToObject(message, "EKcert_signature",
-                                    sw_ek_ak_bind_info.sw_ek_cert_sig) == NULL) {
+        if (cJSON_AddStringToObject(message, "EKcert_signature", ek_ak_bind_info.ek_cert_sig) ==
+            NULL) {
             ret = OVSA_JSON_ERROR_ADD_ELEMENT;
             OVSA_DBG(DBG_E, "OVSA: Error add EKcert_signature to json failed %d\n", ret);
             goto end;
@@ -1580,21 +1658,33 @@ ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_sw_ek_ak_bind_info_t
         }
     }
 
-    if (cJSON_AddStringToObject(message, "AKpub", sw_ek_ak_bind_info.sw_ak_pub_key) == NULL) {
+    if (cJSON_AddStringToObject(message, "AKpub", ek_ak_bind_info.ak_pub_key) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
         OVSA_DBG(DBG_E, "OVSA: Error add AKpub to message info failed %d\n", ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(message, "AK_name", sw_ek_ak_bind_info.sw_ak_name) == NULL) {
+    if (cJSON_AddStringToObject(message, "AK_name", ek_ak_bind_info.ak_name) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
         OVSA_DBG(DBG_E, "OVSA: Error add AK_name to json failed %d\n", ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(message, "certificate", sw_ek_ak_bind_info.platform_cert) == NULL) {
+    if (cJSON_AddStringToObject(message, "certificate", ek_ak_bind_info.platform_cert) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
         OVSA_DBG(DBG_E, "OVSA: Error add certificate to json failed %d\n", ret);
         goto end;
     }
+#ifdef PTT_EK_ONDIE_CA
+    if (cJSON_AddStringToObject(message, "ROM_cert", ek_ak_bind_info.ROM_cert) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add ROM_certificate to json failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(message, "Chain_cert", ek_ak_bind_info.Chain_cert) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add Chain_certificate to json failed %d\n", ret);
+        goto end;
+    }
+#endif
     str_print = cJSON_Print(message);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;

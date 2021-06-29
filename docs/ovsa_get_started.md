@@ -1,4 +1,4 @@
-# OpenVINO™ Security Add-on  {#ovsa_get_started}
+# OpenVINO™ Security Add-on
 
 This guide provides instructions for people who use the OpenVINO™ Security Add-on to create, distribute, and use models that are created with the OpenVINO™ toolkit:
 
@@ -533,7 +533,7 @@ This step is for the combined role of Model Developer and Independent Software V
 2. Build the OpenVINO™ Security Add-on:
    ```sh
    make clean all
-   sudo make package
+   sudo -s make package
    ```
 	The following packages are created under the `release_files` directory:
 	- `ovsa-kvm-host.tar.gz`: Host Machine file
@@ -551,23 +551,23 @@ This step is for the combined role of Model Developer and Independent Software V
 	export OVSA_RELEASE_PATH=$PWD
      ```
 3.  Install the OpenVINO™ Security Add-on Software on the Host Machine: 
-     ```sh
-     cd $OVSA_RELEASE_PATH
-     tar xvfz ovsa-kvm-host.tar.gz
-     cd ovsa-kvm-host
-     ./install.sh
-       ```
+	```sh
+	cd $OVSA_RELEASE_PATH
+	tar xvfz ovsa-kvm-host.tar.gz
+	cd ovsa-kvm-host
+	./install.sh
+	```
 
 If you are using more than one Host Machine repeat Step 3 on each.
 
-### Step 4: Set up packages on the Guest VM
+### Step 4: Install the OpenVINO™ Security Add-on Model Developer / ISV Components
 This step is for the combined role of Model Developer and Independent Software Vendor. References to the Guest VM are to `ovsa_isv_dev`.
  
-1. Log on to the Guest VM.
+1. Log on to the Guest VM  as `<user>`.
 2. Create the OpenVINO™ Security Add-on directory in the home directory
     ```sh
-    mkdir OVSA
-
+    mkdir -p ~/OVSA
+    ```
 3. Go to the Host Machine, outside of the Guest VM.
 
 4. Copy `ovsa-developer.tar.gz` from `release_files` to the Guest VM:
@@ -577,28 +577,26 @@ This step is for the combined role of Model Developer and Independent Software V
     ```
 5. Go to the Guest VM.
 
-6. Install the software to the Guest VM:
-     ```sh
-     cd OVSA
-     tar xvfz ovsa-developer.tar.gz
-     cd ovsa-developer
-     sudo -s
-     ./install.sh
-     ```
-7. Create  a directory named `artefacts`. This directory will hold artefacts required to create licenses:
+6.	Create `OVSA` user
 	```sh
-	cd /<username-home-directory>/OVSA
-	mkdir artefacts
-	cd artefacts
+	sudo useradd -m ovsa
+	sudo passwd ovsa
 	```
-
+7. Install the software to the Guest VM:
+	```sh
+	cd ~/OVSA
+	tar xvfz ovsa-developer.tar.gz
+	cd ovsa-developer
+	sudo ./install.sh
+	```
 8. Start the license server on a separate terminal.
 	```sh
-	sudo -s
 	source /opt/ovsa/scripts/setupvars.sh
 	cd /opt/ovsa/bin
 	./license_server
 	```
+	**NOTE**: If you are behind a firewall, check and set your proxy settings to ensure the license server is able to validate the certificates.
+	
 	
 ### Step 5: Install the OpenVINO™ Security Add-on Model Hosting Component
 
@@ -609,27 +607,28 @@ The Model Hosting components install the OpenVINO™ Security Add-on Runtime Doc
 1. Log on to the Guest VM as `<user>`.
 2. Create the OpenVINO™ Security Add-on directory in the home directory
     ```sh
-    mkdir OVSA
+    mkdir -p ~/OVSA
     ```
 3. While on the Host Machine copy the ovsa-model-hosting.tar.gz from release_files to the Guest VM:
 	```sh
     cd $OVSA_RELEASE_PATH
     scp ovsa-model-hosting.tar.gz username@<isv-developer-vm-ip-address>:/<username-home-directory>/OVSA
     ```
-4. Install the software to the Guest VM:
+4. Go to the Guest VM
+
+5.	Create `OVSA` user
+	```sh
+	sudo useradd -m ovsa
+	sudo passwd ovsa
+	sudo usermod -aG docker ovsa
+	``` 
+6. Install the software to the Guest VM:
     ```sh
-    cd OVSA
+    cd ~/OVSA
     tar xvfz ovsa-model-hosting.tar.gz
     cd ovsa-model-hosting
-    sudo -s
-    ./install.sh
+    sudo ./install.sh
     ```
-5. Create a directory named `artefacts`:
-	```sh
-	cd /<username-home-directory>/OVSA
-	mkdir artefacts
-	cd artefacts
-	```
 
 ## How to Use the OpenVINO™ Security Add-on
 
@@ -645,25 +644,27 @@ The following figure describes the interactions between the Model Developer, Ind
 
 ### Model Developer Instructions
 
-The Model Developer creates model, defines access control and creates the user license. References to the Guest VM are to `ovsa_isv_dev`. After the model is created, access control enabled, and the license is ready, the Model Developer provides the license details to the Independent Software Vendor before sharing to the Model User.
+The Model Developer creates model, defines access control and creates the user license. After the model is created, access control enabled, and the license is ready, the Model Developer provides the license details to the Independent Software Vendor before sharing to the Model User.
 
-#### Step 1: Create a key store and add a certificate to it
+References to the Guest VM are to `ovsa_isv_dev`. Log on to the Guest VM as `OVSA` user.
 
-1. Set up a path to the artefacts directory:
-	```sh
-	sudo -s
-	cd /<username-home-directory>/OVSA/artefacts
-	export OVSA_DEV_ARTEFACTS=$PWD
-	source /opt/ovsa/scripts/setupvars.sh
-	
-2. Create files to request a certificate:<br>
+#### Step 1: Setup up the artefacts directory
+Create a directory named artefacts. This directory will hold artefacts required to create licenses:
+```sh
+mkdir -p ~/OVSA/artefacts
+cd ~/OVSA/artefacts
+export OVSA_DEV_ARTEFACTS=$PWD
+source /opt/ovsa/scripts/setupvars.sh
+```
+#### Step 2: Create a key store and add a certificate to it
+1. Create files to request a certificate:
 	This example uses a self-signed certificate for demonstration purposes. In a production environment, use CSR files to request for a CA-signed certificate.
  
 	```sh
 	cd $OVSA_DEV_ARTEFACTS
 	/opt/ovsa/bin/ovsatool keygen -storekey -t ECDSA -n Intel -k isv_keystore -r  isv_keystore.csr -e "/C=IN/CN=localhost"
  	```
-	Two files are created:<br>
+	Below two files are created along with the keystore file:
 	- `isv_keystore.csr`- A Certificate Signing Request (CSR)  
 	- `isv_keystore.csr.crt` - A self-signed certificate
 
@@ -674,50 +675,38 @@ The Model Developer creates model, defines access control and creates the user l
 	/opt/ovsa/bin/ovsatool keygen -storecert -c isv_keystore.csr.crt -k isv_keystore
 	```	
 	
-#### Step 2: Create the model
+#### Step 3: Create the model
 
 This example uses `curl` to download the `face-detection-retail-004` model from the OpenVINO Model Zoo. If you are behind a firewall, check and set your proxy settings.
 
-1. Log on to the Guest VM.
- 
-2. Download a model from the Model Zoo:
-	```sh
-	cd $OVSA_DEV_ARTEFACTS	
-	curl --create-dirs https://download.01.org/opencv/2021/openvinotoolkit/2021.1/open_model_zoo/models_bin/1/face-detection-retail-0004/FP32/face-detection-retail-0004.xml https://download.01.org/opencv/2021/openvinotoolkit/2021.1/open_model_zoo/models_bin/1/face-detection-retail-0004/FP32/face-detection-retail-0004.bin -o model/face-detection-retail-0004.xml -o model/face-detection-retail-0004.bin
-	```
-	The model is downloaded to the `OVSA_DEV_ARTEFACTS/model` directory
-	
-#### Step 3: Define access control for  the model and create a master license for it
+Download a model from the Model Zoo:
+```sh
+curl --create-dirs https://download.01.org/opencv/2021/openvinotoolkit/2021.1/open_model_zoo/models_bin/1/face-detection-retail-0004/FP32/face-detection-retail-0004.xml https://download.01.org/opencv/2021/openvinotoolkit/2021.1/open_model_zoo/models_bin/1/face-detection-retail-0004/FP32/face-detection-retail-0004.bin -o model/face-detection-retail-0004.xml -o model/face-detection-retail-0004.bin
+```
+The model is downloaded to the `OVSA_DEV_ARTEFACTS/model` directory
 
-1. Go to the `artefacts` directory:
-	```sh	
-	cd $OVSA_DEV_ARTEFACTS
-	```
-2. 
-	```sh	
-	uuidgen
-	```
-3. Define and enable the model access control and master license:
-	```sh	
-	/opt/ovsa/bin/ovsatool controlAccess -i model/face-detection-retail-0004.xml model/face-detection-retail-0004.bin -n "face detection" -d "face detection retail" -v 0004 -p face_detection_model.dat -m face_detection_model.masterlic -k isv_keystore -g <output-of-uuidgen>
-	```
+#### Step 4: Define access control for  the model and create a master license for it
+
+Define and enable the model access control and master license:
+```sh	
+uuid=$(uuidgen)
+/opt/ovsa/bin/ovsatool controlAccess -i model/face-detection-retail-0004.xml model/face-detection-retail-0004.bin -n "face detection" -d "face detection retail" -v 0004 -p face_detection_model.dat -m face_detection_model.masterlic -k isv_keystore -g $uuid
+```
 The Intermediate Representation files for the `face-detection-retail-0004` model are encrypted as `face_detection_model.dat` and a master license is generated as `face_detection_model.masterlic`
 
-#### Step 4: Create a Runtime Reference TCB
+#### Step 5: Create a Runtime Reference TCB
 
 Use the runtime reference TCB to create a customer license for the access controlled model and the specific runtime.
 
 Generate the reference TCB for the runtime
 ```sh
-cd $OVSA_DEV_ARTEFACTS
-source /opt/ovsa/scripts/setupvars.sh
-	/opt/ovsa/bin/ovsaruntime gen-tcb-signature -n "Face Detect @ Runtime VM" -v "1.0" -f face_detect_runtime_vm.tcb -k isv_keystore
+/opt/ovsa/bin/ovsaruntime gen-tcb-signature -n "Face Detect @ Runtime VM" -v "1.0" -f face_detect_runtime_vm.tcb -k isv_keystore
 ```
 	
-#### Step 5: Publish the access controlled Model and Runtime Reference TCB
+#### Step 6: Publish the access controlled Model and Runtime Reference TCB
 The access controlled model is ready to be shared with the User and the reference TCB is ready to perform license checks.
 
-#### Step 6: Receive a User Request
+#### Step 7: Receive a User Request
 1. Obtain artefacts from the User who needs access to a access controlled model:
 	* Customer certificate from the customer's key store.
 	* Other information that apply to your licensing practices, such as the length of time the user needs access to the model
@@ -725,14 +714,16 @@ The access controlled model is ready to be shared with the User and the referenc
 2. Create a customer license configuration
 	```sh
 	cd $OVSA_DEV_ARTEFACTS
-	/opt/ovsa/bin/ovsatool licgen -t TimeLimit -l30 -n "Time Limit License Config" -v 1.0 -u "<isv-developer-vm-ip-address>:<license_server-port>" -k isv_keystore -o 30daylicense.config
+	/opt/ovsa/bin/ovsatool licgen -t TimeLimit -l30 -n "Time Limit License Config" -v 1.0 -u "<isv-developer-vm-ip-address>:<license_server-port>" /opt/ovsa/certs/server.crt  -k isv_keystore -o 30daylicense.config
 	```
+	**NOTE**: The parameter /opt/ovsa/certs/server.crt  contains the certificate used by the License Server. The server certificate will be added to the customer license and validated during use. Refer to [OpenVINO™ Security Add-on License Server Certificate Pinning](ovsa_license_server_cert_pinning.md)
+
 3. Create the customer license
 	```sh
 	cd $OVSA_DEV_ARTEFACTS
 	/opt/ovsa/bin/ovsatool sale -m face_detection_model.masterlic -k isv_keystore -l 30daylicense.config -t face_detect_runtime_vm.tcb -p custkeystore.csr.crt -c face_detection_model.lic
 	```
-	
+
 4. Update the license server database with the license.
 	```sh
 	cd /opt/ovsa/DB
@@ -743,24 +734,27 @@ The access controlled model is ready to be shared with the User and the referenc
 	* `face_detection_model.dat`
 	* `face_detection_model.lic`
 
-### User Instructions
-References to the Guest VM are to `ovsa_rumtime`.
+### Model User Instructions
+References to the Guest VM are to `ovsa_rumtime`. Log on to the Guest VM as `OVSA` user.
 
-#### Step 1: Add a CA-Signed Certificate to a Key Store
+#### Step 1: Setup up the artefacts directory
 
-1. Set up a path to the artefacts directory:
+1. Create a directory named artefacts. This directory will hold artefacts required to create licenses:
 	```sh
-	sudo -s
-	cd /<username-home-directory>/OVSA/artefacts
+	mkdir -p ~/OVSA/artefacts
+	cd ~/OVSA/artefacts
 	export OVSA_RUNTIME_ARTEFACTS=$PWD
 	source /opt/ovsa/scripts/setupvars.sh
 	```
-2. Generate a Customer key store file:
+
+#### Step 2: Add a CA-Signed Certificate to a Key Store
+
+1. Generate a Customer key store file:
 	```sh
 	cd $OVSA_RUNTIME_ARTEFACTS
 	/opt/ovsa/bin/ovsatool keygen -storekey -t ECDSA -n Intel -k custkeystore -r  custkeystore.csr -e "/C=IN/CN=localhost"
 	```
-	Two files are created:
+	Below two files are created along with the keystore file:
 	* `custkeystore.csr` - A Certificate Signing Request (CSR)
 	* `custkeystore.csr.crt` - A self-signed certificate
 
@@ -771,19 +765,24 @@ References to the Guest VM are to `ovsa_rumtime`.
 	/opt/ovsa/bin/ovsatool keygen -storecert -c custkeystore.csr.crt -k custkeystore
 	```
 
-#### Step 2: Request an access controlled Model from the Model Developer
+#### Step 3: Request an access controlled Model from the Model Developer
 This example uses scp to share data between the ovsa_runtime and ovsa_dev Guest VMs on the same Host Machine.
 
 1. Communicate your need for a model to the Model Developer. The Developer will ask you to provide the certificate from your key store and other information. This example uses the length of time the model needs to be available. 
-2. Generate an artefact file to provide to the Developer:
+2. The model user's certificate needs to be provided to the Developer:
 	```sh
 	cd $OVSA_RUNTIME_ARTEFACTS
 	scp custkeystore.csr.crt username@<developer-vm-ip-address>:/<username-home-directory>/OVSA/artefacts
 	```
-#### Step 3: Receive and load the access controlled model into the OpenVINO™ Model Server
+#### Step 4: Receive and load the access controlled model into the OpenVINO™ Model Server
 1. Receive the model as files named
 	* face_detection_model.dat
 	* face_detection_model.lic
+		```sh
+		cd $OVSA_RUNTIME_ARTEFACTS
+		scp username@<developer-vm-ip-address>:/<username-home-directory>/OVSA/artefacts/face_detection_model.dat .
+		scp username@<developer-vm-ip-address>:/<username-home-directory>/OVSA/artefacts/face_detection_model.lic .
+		```
 
 2. Prepare the environment:
 	```sh
@@ -823,14 +822,14 @@ The `$OVSA_RUNTIME_ARTEFACTS/../ovms` directory contains scripts and a sample co
 	]
 	}
 	```
-#### Step 4: Start the NGINX Model Server
+#### Step 5: Start the NGINX Model Server
 The NGINX Model Server publishes the access controlled model.
-	```sh
-	./start_secure_ovsa_model_server.sh
-	```
+```sh
+./start_secure_ovsa_model_server.sh
+```
 For information about the NGINX interface, see https://github.com/openvinotoolkit/model_server/blob/main/extras/nginx-mtls-auth/README.md
 
-#### Step 5: Prepare to run Inference
+#### Step 6: Prepare to run Inference
 
 1. Log on to the Guest VM from another terminal.
 
@@ -845,18 +844,18 @@ For information about the NGINX interface, see https://github.com/openvinotoolki
 	```
 3. Copy the `face_detection.py` from the example_client in `/opt/ovsa/example_client`
 	```sh
-	cd /home/intel/OVSA/ovms
+	cd ~/OVSA/ovms
 	cp /opt/ovsa/example_client/* .
 	```
 4. Copy the sample images for inferencing. An image directory is created that includes a sample image for inferencing.
 	```sh
 	curl --create-dirs https://raw.githubusercontent.com/openvinotoolkit/model_server/master/example_client/images/people/people1.jpeg -o images/people1.jpeg
 	```
-#### Step 6: Run Inference
+#### Step 7: Run Inference
 
 Run the `face_detection.py` script. 
 ```sh
-python3 face_detection.py --grpc_port 3335 --batch_size 1 --width 300 --height 300 --input_images_dir images --output_dir results --tls --server_cert server.pem --client_cert client.pem --client_key client.key --model_name controlled-access-model
+python3 face_detection.py --grpc_port 3335 --batch_size 1 --width 300 --height 300 --input_images_dir images --output_dir results --tls --server_cert /var/OVSA/Modelserver/server.pem --client_cert /var/OVSA/Modelserver/client.pem --client_key /var/OVSA/Modelserver/client.key --model_name controlled-access-model
 ```	
 
 ## Summary

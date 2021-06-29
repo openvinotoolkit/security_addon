@@ -56,8 +56,11 @@
 #define TPM2_TPMU_HA_SIZE        64
 #define DEFAULT_PCR_ID_SET       "0xFFFFFF" /*Set all PCR ID's 0:23 */
 #define HASH_ALG_SHA256          1
-#define HASH_ALG_SHA512          2
+#define HASH_ALG_SHA384          2
+#define HASH_ALG_SHA512          3
 #define QUOTE_NONCE_HASH_SIZE    32
+/* Size of the HASH key Considering SHA512 for HASHING */
+#define HASH_SIZE 192 /* Actual 130: Considering the length for B64 */
 
 /* As per the ASN1_STRING_TABLE, computed max size of the attribute types
    found in the Distinguished Name are around ~129K and added certain buffer
@@ -130,15 +133,17 @@ typedef struct ovsa_quote_info {
     char* ek_cert;
 } ovsa_quote_info_t;
 
-typedef struct ovsa_sw_ek_ak_bind_info {
-    char* sw_ak_pub_key;
-    char* sw_ak_name;
-    char* sw_ek_pub_key;
-    char* sw_ek_pub_sig;
-    char* sw_ek_cert;
-    char* sw_ek_cert_sig;
+typedef struct ovsa_ek_ak_bind_info {
+    char* ak_pub_key;
+    char* ak_name;
+    char* ek_pub_key;
+    char* ek_pub_sig;
+    char* ek_cert;
+    char* ek_cert_sig;
     char* platform_cert;
-} ovsa_sw_ek_ak_bind_info_t;
+    char* ROM_cert;
+    char* Chain_cert;
+} ovsa_ek_ak_bind_info_t;
 
 typedef struct {
     size_t count;
@@ -153,6 +158,8 @@ typedef enum {
     OVSA_SEND_SIGN_NONCE,
     OVSA_SEND_QUOTE_INFO,
     OVSA_SEND_CUST_LICENSE,
+    OVSA_SEND_UPDATE_CUST_LICENSE,
+    OVSA_SEND_UPDATE_CUST_LICENSE_ACK,
     OVSA_SEND_LICENSE_CHECK_RESP,
     OVSA_INVALID_CMD
 } ovsa_command_type_t;
@@ -247,6 +254,8 @@ typedef struct ovsa_tcb_sig_list {
 /* To Store list of License Server URL for License Config Struct */
 typedef struct ovsa_license_serv_url_list {
     char license_serv_url[MAX_URL_SIZE];
+    char cur_cert_hash[HASH_SIZE];
+    char fut_cert_hash[HASH_SIZE];
     struct ovsa_license_serv_url_list* next;
 } ovsa_license_serv_url_list_t;
 
@@ -328,9 +337,11 @@ X509* ovsa_server_crypto_load_cert(const char* cert, const char* cert_descrip);
  *
  * \param[in]  cert    Pointer to certificate.
  *
+ * \param[in]  cert_chain    Pointer to certificate chain.
+ *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert);
+ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert, const char* cert_chain);
 
 /** \brief This function extracts public key from the certificate.
  *

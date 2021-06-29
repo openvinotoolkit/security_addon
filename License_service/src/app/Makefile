@@ -29,7 +29,7 @@ all: license_server
 
 INC_LIBS := $(SRC_BUILD_DIR)/lib
 
-CFLAGS += -DDEBUG=$(DEBUG) #-DENABLE_OCSP_CHECK
+CFLAGS += -DDEBUG=$(DEBUG) #-DPTT_EK_ONDIE_CA #-DENABLE_OCSP_CHECK
 
 INC_DIR := -I$(SRC_BUILD_DIR)/src/lib/mbedtls/install/include \
            -I$(SRC_BUILD_DIR)/src/lib/mbedtls/crypto/include \

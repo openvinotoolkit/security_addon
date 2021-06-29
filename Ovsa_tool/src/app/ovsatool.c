@@ -23,10 +23,11 @@
 #include "ovsa_tool.h"
 
 static ovsa_handle_cmd_t g_ovsa_cmd_handler[MAX_OVSA_CMDS];
-static char* g_ovsa_cmd[] = {"keygen", "licgen", "controlAccess", "sale"};
+static char* g_ovsa_cmd[] = {"keygen", "licgen", "controlAccess", "sale", "updatecustlicense"};
 
 static ovsa_status_t (*ovsa_fptr[])(int argc, char* argv[]) = {
-    ovsa_keygen_main, ovsa_licgen_main, ovsa_controlaccess_main, ovsa_sale_main};
+    ovsa_keygen_main, ovsa_licgen_main, ovsa_controlaccess_main, ovsa_sale_main,
+    ovsa_update_custlicense_main};
 
 /* Help options for Ovsa_tool */
 static void ovsa_help(const char* argv) {
@@ -36,6 +37,7 @@ static void ovsa_help(const char* argv) {
     printf("    licgen\n");
     printf("    controlAccess\n");
     printf("    sale\n");
+    printf("    updatecustlicense\n");
     printf("Supported subcommands for keygen:\n");
     printf("    -storekey\n");
     printf("    -storecert\n");
@@ -52,8 +54,9 @@ static void ovsa_help(const char* argv) {
     printf("%s keygen -verify -p <file to be verified> -s <signature> -k <key_store file>\n", argv);
     printf(
         "%s licgen -t <License Type> [-l <Usage Count Limit> or <Time Limit>] -n \"License "
-        "name\" -v \"License Version\" -u <License URL> -k <key store file> -o <lic conf "
-        "file>\n\n",
+        "name\" -v \"License Version\" -u <License URL> [<Future server certificate file>] [-u "
+        "<License URL> <License Server Certificate> [<Future server certificate file>]] -k <key "
+        "store file> -o <lic conf file>\n\n",
         argv);
     printf(
         "%s controlAccess -i <Intermediate File> <Model weighs file> <additional files> -n "
@@ -66,6 +69,11 @@ static void ovsa_help(const char* argv) {
         "%s sale -m <Master license file> -k <key store file> -l <license conf file> -t <  "
         "list of TCB "
         "Signature files  > -p <Customer Certificate> -c <Customer license> -g <License GUID>\n\n",
+        argv);
+    printf(
+        "%s updatecustlicense -k <key store file> -l <Customer License File> -p <Customer "
+        "Certificate> -u <License URL> <Future server certificate [-u <License URL> <Future server "
+        "certificate file>] -c <Updated Customer license>\n\n",
         argv);
     printf("Please use -help to the commands for details of supported options\n");
 }

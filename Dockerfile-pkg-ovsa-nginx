@@ -30,21 +30,38 @@ RUN yum install -y \
 
 WORKDIR /
 RUN mkdir -vp /ovsa-runtime/lib
-RUN mkdir -vp /opt
 
 COPY /release_files/ovsa-runtime/lib /ovsa-runtime/lib
-COPY /release_files/ovsa-runtime/tpm2-tools /opt/tpm2-tools
+COPY /release_files/ovsa-runtime/usr/bin /usr/bin
+COPY /release_files/ovsa-runtime/usr/etc /usr/etc
+COPY /release_files/ovsa-runtime/usr/include /usr/include
+COPY /release_files/ovsa-runtime/usr/lib /usr/lib
+COPY /release_files/ovsa-runtime/usr/sbin /usr/sbin
+COPY /release_files/ovsa-runtime/usr/share /usr/share
+COPY /release_files/ovsa-runtime/usr/var /usr
+COPY /release_files/ovsa-runtime/tpm2-abrmd/tpm2-abrmd.conf /etc/dbus-1/system.d/tpm2-abrmd.conf
+COPY Scripts/guest/OVSA_tpm2_init.sh /usr/local/bin/OVSA_tpm2_init.sh
 
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/lib/:/ovsa-runtime/lib/
 
-ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/opt/tpm2-tools/lib/:/ovsa-runtime/lib/
-ENV PATH=${PATH}:/opt/tpm2-tools/bin/
-
-
-RUN  sed -i '/secure_path/ s/$/:\/opt\/tpm2-tools\/bin/' /etc/sudoers
-
-
+RUN sed -i 's/80/8888/g' /etc/nginx/nginx.conf
+RUN sed -i 's/"tss"/"ovsa"/g' /etc/dbus-1/system.d/tpm2-abrmd.conf
 RUN sed -i 's/#set -x/set -x/g' /ovms_wrapper
 
+RUN useradd -ms /bin/bash ovsa
+RUN groupadd tss
+RUN mkdir -p /var/lib/tpm
+RUN useradd -M -d /var/lib/tpm -s /bin/bash -g tss tss
+RUN usermod -a -G tss ovsa
+RUN chown -R ovsa:ovsa /ovsa-runtime
+RUN chown -R ovsa:ovsa /ovms_wrapper
+RUN mkdir -p /var/run/dbus
+RUN chown ovsa:ovsa /var/run/dbus
+RUN chmod +x /usr/local/bin/OVSA_tpm2_init.sh
 
-ENTRYPOINT ["/usr/bin/dumb-init", "--", "/ovms_wrapper"]
+USER ovsa
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/lib/:/ovsa-runtime/lib/
+USER root
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--", "./usr/local/bin/OVSA_tpm2_init.sh"]
 #ENTRYPOINT []

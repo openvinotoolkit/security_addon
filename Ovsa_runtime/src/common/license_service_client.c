@@ -54,13 +54,98 @@ static ovsa_status_t ovsa_license_service_close(void* ssl);
 static ovsa_status_t ovsa_license_service_write(void* ssl, const char* buf, size_t len);
 static ovsa_status_t ovsa_license_service_read(void* ssl, uint8_t* buf, size_t len);
 static ovsa_status_t ovsa_license_service_start(const char* in_servers,
-                                                const char* in_ca_chain_path, void** out_ssl);
+                                                const char* in_ca_chain_path, void** out_ssl,
+                                                ovsa_customer_license_sig_t customer_lic_sig);
 
 static const char* g_cipher_suitename[CIPHER_SUITE_SIZE] = {
     "TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384"};
 static int g_cipher_suite[CIPHER_SUITE_SIZE];
 static mbedtls_ecp_group_id g_curve_list[CURVE_LIST_SIZE];
 
+static ovsa_status_t ovsa_send_update_cust_lic_ACK(void** _ssl_session) {
+    ovsa_status_t ret    = OVSA_OK;
+    void* ssl_session    = NULL;
+    char* json_buf       = NULL;
+    char dummy_payload[] = "";
+    char* json_payload   = NULL;
+    size_t buf_len       = 0;
+    size_t length        = 0;
+    size_t payload_len   = 0;
+
+    ssl_session = *_ssl_session;
+
+    OVSA_DBG(DBG_I, "OVSA:Entering %s\n", __func__);
+
+    /* create json message blob */
+    ret = ovsa_json_create_message_blob(OVSA_SEND_UPDATE_CUST_LICENSE_ACK, dummy_payload, &json_buf,
+                                        &length);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(
+            DBG_E,
+            "OVSA: Error create update customer lickense ACK message failed with error code %d\n",
+            ret);
+        goto out;
+    }
+    /* Append payload length to json blob */
+    payload_len = length + PAYLOAD_LENGTH + 1;
+    ret         = ovsa_safe_malloc(sizeof(char) * payload_len, (char**)&json_payload);
+    if (ret < OVSA_OK) {
+        ret = OVSA_MEMORY_ALLOC_FAIL;
+        OVSA_DBG(DBG_E, "OVSA: Error create json blob memory init failed\n");
+        goto out;
+    }
+    ret = ovsa_append_json_payload_len_to_blob(json_buf, (char**)&json_payload);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error json blob creation failed with %d\n", ret);
+        goto out;
+    }
+    ret = ovsa_get_string_length((char*)json_payload, &buf_len);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of json_payload string %d\n", ret);
+        goto out;
+    }
+    /* Send UPDATE_CUST_LICENSE_ACK to Server */
+    ret = ovsa_license_service_write(ssl_session, (char*)json_payload, buf_len);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error ovsa_license_service_write() returned %d\n", ret);
+        goto out;
+    }
+    OVSA_DBG(DBG_I, "OVSA:Send UPDATE_CUST_LICENSE_ACK to server\n%s", json_payload);
+out:
+    ovsa_safe_free(&json_buf);
+    ovsa_safe_free(&json_payload);
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
+
+static ovsa_status_t ovsa_validate_peer_cert_hash(ovsa_customer_license_sig_t customer_lic_sig,
+                                                  char* peer_cert_hash) {
+    ovsa_status_t ret           = OVSA_OK;
+    char* cur_cert_hash         = NULL;
+    char* fut_cert_hash         = NULL;
+    int cur_cert_hash_indicator = -1;
+    int fut_cert_hash_indicator = -1;
+    OVSA_DBG(DBG_I, "OVSA:Entering %s\n", __func__);
+
+    cur_cert_hash = customer_lic_sig.customer_lic.license_url_list->cur_cert_hash;
+    fut_cert_hash = customer_lic_sig.customer_lic.license_url_list->fut_cert_hash;
+
+    /*validate peer_cert_hash*/
+    strcmp_s(peer_cert_hash, HASH_SIZE, cur_cert_hash, &cur_cert_hash_indicator);
+    strcmp_s(peer_cert_hash, HASH_SIZE, fut_cert_hash, &fut_cert_hash_indicator);
+
+    if ((cur_cert_hash_indicator == 0) || (fut_cert_hash_indicator == 0)) {
+        OVSA_DBG(DBG_I, "\nOVSA: Peer certificate HASH verified OK.\n");
+        goto out;
+    } else {
+        ret = OVSA_PEER_CERT_HASH_VALIDATION_FAILED;
+        OVSA_DBG(DBG_E, "OVSA: Error Peer certificate HASH Validation failed %d\n", ret);
+    }
+
+out:
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
 ovsa_command_type_t ovsa_get_command_type(const char* command) {
     ovsa_command_type_t cmd = OVSA_INVALID_CMD;
 
@@ -72,6 +157,8 @@ ovsa_command_type_t ovsa_get_command_type(const char* command) {
         cmd = OVSA_SEND_EK_AK_BIND;
     else if (!strcmp(command, "OVSA_SEND_QUOTE_NONCE"))
         cmd = OVSA_SEND_QUOTE_NONCE;
+    else if (!strcmp(command, "OVSA_SEND_UPDATE_CUST_LICENSE"))
+        cmd = OVSA_SEND_UPDATE_CUST_LICENSE;
     else if (!strcmp(command, "OVSA_SEND_LICENSE_CHECK_RESP"))
         cmd = OVSA_SEND_LICENSE_CHECK_RESP;
     else
@@ -173,12 +260,14 @@ static ovsa_status_t ovsa_license_service_close(void* ssl) {
 }
 
 static ovsa_status_t ovsa_license_service_start(const char* in_servers,
-                                                const char* in_ca_chain_path, void** out_ssl) {
-    ovsa_status_t ret               = OVSA_OK;
-    char* servers                   = NULL;
-    char* connected_addr            = NULL;
-    char* connected_port            = NULL;
-    char* issuer_dup                = NULL;
+                                                const char* in_ca_chain_path, void** out_ssl,
+                                                ovsa_customer_license_sig_t customer_lic_sig) {
+    ovsa_status_t ret    = OVSA_OK;
+    char* servers        = NULL;
+    char* connected_addr = NULL;
+    char* connected_port = NULL;
+    char* issuer_dup     = NULL;
+    char peer_cert_hash[HASH_SIZE];
     mbedtls_x509_crt* g_server_cert = NULL;
     BIO* issuer_cert_bio            = NULL;
     BIO* issuer_cert_mem            = NULL;
@@ -355,7 +444,20 @@ static ovsa_status_t ovsa_license_service_start(const char* in_servers,
         OVSA_DBG(DBG_E, "OVSA: Error getting the issuer cert failed with error %d\n", ret);
         goto out;
     }
-
+    /*compute hash of peer certificate*/
+    memset_s(peer_cert_hash, HASH_SIZE, 0);
+    ret = ovsa_crypto_compute_hash(issuer_dup, HASH_ALG_SHA384, (unsigned char*)peer_cert_hash,
+                                   true /* FORMAT_BASE64 */);
+    if (ret != OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error certificate HASH generation failed with code %d\n", ret);
+        goto out;
+    }
+    /* Validate peer certificate hash */
+    ret = ovsa_validate_peer_cert_hash(customer_lic_sig, peer_cert_hash);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error validate peer certificate hash failed with code %d\n", ret);
+        goto out;
+    }
     /* Verify the peer certificate */
     ret = ovsa_crypto_extract_pubkey_verify_cert(
         /* PEER CERT */ true, issuer_dup, /* lifetime_validity_check */ true, &peer_cert_slot);
@@ -366,15 +468,6 @@ static ovsa_status_t ovsa_license_service_start(const char* in_servers,
     *out_ssl = &g_ssl;
 
 out:
-
-    if (ret < OVSA_OK || !out_ssl) {
-        mbedtls_net_free(&g_verifier_fd);
-        mbedtls_ssl_free(&g_ssl);
-        mbedtls_ssl_config_free(&g_conf);
-        mbedtls_ctr_drbg_free(&g_ctr_drbg);
-        mbedtls_entropy_free(&g_entropy);
-    }
-
     mbedtls_x509_crt_free(g_server_cert);
     BIO_free_all(issuer_cert_bio);
     BIO_free_all(issuer_cert_mem);
@@ -590,6 +683,57 @@ out:
     ovsa_safe_free_url_list(&customer_lic_sig->customer_lic.license_url_list);
     ovsa_safe_free_tcb_list(&customer_lic_sig->customer_lic.tcb_signatures);
     ovsa_safe_free(&cust_lic_buf);
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
+
+static ovsa_status_t ovsa_do_update_cust_license(char* update_cust_lic_buf,
+                                                 const char* cust_lic_file_path,
+                                                 void** _ssl_session) {
+    ovsa_status_t ret             = OVSA_OK;
+    void* ssl_session             = NULL;
+    char* update_cust_lic_payload = NULL;
+    size_t buf_len                = 0;
+    ssl_session                   = *_ssl_session;
+
+    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+
+    ret = ovsa_json_extract_element((char*)update_cust_lic_buf, "payload",
+                                    (void*)&update_cust_lic_payload);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error read updated customer license payload from json failed %d\n",
+                 ret);
+        goto out;
+    }
+    /* Update customer license file */
+    FILE* fcust_lic = fopen(cust_lic_file_path, "w");
+    if (fcust_lic == NULL) {
+        ret = OVSA_FILEOPEN_FAIL;
+        OVSA_DBG(DBG_E, "OVSA: Error opening customer license file failed with code %d\n", ret);
+        goto out;
+    }
+    ret = ovsa_get_string_length((char*)update_cust_lic_payload, &buf_len);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of update_cust_lic_payload string %d\n",
+                 ret);
+        fclose(fcust_lic);
+        goto out;
+    }
+    if (!fwrite(update_cust_lic_payload, buf_len, 1, fcust_lic)) {
+        ret = OVSA_FILEIO_FAIL;
+        OVSA_DBG(DBG_E, "OVSA: Error write customer license file failed with code %d\n", ret);
+        fclose(fcust_lic);
+        goto out;
+    }
+    fclose(fcust_lic);
+    /* Send update cust_lic_ACK to Server */
+    ret = ovsa_send_update_cust_lic_ACK(&ssl_session);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error send_update_cust_lic_ACK failed with %d\n", ret);
+        goto out;
+    }
+out:
+    ovsa_safe_free(&update_cust_lic_payload);
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }
@@ -812,8 +956,7 @@ ovsa_status_t ovsa_tpm2_nvread(char* hw_quote_file, int nvindex, int size, int o
     snprintf(offset_buf, MAX_INDEX_LEN, "%d", offset);
 
     /* read hw quote info from NV memory */
-    char* const nvread_cmd[] = {"/usr/bin/sudo",
-                                "tpm2_nvread",
+    char* const nvread_cmd[] = {"/usr/bin/tpm2_nvread",
                                 "-C",
                                 "o",
                                 "-s",
@@ -823,13 +966,11 @@ ovsa_status_t ovsa_tpm2_nvread(char* hw_quote_file, int nvindex, int size, int o
                                 offset_buf,
                                 "-o",
                                 hw_quote_file,
-                                "-T",
-                                "device:/dev/tpmrm0",
                                 0};
 
     if (ovsa_do_run_tpm2_command(nvread_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "OVSA: Error reading nv memory failed to execute %s command\n",
-                 nvread_cmd[1]);
+                 nvread_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
     /* Read hwquote info from diskfile */
@@ -924,7 +1065,7 @@ ovsa_status_t ovsa_get_tpm2_HW_quote(ovsa_quote_info_t* hw_quote_info) {
             OVSA_DBG(DBG_E, "OVSA: Error ovsa_tpm2_nvread failed with code %d\n", ret);
             goto out;
         }
-
+        remove(hwquote_file_name);
         memcpy_s((hwquote_buff + bytes_read), hwquote_bufsize, hwquote_buff_chunk, size);
 
         bytes_read += size;
@@ -1334,6 +1475,7 @@ static ovsa_status_t ovsa_do_get_quote_nounce(const int asym_keyslot, char* quot
         OVSA_DBG(DBG_E, "OVSA: Error ovsa_license_service_write() returned %d\n", ret);
         goto out;
     }
+    OVSA_DBG(DBG_I, "OVSA:Send OVSA_SEND_CUST_LICENSE to server\n%s", cust_lic_json_payload);
 out:
     ovsa_safe_free(&quote_buf);
     ovsa_safe_free(&payload);
@@ -1444,8 +1586,65 @@ out:
     return ret;
 }
 
+#ifdef PTT_EK_ONDIE_CA
+static ovsa_status_t ovsa_do_read_EK_cert_chain_file(ovsa_ek_ak_bind_info_t* ek_ak_bind_info) {
+    ovsa_status_t ret = OVSA_OK;
+    size_t file_size  = 0;
+
+    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+    /*
+     * Check if EK_cert_chain ROM Certificate exists. If so, read and send it to server
+     */
+    if (ovsa_check_if_file_exists(TPM2_EKCERT_CHAIN_ROM_CERT) == true) {
+        OVSA_DBG(DBG_D, "OVSA:TPM2_SW_EK_Chain ROM certificate file exists \n");
+        /* Read ROM cert */
+        ret = ovsa_read_file_content(TPM2_EKCERT_CHAIN_ROM_CERT, &ek_ak_bind_info->ROM_cert,
+                                     &file_size);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(
+                DBG_E,
+                "OVSA: Error reading TPM2_SW_EK_Chain ROM certificate failed with error code %d\n",
+                ret);
+            goto out;
+        }
+        OVSA_DBG(DBG_I, "OVSA:EKcert Chain ROM_cert read...!:%s\n", ek_ak_bind_info->ROM_cert);
+    } else {
+        OVSA_DBG(DBG_E, "OVSA: Error TPM2_SW_EK_Chain ROM certificate doesn't exists\n");
+        ret = OVSA_INVALID_PARAMETER;
+        goto out;
+    }
+    /*
+     * Check if EKcert on_diechain_certificate exists. If so, read and send it to server
+     */
+    if (ovsa_check_if_file_exists(TPM2_EKCERT_ONDIE_CHAIN) == true) {
+        OVSA_DBG(DBG_D, "OVSA:TPM2_SW_EKcert on_diechain_certificate file exists \n");
+        /* Read ROM cert */
+        ret = ovsa_read_file_content(TPM2_EKCERT_ONDIE_CHAIN, &ek_ak_bind_info->Chain_cert,
+                                     &file_size);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(
+                DBG_E,
+                "OVSA: Error reading EKcert on_diechain_certificate failed with error code %d\n",
+                ret);
+            goto out;
+        }
+        OVSA_DBG(DBG_I, "OVSA:EKcert on_diechain_certificate read...!:%s\n",
+                 ek_ak_bind_info->Chain_cert);
+    } else {
+        OVSA_DBG(DBG_E, "OVSA: Error TTPM2_SW_EKcert on_diechain_certificate:%s doesn't exists\n",
+                 TPM2_EKCERT_ONDIE_CHAIN);
+        ret = OVSA_INVALID_PARAMETER;
+        goto out;
+    }
+
+out:
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
+#endif
+
 static ovsa_status_t ovsa_do_sign_EKpub_EKcert(const int asym_keyslot,
-                                               ovsa_sw_ek_ak_bind_info_t* sw_ek_ak_bind_info) {
+                                               ovsa_ek_ak_bind_info_t* ek_ak_bind_info) {
     ovsa_status_t ret = OVSA_OK;
     size_t file_size  = 0;
     char* ekpub_buf   = NULL;
@@ -1458,14 +1657,13 @@ static ovsa_status_t ovsa_do_sign_EKpub_EKcert(const int asym_keyslot,
     if (ovsa_check_if_file_exists(TPM2_SW_EK_CERT) == true) {
         OVSA_DBG(DBG_D, "OVSA:TPM2_SW_EK certificate file exists \n");
         /* Read EK cert */
-        ret = ovsa_read_file_content(TPM2_SW_EK_CERT, &sw_ek_ak_bind_info->sw_ek_cert, &file_size);
+        ret = ovsa_read_file_content(TPM2_SW_EK_CERT, &ek_ak_bind_info->ek_cert, &file_size);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E,
                      "OVSA: Error reading TPM2_SW_EK Certificate failed with error code %d\n", ret);
             goto out;
         }
-        ret = ovsa_safe_malloc(sizeof(char) * MAX_SIGNATURE_SIZE,
-                               &sw_ek_ak_bind_info->sw_ek_cert_sig);
+        ret = ovsa_safe_malloc(sizeof(char) * MAX_SIGNATURE_SIZE, &ek_ak_bind_info->ek_cert_sig);
         if (ret < OVSA_OK) {
             ret = OVSA_MEMORY_ALLOC_FAIL;
             OVSA_DBG(DBG_E, "OVSA: Error create ek_ak_bind_info memory init failed\n");
@@ -1477,8 +1675,8 @@ static ovsa_status_t ovsa_do_sign_EKpub_EKcert(const int asym_keyslot,
             goto out;
         }
         /* Sign Ekcert */
-        ret = ovsa_crypto_sign_mem(asym_keyslot, sw_ek_ak_bind_info->sw_ek_cert, file_size - 1,
-                                   sw_ek_ak_bind_info->sw_ek_cert_sig);
+        ret = ovsa_crypto_sign_mem(asym_keyslot, ek_ak_bind_info->ek_cert, file_size - 1,
+                                   ek_ak_bind_info->ek_cert_sig);
         if (ret != OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error EKCert Signing failed with code %d\n", ret);
             goto out;
@@ -1496,15 +1694,14 @@ out:
     return ret;
 }
 
-static ovsa_status_t ovsa_do_read_AK_pubkey_AKname(ovsa_sw_ek_ak_bind_info_t* sw_ek_ak_bind_info) {
+static ovsa_status_t ovsa_do_read_AK_pubkey_AKname(ovsa_ek_ak_bind_info_t* ek_ak_bind_info) {
     ovsa_status_t ret = OVSA_OK;
     size_t file_size  = 0;
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
     /* Read AKpub pem */
-    ret =
-        ovsa_read_file_content(TPM2_AK_PUB_PEM_KEY, &sw_ek_ak_bind_info->sw_ak_pub_key, &file_size);
+    ret = ovsa_read_file_content(TPM2_AK_PUB_PEM_KEY, &ek_ak_bind_info->ak_pub_key, &file_size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error reading TPM2_AK_PUB_PEM_KEY file failed with error code %d\n",
                  ret);
@@ -1512,7 +1709,7 @@ static ovsa_status_t ovsa_do_read_AK_pubkey_AKname(ovsa_sw_ek_ak_bind_info_t* sw
     }
     /* Read AKname */
     file_size = 0;
-    ret = ovsa_read_file_content(TPM2_AK_NAME_HEX, &sw_ek_ak_bind_info->sw_ak_name, &file_size);
+    ret       = ovsa_read_file_content(TPM2_AK_NAME_HEX, &ek_ak_bind_info->ak_name, &file_size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error reading TPM2_AK_NAME_HEX file failed with error code %d\n",
                  ret);
@@ -1532,34 +1729,43 @@ static ovsa_status_t ovsa_send_EK_AK_bind_info(const int asym_keyslot, void** _s
     char* json_payload       = NULL;
     size_t payload_len       = 0;
     size_t buf_len           = 0;
-    ovsa_sw_ek_ak_bind_info_t sw_ek_ak_bind_info;
+    ovsa_ek_ak_bind_info_t ek_ak_bind_info;
 
     ssl_session = *_ssl_session;
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
-    memset_s(&sw_ek_ak_bind_info, sizeof(ovsa_sw_ek_ak_bind_info_t), 0);
+    memset_s(&ek_ak_bind_info, sizeof(ovsa_ek_ak_bind_info_t), 0);
 
     /* Read and sign EKpub/EKcert */
-    ret = ovsa_do_sign_EKpub_EKcert(asym_keyslot, &sw_ek_ak_bind_info);
+    ret = ovsa_do_sign_EKpub_EKcert(asym_keyslot, &ek_ak_bind_info);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error sign EK_pub using platform priv key failed with code %d\n",
                  ret);
         goto out;
     }
     /* Read AKpub and AKname */
-    ret = ovsa_do_read_AK_pubkey_AKname(&sw_ek_ak_bind_info);
+    ret = ovsa_do_read_AK_pubkey_AKname(&ek_ak_bind_info);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read_AK_pubkey_AKname failed with code %d\n", ret);
         goto out;
     }
     /* Get customer certificate from key slot */
-    ret = ovsa_crypto_get_certificate(asym_keyslot, &sw_ek_ak_bind_info.platform_cert);
+    ret = ovsa_crypto_get_certificate(asym_keyslot, &ek_ak_bind_info.platform_cert);
     if (ret != OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error get customer certificate failed with code %d\n", ret);
         goto out;
     }
-    ret =
-        ovsa_json_create_EK_AK_binding_info_blob(sw_ek_ak_bind_info, &EK_AK_binding_info, &length);
+
+#ifdef PTT_EK_ONDIE_CA
+    /* ROM_cert and chain file */
+    ret = ovsa_do_read_EK_cert_chain_file(&ek_ak_bind_info);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error Read_EK_cert_chain_file failed with code %d\n", ret);
+        goto out;
+    }
+#endif
+
+    ret = ovsa_json_create_EK_AK_binding_info_blob(ek_ak_bind_info, &EK_AK_binding_info, &length);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E,
                  "OVSA: Error create EK_AK_binding_info info blob failed with error code %d\n",
@@ -1600,13 +1806,17 @@ static ovsa_status_t ovsa_send_EK_AK_bind_info(const int asym_keyslot, void** _s
         goto out;
     }
 out:
-    ovsa_safe_free(&sw_ek_ak_bind_info.sw_ak_pub_key);
-    ovsa_safe_free(&sw_ek_ak_bind_info.sw_ak_name);
-    ovsa_safe_free(&sw_ek_ak_bind_info.sw_ek_pub_key);
-    ovsa_safe_free(&sw_ek_ak_bind_info.sw_ek_pub_sig);
-    ovsa_safe_free(&sw_ek_ak_bind_info.sw_ek_cert);
-    ovsa_safe_free(&sw_ek_ak_bind_info.sw_ek_cert_sig);
-    ovsa_safe_free(&sw_ek_ak_bind_info.platform_cert);
+    ovsa_safe_free(&ek_ak_bind_info.ak_pub_key);
+    ovsa_safe_free(&ek_ak_bind_info.ak_name);
+    ovsa_safe_free(&ek_ak_bind_info.ek_pub_key);
+    ovsa_safe_free(&ek_ak_bind_info.ek_pub_sig);
+    ovsa_safe_free(&ek_ak_bind_info.ek_cert);
+    ovsa_safe_free(&ek_ak_bind_info.ek_cert_sig);
+    ovsa_safe_free(&ek_ak_bind_info.platform_cert);
+#ifdef PTT_EK_ONDIE_CA
+    ovsa_safe_free(&ek_ak_bind_info.ROM_cert);
+    ovsa_safe_free(&ek_ak_bind_info.Chain_cert);
+#endif
     ovsa_safe_free(&json_buf);
     ovsa_safe_free(&json_payload);
     ovsa_safe_free(&EK_AK_binding_info);
@@ -1618,9 +1828,10 @@ static void ovsa_remove_quote_files(void) {
     remove(TPM2_SWQUOTE_PCR);
     remove(TPM2_SWQUOTE_MSG);
     remove(TPM2_SWQUOTE_SIG);
-    remove(SERVER_NONCE);
+    remove(CHALLENGE_NONCE);
     remove(TPM2_CREDOUT_FILE);
     remove(TPM2_ACTCRED_OUT);
+    remove(TPM2_NVM_HWQUOTE_LEN_FILE);
 
     OVSA_DBG(DBG_D, "OVSA:Removed the Quote files from /tmp directory\n");
 }
@@ -1640,6 +1851,7 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
     ovsa_customer_license_sig_t customer_lic_sig;
     /* Set all pointers to NULL for KW fix */
     customer_lic_sig.customer_lic.isv_certificate  = NULL;
+    customer_lic_sig.customer_lic.tcb_signatures   = NULL;
     customer_lic_sig.customer_lic.license_url_list = NULL;
     ovsa_license_serv_url_list_t* license_url_list = NULL;
     char license_serv_url[MAX_URL_SIZE + 1];
@@ -1704,7 +1916,8 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
                     license_serv_url[len] = '\0';
                     OVSA_DBG(DBG_I, "OVSA:License_serv_url_%d: '%s' %s\n", url_count++,
                              license_serv_url, license_url_list->license_serv_url);
-                    ret = ovsa_license_service_start(license_serv_url, NULL, &ssl_session);
+                    ret = ovsa_license_service_start(license_serv_url, NULL, &ssl_session,
+                                                     customer_lic_sig);
                     if (ret < OVSA_OK) {
                         OVSA_DBG(
                             DBG_E,
@@ -1756,7 +1969,7 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
             }
 
             payload_size = atoi((char*)payload_len_str);
-            if (payload_size < 0 || payload_size > RSIZE_MAX_STR) {
+            if (payload_size < 0 || payload_size > SIZE_MAX) {
                 ret = OVSA_MEMORY_ALLOC_FAIL;
                 OVSA_DBG(DBG_E, "OVSA: Error read payload length from server is wrong\n");
                 goto out;
@@ -1814,6 +2027,17 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
                         goto out;
                     }
                     ovsa_remove_quote_files();
+                    break;
+                case OVSA_SEND_UPDATE_CUST_LICENSE:
+                    ret = ovsa_do_update_cust_license((char*)read_buf, customer_license,
+                                                      &ssl_session);
+                    if (ret < OVSA_OK) {
+                        OVSA_DBG(DBG_E,
+                                 "OVSA: Error read and update customer license from server failed "
+                                 "with code %d\n",
+                                 ret);
+                        goto out;
+                    }
                     break;
                 case OVSA_SEND_LICENSE_CHECK_RESP:
                     ret = ovsa_do_get_license_check(asym_keyslot, (char*)read_buf);
@@ -1953,6 +2177,7 @@ out:
     ovsa_crypto_clear_asymmetric_key_slot(asym_keyslot);
     /* clear peer keys from the key slots */
     ovsa_crypto_clear_asymmetric_key_slot(peer_keyslot);
+    ovsa_safe_free_enc_list(&control_access_model_sig.controlled_access_model.enc_model);
     ovsa_safe_free(&certificate);
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;

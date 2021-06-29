@@ -30,101 +30,76 @@ ovsa_status_t ovsa_do_load_EK_context_AKkeys() {
     OVSA_DBG(DBG_D, "LibOVSA: Entering %s\n", __func__);
 
     /* Clean up the previous context which are not flushed before starting */
-    char* const flushall_context_cmd[] = {
-        "/usr/bin/sudo", "tpm2_flushcontext", "-s", "-T", "device:/dev/tpmrm0", 0};
+    char* const flushall_context_cmd[] = {"/usr/bin/tpm2_flushcontext", "-s", 0};
 
     if (ovsa_do_run_tpm2_command(flushall_context_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error loading EK context AKkeys failed to execute %s command\n",
-                 flushall_context_cmd[1]);
+                 flushall_context_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Load EK context */
-    char* const createek_cmd[] = {"/usr/bin/sudo",
-                                  "tpm2_createek",
+    char* const createek_cmd[] = {"/usr/bin/tpm2_createek",
                                   "--ek-context",
-                                  "/var/OVSA/Quote/tpm_ek.ctx",
+                                  TPM2_EK_CTX,
                                   "--key-algorithm",
                                   "rsa",
                                   "--public",
-                                  "/var/OVSA/Quote/tpm_ek.pub",
-                                  "-T",
-                                  "device:/dev/tpmrm0",
+                                  TPM2_EK_PUB_KEY,
                                   0};
 
     if (ovsa_do_run_tpm2_command(createek_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error loading EK context AKkeys failed to execute %s command\n",
-                 createek_cmd[1]);
+                 createek_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Startauthsession */
-    char* const startauthsession_cmd[] = {"/usr/bin/sudo",
-                                          "tpm2_startauthsession",
-                                          "-S",
-                                          "/var/OVSA/Quote/session.ctx",
-                                          "--policy-session",
-                                          "-T",
-                                          "device:/dev/tpmrm0",
-                                          0};
+    char* const startauthsession_cmd[] = {"/usr/bin/tpm2_startauthsession", "-S",
+                                          TPM2_QUOTE_SESSION_CTX, "--policy-session", 0};
 
     if (ovsa_do_run_tpm2_command(startauthsession_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error loading EK context AKkeys failed to execute %s command\n",
-                 startauthsession_cmd[1]);
+                 startauthsession_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Policysecret */
-    char* const policysecret_cmd[] = {"/usr/bin/sudo",
-                                      "tpm2_policysecret",
-                                      "-S",
-                                      "/var/OVSA/Quote/session.ctx",
-                                      "-c",
-                                      "e",
-                                      "-T",
-                                      "device:/dev/tpmrm0",
-                                      0};
+    char* const policysecret_cmd[] = {
+        "/usr/bin/tpm2_policysecret", "-S", TPM2_QUOTE_SESSION_CTX, "-c", "e", 0};
 
     if (ovsa_do_run_tpm2_command(policysecret_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error loading EK context AKkeys failed to execute %s command\n",
-                 policysecret_cmd[1]);
+                 policysecret_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* TPM load */
-    char* const load_cmd[] = {"/usr/bin/sudo",
-                              "tpm2_load",
+    char* const load_cmd[] = {"/usr/bin/tpm2_load",
                               "-C",
-                              "/var/OVSA/Quote/tpm_ek.ctx",
+                              TPM2_EK_CTX,
                               "-u",
-                              "/var/OVSA/Quote/tpm_ak.pub",
+                              TPM2_AK_PUB,
                               "-r",
-                              "/var/OVSA/Quote/tpm_ak.priv",
+                              TPM2_AK_PRIV,
                               "-c",
-                              "/var/OVSA/Quote/tpm_ak.ctx",
+                              TPM2_AK_CTX,
                               "-P",
-                              "session:/var/OVSA/Quote/session.ctx",
-                              "-T",
-                              "device:/dev/tpmrm0",
+                              "session:" TPM2_QUOTE_SESSION_CTX,
                               0};
 
     if (ovsa_do_run_tpm2_command(load_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error loading EK context AKkeys failed to execute %s command\n",
-                 load_cmd[1]);
+                 load_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Flushcontext */
-    char* const flushcontext_cmd[] = {"/usr/bin/sudo",
-                                      "tpm2_flushcontext",
-                                      "/var/OVSA/Quote/session.ctx",
-                                      "-T",
-                                      "device:/dev/tpmrm0",
-                                      0};
+    char* const flushcontext_cmd[] = {"/usr/bin/tpm2_flushcontext", TPM2_QUOTE_SESSION_CTX, 0};
 
     if (ovsa_do_run_tpm2_command(flushcontext_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error loading EK context AKkeys failed to execute %s command\n",
-                 flushcontext_cmd[1]);
+                 flushcontext_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
@@ -138,18 +113,11 @@ ovsa_status_t ovsa_tpm2_generaterand() {
     OVSA_DBG(DBG_D, "LibOVSA: Entering %s\n", __func__);
 
     /* Generate Nonce using TPM2_getrandom */
-    char* const getrand_cmd[] = {"/usr/bin/sudo",
-                                 "tpm2_getrandom",
-                                 "-o",
-                                 "/var/OVSA/Quote/HW_QUOTE_nonce.bin",
-                                 "32",
-                                 "-T",
-                                 "device:/dev/tpmrm0",
-                                 0};
+    char* const getrand_cmd[] = {"/usr/bin/tpm2_getrandom", "-o", TPM2_HW_QUOTE_NONCE, "32", 0};
 
     if (ovsa_do_run_tpm2_command(getrand_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error generating rand failed to execute %s command\n",
-                 getrand_cmd[1]);
+                 getrand_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
@@ -163,21 +131,14 @@ ovsa_status_t ovsa_tpm2_generatequote(char* nonce) {
     OVSA_DBG(DBG_D, "LibOVSA: Entering %s\n", __func__);
 
     if (nonce[0] == '\0') {
-        nonce = "/var/OVSA/Quote/nonce.bin";
+        nonce = TPM2_QUOTE_NONCE;
 
         /* Generate Nonce using TPM2_getrandom */
-        char* const getrand_cmd[] = {"/usr/bin/sudo",
-                                     "tpm2_getrandom",
-                                     "--output",
-                                     nonce,
-                                     "32",
-                                     "-T",
-                                     "device:/dev/tpmrm0",
-                                     0};
+        char* const getrand_cmd[] = {"/usr/bin/tpm2_getrandom", "--output", nonce, "32", 0};
 
         if (ovsa_do_run_tpm2_command(getrand_cmd, NULL) != 0) {
             OVSA_DBG(DBG_E, "LibOVSA: Error generating quote failed to execute %s command\n",
-                     getrand_cmd[1]);
+                     getrand_cmd[0]);
             return OVSA_TPM2_CMD_EXEC_FAIL;
         }
     }
@@ -192,12 +153,11 @@ ovsa_status_t ovsa_tpm2_generatequote(char* nonce) {
     }
 
     /* Generate quote using tpm2_quote */
-    char* const quote_cmd[] = {"/usr/bin/sudo",
-                               "tpm2_quote",
+    char* const quote_cmd[] = {"/usr/bin/tpm2_quote",
                                "--key-context",
-                               "/var/OVSA/Quote/tpm_ak.ctx",
+                               TPM2_AK_CTX,
                                "--pcr-list",
-                               "sha512:all",
+                               "sha256:all",
                                "--message",
                                TPM2_SWQUOTE_MSG,
                                "--signature",
@@ -208,20 +168,18 @@ ovsa_status_t ovsa_tpm2_generatequote(char* nonce) {
                                "sha256",
                                "--pcr",
                                TPM2_SWQUOTE_PCR,
-                               "-T",
-                               "device:/dev/tpmrm0",
                                0};
 
     if (ovsa_do_run_tpm2_command(quote_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error generating quote failed to execute %s command\n",
-                 quote_cmd[1]);
+                 quote_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     OVSA_DBG(
         DBG_D,
         "\nLibOVSA: Generated quote successfully, message file: %s, signature: %s, PCR file: %s\n",
-        quote_cmd[7], quote_cmd[9], quote_cmd[15]);
+        quote_cmd[6], quote_cmd[8], quote_cmd[14]);
     OVSA_DBG(DBG_D, "LibOVSA: %s Exit\n", __func__);
     return ret;
 }
@@ -234,12 +192,12 @@ ovsa_status_t ovsa_do_run_tpm2_command(char* const argv[], char* output) {
     char cmd_output[MAX_EKEY_SIZE];
     char error_output[MAX_BUF_SIZE];
 
-    if ((argv == NULL) || (argv[1] == NULL)) {
+    if ((argv == NULL) || (argv[0] == NULL)) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 command failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
 
-    OVSA_DBG(DBG_D, "LibOVSA: %s: Loading object '%s' into TPM\n", __func__, argv[1]);
+    OVSA_DBG(DBG_D, "LibOVSA: %s: Loading object '%s' into TPM\n", __func__, argv[0]);
     if (pipe(link) == -1) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 command failed in creating pipe\n");
         return OVSA_SYSCALL_READ_PIPE_FAIL;
@@ -258,7 +216,7 @@ ovsa_status_t ovsa_do_run_tpm2_command(char* const argv[], char* output) {
         err = execve(argv[0], argv, NULL);
         if (err == -1) {
             /* If it got here, it's an error */
-            OVSA_DBG(DBG_E, "LibOVSA: Error executing %s failed with error %s\n", argv[1],
+            OVSA_DBG(DBG_E, "LibOVSA: Error executing %s failed with error %s\n", argv[0],
                      strerror(errno));
             return OVSA_SYSCALL_EXECVE_FAIL;
         }
@@ -303,7 +261,7 @@ ovsa_status_t ovsa_do_run_tpm2_command(char* const argv[], char* output) {
         int exit_status = WEXITSTATUS(child_status);
         if (exit_status != 0) {
             OVSA_DBG(DBG_E, "LibOVSA: Error execution of TPM2 %s failed with exit_status %d \n",
-                     argv[1], exit_status);
+                     argv[0], exit_status);
             memset_s(error_output, sizeof(error_output), 0);
             nbytes = read(link[0], error_output, (sizeof(error_output) - 1));
             if (nbytes > 0) {
@@ -345,71 +303,50 @@ ovsa_status_t ovsa_do_tpm2_activatecredential(char* cred_outbuf) {
     }
 
     /* Startauthsession */
-    char* const startauthsession_argv[] = {"/usr/bin/sudo",
-                                           "tpm2_startauthsession",
-                                           "--policy-session",
-                                           "--session",
-                                           "/var/OVSA/Quote/session.ctx",
-                                           "-T",
-                                           "device:/dev/tpmrm0",
-                                           0};
+    char* const startauthsession_argv[] = {"/usr/bin/tpm2_startauthsession", "--policy-session",
+                                           "--session", TPM2_QUOTE_SESSION_CTX, 0};
     if (ovsa_do_run_tpm2_command(startauthsession_argv, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error activate credential failed to execute %s command\n",
-                 startauthsession_argv[1]);
+                 startauthsession_argv[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Policysecret */
-    char* const policysecret_argv[] = {"/usr/bin/sudo",
-                                       "tpm2_policysecret",
-                                       "-S",
-                                       "/var/OVSA/Quote/session.ctx",
-                                       "-c",
-                                       TPM2_RH_ENDORSEMENT,
-                                       "-T",
-                                       "device:/dev/tpmrm0",
-                                       0};
+    char* const policysecret_argv[] = {
+        "/usr/bin/tpm2_policysecret", "-S", TPM2_QUOTE_SESSION_CTX, "-c", TPM2_RH_ENDORSEMENT, 0};
 
     if (ovsa_do_run_tpm2_command(policysecret_argv, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error activate credential failed to execute %s command\n",
-                 policysecret_argv[1]);
+                 policysecret_argv[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Activatecredential */
-    char* const activatecredential_argv[] = {"/usr/bin/sudo",
-                                             "tpm2_activatecredential",
+    char* const activatecredential_argv[] = {"/usr/bin/tpm2_activatecredential",
                                              "--credentialedkey-context",
-                                             "/var/OVSA/Quote/tpm_ak.ctx",
+                                             TPM2_AK_CTX,
                                              "--credentialkey-context",
-                                             "/var/OVSA/Quote/tpm_ek.ctx",
+                                             TPM2_EK_CTX,
                                              "--credential-blob",
                                              TPM2_CREDOUT_FILE,
                                              "--certinfo-data",
                                              TPM2_ACTCRED_OUT,
                                              "--credentialkey-auth",
-                                             "session:/var/OVSA/Quote/session.ctx",
-                                             "-T",
-                                             "device:/dev/tpmrm0",
+                                             "session:" TPM2_QUOTE_SESSION_CTX,
                                              0};
 
     /* Run activatecredential */
     if (ovsa_do_run_tpm2_command(activatecredential_argv, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error activate credential failed to execute %s command\n",
-                 activatecredential_argv[1]);
+                 activatecredential_argv[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
-    char* const flushcontext_argv[] = {"/usr/bin/sudo",
-                                       "tpm2_flushcontext",
-                                       "/var/OVSA/Quote/session.ctx",
-                                       "-T",
-                                       "device:/dev/tpmrm0",
-                                       0};
+    char* const flushcontext_argv[] = {"/usr/bin/tpm2_flushcontext", TPM2_QUOTE_SESSION_CTX, 0};
 
     if (ovsa_do_run_tpm2_command(flushcontext_argv, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error activate credential failed to execute %s command\n",
-                 flushcontext_argv[1]);
+                 flushcontext_argv[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
@@ -428,117 +365,92 @@ ovsa_status_t ovsa_tpm2_unsealkey(char* encryption_key) {
     }
 
     /* Load object to TPM */
-    char* const loadexternal_cmd[] = {"/usr/bin/sudo",
-                                      "tpm2_loadexternal",
+    char* const loadexternal_cmd[] = {"/usr/bin/tpm2_loadexternal",
                                       "--key-algorithm=rsa",
                                       "--hierarchy=o",
                                       "--public=" TPM2_SEAL_SIGN_PUB_KEY,
                                       "--key-context=" TPM2_SIGNING_KEY_CTX,
                                       "--name=" TPM2_SIGNING_KEY_NAME,
-                                      "-T",
-                                      "device:/dev/tpmrm0",
                                       0,
                                       NULL};
 
     if (ovsa_do_run_tpm2_command(loadexternal_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 loadexternal_cmd[1]);
+                 loadexternal_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Verify the signature on the pcr and get the tpm verification tkt */
-    char* const verify_cmd[] = {"/usr/bin/sudo",
-                                "tpm2_verifysignature",
+    char* const verify_cmd[] = {"/usr/bin/tpm2_verifysignature",
                                 "--key-context=" TPM2_SIGNING_KEY_CTX,
                                 "--hash-algorithm=sha256",
                                 "--message=" TPM2_SEAL_PCR_POLICY,
                                 "--signature=" TPM2_SEAL_PCR_SIGN,
                                 "--ticket=" TPM2_VERIFICATION_TKT,
                                 "--scheme=rsassa",
-                                "-T",
-                                "device:/dev/tpmrm0",
                                 0,
                                 NULL};
 
     if (ovsa_do_run_tpm2_command(verify_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 verify_cmd[1]);
+                 verify_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Start session with TPM */
-    char* const authsession_cmd[] = {"/usr/bin/sudo",
-                                     "tpm2_startauthsession",
-                                     "--policy-session",
-                                     "--session=" TPM2_SESSION_CTX,
-                                     "-T",
-                                     "device:/dev/tpmrm0",
-                                     0,
-                                     NULL};
+    char* const authsession_cmd[] = {"/usr/bin/tpm2_startauthsession", "--policy-session",
+                                     "--session=" TPM2_SESSION_CTX, 0, NULL};
 
     if (ovsa_do_run_tpm2_command(authsession_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 authsession_cmd[1]);
+                 authsession_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Create policy with PCR */
-    char* const policypcr_cmd[] = {"/usr/bin/sudo",
-                                   "tpm2_policypcr",
+    char* const policypcr_cmd[] = {"/usr/bin/tpm2_policypcr",
                                    "--pcr-list=sha256:0",
                                    "--session=" TPM2_SESSION_CTX,
                                    "--policy=" TPM2_PCR_POLICY,
-                                   "-T",
-                                   "device:/dev/tpmrm0",
                                    0,
                                    NULL};
 
     if (ovsa_do_run_tpm2_command(policypcr_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 policypcr_cmd[1]);
+                 policypcr_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Run policyauthorize to Unseal */
-    char* const policyauth_cmd[] = {"/usr/bin/sudo",
-                                    "tpm2_policyauthorize",
+    char* const policyauth_cmd[] = {"/usr/bin/tpm2_policyauthorize",
                                     "--session=" TPM2_SESSION_CTX,
                                     "--input=" TPM2_PCR_POLICY,
                                     "--name=" TPM2_SIGNING_KEY_NAME,
                                     "--ticket=" TPM2_VERIFICATION_TKT,
-                                    "-T",
-                                    "device:/dev/tpmrm0",
                                     0,
                                     NULL};
 
     if (ovsa_do_run_tpm2_command(policyauth_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 policyauth_cmd[1]);
+                 policyauth_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
     /* Unseal output to the file */
-    char* const unseal_cmd[] = {"/usr/bin/sudo",
-                                "tpm2_unseal",
-                                "--auth=session:" TPM2_SESSION_CTX,
-                                "--object-context=0x81010001",
-                                "-T",
-                                "device:/dev/tpmrm0",
-                                0,
-                                NULL};
+    char* const unseal_cmd[] = {"/usr/bin/tpm2_unseal", "--auth=session:" TPM2_SESSION_CTX,
+                                "--object-context=0x81010001", 0, NULL};
 
     if (ovsa_do_run_tpm2_command(unseal_cmd, encryption_key) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 unseal_cmd[1]);
+                 unseal_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
-    char* const flushcontext_cmd[] = {
-        "/usr/bin/sudo", "tpm2_flushcontext", TPM2_SESSION_CTX, "-T", "device:/dev/tpmrm0", NULL};
+    char* const flushcontext_cmd[] = {"/usr/bin/tpm2_flushcontext", TPM2_SESSION_CTX, NULL};
 
     if (ovsa_do_run_tpm2_command(flushcontext_cmd, NULL) != 0) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 flushcontext_cmd[1]);
+                 flushcontext_cmd[0]);
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 

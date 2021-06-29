@@ -18,36 +18,41 @@
 
 echo "Installing OVSA Model Hosting Packages"
 
-rm -vrf /opt/ovsa
-rm -vrf /var/OVSA
+sudo rm -vrf /opt/ovsa
+sudo rm -vrf /var/OVSA
 
-mkdir -vp /opt/ovsa/bin
-mkdir -vp /opt/ovsa/scripts
-mkdir -vp /opt/ovsa/example_runtime
-mkdir -vp /opt/ovsa/example_client
+sudo mkdir -vp /opt/ovsa/bin
+sudo mkdir -vp /opt/ovsa/scripts
+sudo mkdir -vp /opt/ovsa/example_runtime
+sudo mkdir -vp /opt/ovsa/example_client
 
-cp -vR bin/* /opt/ovsa/bin/
-cp -vR scripts/* /opt/ovsa/scripts/
-cp -vR example_runtime/* /opt/ovsa/example_runtime/
-cp -vR example_client/* /opt/ovsa/example_client/
+sudo cp -vR bin/* /opt/ovsa/bin/
+sudo cp -vR scripts/* /opt/ovsa/scripts/
+sudo cp -vR example_runtime/* /opt/ovsa/example_runtime/
+sudo cp -vR example_client/* /opt/ovsa/example_client/
+sudo chown -R ovsa /opt/ovsa
 
-mkdir -vp /var/OVSA/Seal
-cp /opt/ovsa/scripts/OVSA_Seal_Key_TPM_Policy_Authorize.sh /var/OVSA/Seal
+sudo mkdir -vp /var/OVSA/Seal
+sudo cp /opt/ovsa/scripts/OVSA_Seal_Key_TPM_Policy_Authorize.sh /var/OVSA/Seal
 cd /var/OVSA/Seal && ./OVSA_Seal_Key_TPM_Policy_Authorize.sh
 cd -
 
-mkdir -vp /var/OVSA/Quote
-cp /opt/ovsa/scripts/OVSA_create_ek_ak_keys.sh /var/OVSA/Quote
+sudo mkdir -vp /var/OVSA/Quote
+sudo cp /opt/ovsa/scripts/OVSA_create_ek_ak_keys.sh /var/OVSA/Quote
 cd /var/OVSA/Quote && ./OVSA_create_ek_ak_keys.sh
 cd -
+
+cd /opt/ovsa/example_runtime/ && ./generate_certs.sh -p /var/OVSA/Modelserver
+cd -
+sudo chown -R ovsa /var/OVSA
 
 if [[ "$(docker images -q ovsa/runtime-tpm-nginx:latest 2> /dev/null)" == "" ]]; then
         echo "Docker does not exist."
 else
-        docker image rm -f ovsa/runtime-tpm-nginx:latest
+        sudo docker image rm -f ovsa/runtime-tpm-nginx:latest
 fi
 
-docker load -i ovsa-runtime-tpm-nginx.tar.gz
+sudo docker load -i ovsa-runtime-tpm-nginx.tar.gz
 
 echo "Open the .bashrc file in <user_directory>:"
 echo "vi <user_directory>/.bashrc"

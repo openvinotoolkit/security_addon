@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Copyright (c) 2020-2021 Intel Corporation
 #
@@ -16,39 +17,23 @@
 
 #set -e
 
-echo "Installing OVSA Developer/ISV Tools"
+echo "Installing OVSA License Server"
 
-sudo rm -vrf /opt/ovsa
-sudo rm -vrf /var/OVSA
+mkdir -vp /opt/ovsa/bin
+mkdir -vp /opt/ovsa/scripts
+mkdir -vp /opt/ovsa/DB
+mkdir -vp /opt/ovsa/lib
 
-sudo mkdir -vp /opt/ovsa/bin
-sudo mkdir -vp /opt/ovsa/scripts
-sudo mkdir -vp /opt/ovsa/DB
-sudo mkdir -vp /opt/ovsa/lib
-
-sudo cp -vR bin/* /opt/ovsa/bin/
-sudo cp -vR scripts/* /opt/ovsa/scripts/
-sudo cp -vR DB/* /opt/ovsa/DB/
-sudo cp -vR lib/* /opt/ovsa/lib/
+cp -vR bin/* /opt/ovsa/bin/
+cp -vR scripts/* /opt/ovsa/scripts/
+cp -vR DB/* /opt/ovsa/DB/
+cp -vR lib/* /opt/ovsa/lib/
 
 python3 /opt/ovsa/DB/ovsa_create_db.py /opt/ovsa/DB/ovsa.db
-sudo chown -R ovsa /opt/ovsa
 
-sudo mkdir -vp /var/OVSA/Seal
-sudo cp /opt/ovsa/scripts/OVSA_Seal_Key_TPM_Policy_Authorize.sh /var/OVSA/Seal
-cd /var/OVSA/Seal && ./OVSA_Seal_Key_TPM_Policy_Authorize.sh
-cd -
-
-sudo mkdir -vp /var/OVSA/Quote
-sudo cp /opt/ovsa/scripts/OVSA_create_ek_ak_keys.sh /var/OVSA/Quote
-cd /var/OVSA/Quote && ./OVSA_create_ek_ak_keys.sh
-cd -
-
-sudo chown -R ovsa /var/OVSA
-
-cd /opt/ovsa/scripts/ && ./OVSA_install_license_server_cert.sh gencert
-sudo chown -R ovsa /opt/ovsa
-cd -
+pushd /opt/ovsa/scripts/
+./OVSA_install_license_server_cert.sh gencert
+popd
 
 echo "Open the .bashrc file in <user_directory>:"
 echo "vi <user_directory>/.bashrc"
