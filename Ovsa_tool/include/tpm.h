@@ -22,27 +22,40 @@
 
 #define TPM2_CREDOUT_FILE "/tmp/cred.out.bin"
 #define TPM2_ACTCRED_OUT  "/tmp/actcred.out"
-#define SERVER_NONCE      "/tmp/quote_nonce.bin"
 #define CHALLENGE_NONCE   "/tmp/challenge_nonce.bin"
 
 #define TPM2_SWQUOTE_PCR "/tmp/pcr.bin"
 #define TPM2_SWQUOTE_MSG "/tmp/pcr_quote.plain"
 #define TPM2_SWQUOTE_SIG "/tmp/pcr_quote.signature"
 
-#define TPM2_SW_EK_CERT       "/var/OVSA/Quote/tpm_ek_cert.pem"
-#define TPM2_EK_PUB_KEY       "/var/OVSA/Quote/tpm_ek.pub"
-#define TPM2_AK_NAME_HEX      "/var/OVSA/Quote/tpm_ak.name.hex"
-#define TPM2_AK_PUB_PEM_KEY   "/var/OVSA/Quote/tpm_ak.pub.pem"
+#define TPM2_PROVISION_DIR     "/var/OVSA/"
+#define TPM2_SW_EK_CERT        TPM2_PROVISION_DIR "Quote/tpm_ek_cert.pem"
+#define TPM2_EK_PUB_KEY        TPM2_PROVISION_DIR "Quote/tpm_ek.pub"
+#define TPM2_AK_NAME_HEX       TPM2_PROVISION_DIR "Quote/tpm_ak.name.hex"
+#define TPM2_AK_PUB_PEM_KEY    TPM2_PROVISION_DIR "Quote/tpm_ak.pub.pem"
+#define TPM2_QUOTE_SESSION_CTX TPM2_PROVISION_DIR "Quote/session.ctx"
+#define TPM2_EK_CTX            TPM2_PROVISION_DIR "Quote/tpm_ek.ctx"
+#define TPM2_AK_PUB            TPM2_PROVISION_DIR "Quote/tpm_ak.pub"
+#define TPM2_AK_PRIV           TPM2_PROVISION_DIR "Quote/tpm_ak.priv"
+#define TPM2_AK_CTX            TPM2_PROVISION_DIR "Quote/tpm_ak.ctx"
+#define TPM2_HW_QUOTE_NONCE    TPM2_PROVISION_DIR "Quote/HW_QUOTE_nonce.bin"
+#define TPM2_QUOTE_NONCE       TPM2_PROVISION_DIR "Quote/nonce.bin"
+
+#ifdef PTT_EK_ONDIE_CA
+#define TPM2_EKCERT_CHAIN_ROM_CERT TPM2_PROVISION_DIR "Quote/ROM_cert.pem"
+#define TPM2_EKCERT_ONDIE_CHAIN    TPM2_PROVISION_DIR "Quote/Ondie_chain.pem"
+#endif
+
+#define TPM2_SEAL_SIGN_PUB_KEY TPM2_PROVISION_DIR "Seal/signing_key_public.pem"
+#define TPM2_SEAL_PCR_POLICY   TPM2_PROVISION_DIR "Seal/tpm_pcr.policy"
+#define TPM2_SEAL_PCR_SIGN     TPM2_PROVISION_DIR "Seal/tpm_pcr.signature"
+
 #define TPM2_RH_ENDORSEMENT   "0x4000000B"
 #define TPM2_SESSION_CTX      "/tmp/session.ctx"
 #define TPM2_PCR_POLICY       "/tmp/tpm_pcr.policy"
 #define TPM2_VERIFICATION_TKT "/tmp/verification.tkt"
 #define TPM2_SIGNING_KEY_CTX  "/tmp/signing_key.ctx"
 #define TPM2_SIGNING_KEY_NAME "/tmp/signing_key.name"
-
-#define TPM2_SEAL_SIGN_PUB_KEY "/var/OVSA/Seal/signing_key_public.pem"
-#define TPM2_SEAL_PCR_POLICY   "/var/OVSA/Seal/tpm_pcr.policy"
-#define TPM2_SEAL_PCR_SIGN     "/var/OVSA/Seal/tpm_pcr.signature"
 
 /** \brief This function unseals the encryption key from tpm.
  *

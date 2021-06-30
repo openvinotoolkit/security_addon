@@ -65,15 +65,19 @@ typedef struct ovsa_quote_info {
     char* ek_cert;
 } ovsa_quote_info_t;
 
-typedef struct ovsa_sw_ek_ak_bind_info {
-    char* sw_ak_pub_key;
-    char* sw_ak_name;
-    char* sw_ek_pub_key;
-    char* sw_ek_pub_sig;
-    char* sw_ek_cert;
-    char* sw_ek_cert_sig;
+typedef struct ovsa_ek_ak_bind_info {
+    char* ak_pub_key;
+    char* ak_name;
+    char* ek_pub_key;
+    char* ek_pub_sig;
+    char* ek_cert;
+    char* ek_cert_sig;
     char* platform_cert;
-} ovsa_sw_ek_ak_bind_info_t;
+#ifdef PTT_EK_ONDIE_CA
+    char* ROM_cert;
+    char* Chain_cert;
+#endif
+} ovsa_ek_ak_bind_info_t;
 
 typedef enum {
     OVSA_SEND_NONCE = 0,
@@ -84,6 +88,8 @@ typedef enum {
     OVSA_SEND_QUOTE_INFO,
     OVSA_SEND_HW_QUOTE,
     OVSA_SEND_CUST_LICENSE,
+    OVSA_SEND_UPDATE_CUST_LICENSE,
+    OVSA_SEND_UPDATE_CUST_LICENSE_ACK,
     OVSA_SEND_LICENSE_CHECK_RESP,
     OVSA_INVALID_CMD
 } ovsa_command_type_t;

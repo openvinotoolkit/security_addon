@@ -43,20 +43,42 @@ def create_customer_license_info(conn, customer_license_info):
     :return:
     """
 
-    sql = ''' DELETE FROM customer_license_info WHERE license_guid=? AND model_guid=? '''
-    cur = conn.cursor()
-    cur.execute(sql, (customer_license_info[0], customer_license_info[1]))
-    conn.commit()
-
-    sql = ''' INSERT INTO customer_license_info (license_guid, model_guid, isv_certificate, customer_certificate,
-              license_type, limit_count, usage_count, time_limit, created_date, updated_date)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '''
+    row_id = 0
 
     cur = conn.cursor()
-    cur.execute(sql, customer_license_info)
-    conn.commit()
+    cur.execute("SELECT rowid FROM customer_license_info WHERE license_guid = ? AND model_guid = ?", (customer_license_info[0], customer_license_info[1]))
+    data=cur.fetchall()
+    if len(data)==0:
+        print('Record not found. Inserting new record....')
+        sql = ''' INSERT INTO customer_license_info (license_guid, model_guid, isv_certificate, customer_certificate,
+              customer_license_blob, license_type, limit_count, usage_count, time_limit, created_date, updated_date)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '''
 
-    return cur.lastrowid
+        #cur = conn.cursor()
+        cur.execute(sql, customer_license_info)
+        conn.commit()
+        row_id = cur.lastrowid
+    else:
+        print('Record exists. Updating license information....')
+        sql = ''' UPDATE customer_license_info SET isv_certificate = ?, customer_certificate = ?,
+              customer_license_blob = ?, updated_date = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE
+              license_guid = ? AND model_guid = ? '''
+        cur.execute(sql, (customer_license_info[2], customer_license_info[3], customer_license_info[4], customer_license_info[0], customer_license_info[1]))
+        conn.commit()
+
+    cur.execute("SELECT * FROM customer_license_info WHERE license_guid = ? AND model_guid = ?", (customer_license_info[0], customer_license_info[1]))
+    data=cur.fetchall()
+    for row in data:
+        print("record id:")
+        print(row[0])
+        print("isv-certificate:")
+        print(row[3])
+        print("customer_certificate")
+        print(row[4])
+        print("json blob")
+        print(row[5])
+
+    return row_id
 
 
 def main():
@@ -69,11 +91,15 @@ def main():
         database = sys.argv[1]
         customer_license_file_path = sys.argv[2]
         customer_cert_file_path = sys.argv[3]
+        customer_license_blob = None
 
         # read customer license file
         print('Opening Customer License File - ' + customer_license_file_path)
         with open(customer_license_file_path) as customer_license_file:
             license_json_dict = json.load(customer_license_file)
+
+        with open(customer_license_file_path) as customer_license_file:
+            customer_license_blob = customer_license_file.read()
 
         license_guid = license_json_dict["license_guid"]
         model_guid = license_json_dict["model_guid"]
@@ -106,7 +132,7 @@ def main():
         print('Opening DB - ' + database)
         conn = create_connection(database)
         customer_license_info = (license_guid, model_guid, isv_certificate, customer_certificate,
-                                 license_type_no, limit_count, usage_count, time_limit,
+                                 customer_license_blob, license_type_no, limit_count, usage_count, time_limit,
                                  datetime.datetime.now(), datetime.datetime.now())
         create_customer_license_info(conn, customer_license_info)
 

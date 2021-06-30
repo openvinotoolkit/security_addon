@@ -465,7 +465,10 @@ end:
     if (ret < 0) {
         ERR_print_errors(g_bio_err);
     }
-    BIO_free_all(g_bio_err);
+    if (g_bio_err != NULL) {
+        BIO_free_all(g_bio_err);
+        g_bio_err = NULL;
+    }
     return ret;
 }
 
@@ -745,6 +748,9 @@ ovsa_status_t ovsa_server_crypto_compute_hash(const char* in_buff, int hash_alg,
     if (hash_alg == HASH_ALG_SHA256) {
         md          = EVP_sha256();
         hash_length = 32;
+    } else if (hash_alg == HASH_ALG_SHA384) {
+        md          = EVP_sha384();
+        hash_length = 48;
     } else {
         md          = EVP_sha512();
         hash_length = 64;

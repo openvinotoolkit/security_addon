@@ -6,7 +6,7 @@ Third party programs and their corresponding required notices and/or license ter
 
 1. OpenVINO(TM) Model Server
 
-Copyright (c) 2020 Intel Corporation
+Copyright (c) 2020-2021 Intel Corporation
 
 http://www.apache.org/licenses/
 

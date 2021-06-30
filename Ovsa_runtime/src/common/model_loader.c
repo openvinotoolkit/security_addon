@@ -152,6 +152,5 @@ ovsa_status_t ovsa_start_model_loader(
 
 out:
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
-    ovsa_safe_free_enc_list(&controlled_access_model_sig->controlled_access_model.enc_model);
     return ret;
 }

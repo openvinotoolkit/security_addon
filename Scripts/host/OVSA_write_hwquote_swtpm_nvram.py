@@ -39,21 +39,21 @@ def check_result(return_val,user_mesg):
 
 def generate_AK_EK_keys():
     print("Generating EK & AK Keys")
-    return_val = runcommand('tpm2_flushcontext -s -T device:/dev/tpmrm0')
+    return_val = runcommand('tpm2_flushcontext -s')
     check_result(return_val,"Flushing tpm2 context")
-    return_val  = runcommand('tpm2_createek --ek-context tpm_ek.ctx --key-algorithm rsa --public tpm_ek.pub -T device:/dev/tpmrm0')
+    return_val  = runcommand('tpm2_createek --ek-context tpm_ek.ctx --key-algorithm rsa --public tpm_ek.pub')
     check_result(return_val,'Generating EK context')
-    return_val  = runcommand('tpm2_createak --ek-context tpm_ek.ctx --ak-context tpm_ak.ctx --key-algorithm rsa --hash-algorithm sha256 --signing-algorithm rsassa --public tpm_ak.pub --private tpm_ak.priv --ak-name tpm_ak.name -T device:/dev/tpmrm0')
+    return_val  = runcommand('tpm2_createak --ek-context tpm_ek.ctx --ak-context tpm_ak.ctx --key-algorithm rsa --hash-algorithm sha256 --signing-algorithm rsassa --public tpm_ak.pub --private tpm_ak.priv --ak-name tpm_ak.name')
     check_result(return_val,'Generating AK context')
-    return_val  = runcommand('tpm2_startauthsession --session tmp_session_ctx --policy-session -T device:/dev/tpmrm0')
+    return_val  = runcommand('tpm2_startauthsession --session tmp_session_ctx --policy-session')
     check_result(return_val,"Authenticating session context")
-    return_val  = runcommand('tpm2_policysecret --session tmp_session_ctx --object-context e -T device:/dev/tpmrm0')
+    return_val  = runcommand('tpm2_policysecret --session tmp_session_ctx --object-context e')
     check_result(return_val,'Generating policy secret')
-    return_val  = runcommand('tpm2_readpublic -c tpm_ak.ctx -o tpm_ak.pub.pem -f pem -T device:/dev/tpmrm0')
+    return_val  = runcommand('tpm2_readpublic -c tpm_ak.ctx -o tpm_ak.pub.pem -f pem')
     check_result(return_val,'Reading EK Keys in PEM Format')
-    return_val  = runcommand('tpm2_readpublic -c tpm_ek.ctx -o tpm_ek.pub.pem -f pem -T device:/dev/tpmrm0')
+    return_val  = runcommand('tpm2_readpublic -c tpm_ek.ctx -o tpm_ek.pub.pem -f pem')
     check_result(return_val,'Reading AK Keys in PEM Format')
-    return_val  = runcommand('tpm2_load --parent-context tpm_ek.ctx --public tpm_ak.pub --private tpm_ak.priv --key-context tpm_ak.ctx --auth session:tmp_session_ctx -T device:/dev/tpmrm0')
+    return_val  = runcommand('tpm2_load --parent-context tpm_ek.ctx --public tpm_ak.pub --private tpm_ak.priv --key-context tpm_ak.ctx --auth session:tmp_session_ctx')
     check_result(return_val,'Loading tpm2 context')
     print("Successfully generated AK EK keys...")
     
@@ -82,7 +82,7 @@ def read_SWEK_cert(port):
 def read_HWEK_cert():
     print("Read HW EK Certificate from NVRAM")
     RSA_EK_CERT_NV_INDEX="0x01C00002"
-    cmd="tpm2_nvreadpublic " + RSA_EK_CERT_NV_INDEX + " -T device:/dev/tpmrm0 | grep size | awk '{print $2}'"
+    cmd="tpm2_nvreadpublic " + RSA_EK_CERT_NV_INDEX + " | grep size | awk '{print $2}'"
     return_val  = runcommand(cmd)
     NV_SIZE = return_val[1]
     check_result(return_val, "EK Certificate not provisioned")
@@ -92,7 +92,7 @@ def read_HWEK_cert():
         return_val = runcommand(cmd)
         check_result(return_val,'Reading EK Certificate size from TPM2')
     else:
-        cmd="tpm2_nvread --hierarchy owner --output tpm_hw_ek_cert.bin " + RSA_EK_CERT_NV_INDEX + " -T device:/dev/tpmrm0 --size " + str(NV_SIZE)
+        cmd="tpm2_nvread --hierarchy owner --output tpm_hw_ek_cert.bin " + RSA_EK_CERT_NV_INDEX + " --size " + str(NV_SIZE)
         return_val = runcommand(cmd)
         check_result(return_val,'Reading EK Certificate size from TPM2')
     cmd="openssl x509 -inform der -in tpm_hw_ek_cert.bin -out tpm_hw_ek_cert.pem"
@@ -106,7 +106,7 @@ def generate_HW_quote():
     return_val = runcommand(cmd)
     cert_hash=return_val[1]
     if cert_hash:
-        return_val  = runcommand("tpm2_quote --key-context tpm_ak.ctx --pcr-list sha256:all --message tmp_quote_msg --signature tmp_quote_sig --hash-algorithm sha256 --pcr tmp_quote_pcr -T device:/dev/tpmrm0 --qualification " + str(cert_hash))
+        return_val  = runcommand("tpm2_quote --key-context tpm_ak.ctx --pcr-list sha256:all --message tmp_quote_msg --signature tmp_quote_sig --hash-algorithm sha256 --pcr tmp_quote_pcr --qualification " + str(cert_hash))
         check_result(return_val,'Generating HW quote')
         print("Successfully generated quotes...")
     else:

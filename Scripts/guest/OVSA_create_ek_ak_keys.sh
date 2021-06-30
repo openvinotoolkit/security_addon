@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Copyright (c) 2020-2021 Intel Corporation
 #
@@ -26,48 +27,70 @@ fi
 
 # Create EK and AK keys
 echo "Generating EK & AK Keys"
-sudo tpm2_createek --ek-context tpm_ek.ctx --key-algorithm rsa --public tpm_ek.pub -T device:/dev/tpmrm0
+tpm2_createek --ek-context tpm_ek.ctx --key-algorithm rsa --public tpm_ek.pub
 check_status "EK Key generation failed"
-sudo tpm2_createak --ek-context tpm_ek.ctx --ak-context tpm_ak.ctx --key-algorithm rsa --hash-algorithm sha256 --signing-algorithm rsassa --public tpm_ak.pub --private tpm_ak.priv --ak-name tpm_ak.name -T device:/dev/tpmrm0
+tpm2_createak --ek-context tpm_ek.ctx --ak-context tpm_ak.ctx --key-algorithm rsa --hash-algorithm sha256 --signing-algorithm rsassa --public tpm_ak.pub --private tpm_ak.priv --ak-name tpm_ak.name
 check_status "AK Key generation failed"
 
 # Read keys to PEM Format
 echo "Read EK & AK Keys in PEM Format"
-sudo tpm2_readpublic -c tpm_ak.ctx -o tpm_ak.pub.pem -f pem -T device:/dev/tpmrm0
+tpm2_readpublic -c tpm_ak.ctx -o tpm_ak.pub.pem -f pem
 check_status "Reading AK Key in PEM Format failed"
-sudo tpm2_readpublic -c tpm_ek.ctx -o tpm_ek.pub.pem -f pem -T device:/dev/tpmrm0
+tpm2_readpublic -c tpm_ek.ctx -o tpm_ek.pub.pem -f pem
 check_status "Reading EK Key in PEM Format failed"
 
 # Create AK Name in HEX format
-file_size=`stat --printf="%s" tpm_ak.name`
-loaded_key_name=`sudo cat tpm_ak.name | xxd -p -c $file_size`
+file_size=`stat -c"%s" tpm_ak.name`
+loaded_key_name=`cat tpm_ak.name | xxd -p -c $file_size`
 
-sudo echo $loaded_key_name > tpm_ak.name.hex
+echo $loaded_key_name > tpm_ak.name.hex
 
 # READ EK Cert
 # Location 1 - TPM2 NV Index 0x1c00002 is the TCG specified location for RSA-EK-certificate.
 RSA_EK_CERT_NV_INDEX=0x01C00002
 
 echo "Read EK Certificate size from TPM2"
-NV_SIZE=`sudo tpm2_nvreadpublic $RSA_EK_CERT_NV_INDEX -T device:/dev/tpmrm0 | grep size |  awk '{print $2}'` 
+NV_SIZE=`tpm2_nvreadpublic $RSA_EK_CERT_NV_INDEX | grep size |  awk '{print $2}'`
 check_status "Warning: EK Certificate not provisioned"
 
 if [ $NV_SIZE -eq  0 ]
 then
    echo "Read EK Certificate from TPM2 - ECC EK Certificate"
-   sudo tpm2 getekcertificate -u tpm_ek.pub -x -X -o tpm_hw_ek_cert.bin
+   tpm2 getekcertificate -u tpm_ek.pub -x -X -o tpm_hw_ek_cert.bin
    check_status "Warning: EK Certificate not provisioned"
 else
    echo "Read EK Certificate from TPM2"
-sudo tpm2_nvread \
+tpm2_nvread \
 --hierarchy owner \
 --size $NV_SIZE \
 --output tpm_ek_cert.bin \
-$RSA_EK_CERT_NV_INDEX -T device:/dev/tpmrm0
+$RSA_EK_CERT_NV_INDEX
 check_status "Warning: EK Certificate not provisioned"
 fi
 
 echo "Converting EK Certificate from DER to PEM Format"
 openssl x509 -inform der -in tpm_ek_cert.bin -out tpm_ek_cert.pem
 check_status "Converting EK Certificate to PEM format failed"
+
+EK_CERT_CHAIN_INDEX=0x1C00100
+echo "Check for PTT ondie CA Cert"
+tpm2_nvreadpublic | grep -i $EK_CERT_CHAIN_INDEX
+if [ "$?" == 0 ]
+then
+    echo "Reading PTT ondie CA Cert from NVIndex"
+        NV_SIZE=`tpm2_nvreadpublic $EK_CERT_CHAIN_INDEX | grep size |  awk '{print $2}'`
+        tpm2_nvread --hierarchy owner --size $NV_SIZE --output tpm_ek_cert_chain.bin $EK_CERT_CHAIN_INDEX
+
+        echo "Reading intermediate files from chain"
+        ./icert_ondie_ca.sh tpm_ek_cert_chain.bin
+
+        mv 0.pem ROM_cert.pem
+        mv 1.pem Kernel_cert.pem
+        mv 2.pem PTT_cert.pem
+
+        echo "Storing the chain in PEM format"
+        cat tpm_ek_cert.pem > Ondie_chain.pem
+        cat PTT_cert.pem >> Ondie_chain.pem
+        cat Kernel_cert.pem >> Ondie_chain.pem
+fi
 

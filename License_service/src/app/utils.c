@@ -146,12 +146,42 @@ void ovsa_hexdump_mem(const void* data, size_t size) {
     for (size_t i = 0; i < size; i++) OVSA_DBG(DBG_D, "%02x", ptr[i]);
 }
 
+ovsa_status_t ovsa_do_string_concat(const char* in_buff, char** out_buff) {
+    ovsa_status_t ret = OVSA_OK;
+    size_t buff_len   = 0;
+    char* cur_buff    = NULL;
+    size_t len        = 0;
+
+    if ((in_buff == NULL) || (*out_buff == NULL)) {
+        OVSA_DBG(DBG_E, "OVSA: Error do string concat failed with invalid parameter\n");
+        return OVSA_INVALID_PARAMETER;
+    }
+    cur_buff = *out_buff;
+    buff_len = strnlen_s(in_buff, RSIZE_MAX_STR);
+    if (buff_len < RSIZE_MAX_STR) {
+        strcat_s(*out_buff, RSIZE_MAX_STR, in_buff);
+    } else {
+        while (buff_len == RSIZE_MAX_STR) {
+            len = strnlen_s(cur_buff, RSIZE_MAX_STR);
+            cur_buff += len;
+            memcpy_s(cur_buff, RSIZE_MAX_STR, in_buff, buff_len);
+            in_buff += RSIZE_MAX_STR;
+            cur_buff += RSIZE_MAX_STR;
+            buff_len = strnlen_s(in_buff, RSIZE_MAX_STR);
+            if (buff_len < RSIZE_MAX_STR) {
+                strcat_s(cur_buff, RSIZE_MAX_STR, in_buff);
+                break;
+            }
+        }
+    }
+    return ret;
+}
 ovsa_status_t ovsa_append_payload_len_to_blob(const char* input_buf, char** json_payload) {
     ovsa_status_t ret         = OVSA_OK;
     uint64_t json_payload_len = 0;
     unsigned char payload_len[PAYLOAD_LENGTH + 1];
     size_t size = 0;
-
+    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
     memset_s(payload_len, sizeof(payload_len), 0);
     ret = ovsa_server_get_string_length(input_buf, &json_payload_len);
     if (ret < OVSA_OK) {
@@ -161,8 +191,13 @@ ovsa_status_t ovsa_append_payload_len_to_blob(const char* input_buf, char** json
     snprintf(payload_len, (PAYLOAD_LENGTH + 1), "%08ld", json_payload_len);
     size = strnlen_s(payload_len, RSIZE_MAX_STR) + 1;
     strcpy_s(*json_payload, size, payload_len);
-    strcat_s(*json_payload, RSIZE_MAX_STR, input_buf);
-
+    /*concatenate input_buf and json_payload*/
+    ret = ovsa_do_string_concat(input_buf, json_payload);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error string concat failed with error code %d\n", ret);
+        return ret;
+    }
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }
 

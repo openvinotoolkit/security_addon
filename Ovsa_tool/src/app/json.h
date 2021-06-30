@@ -148,12 +148,12 @@ ovsa_status_t ovsa_json_extract_element(const char* inputBuf, const char* keyNam
 /*!
  * \brief ovsa_json_create_EK_AK_binding_info_blob
  *
- * \param [in]  sw_ek_ak_bind_info
+ * \param [in]  ek_ak_bind_info
  * \param [out] outputBuf buffer content
  * \param [out] valuelen output size
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_sw_ek_ak_bind_info_t sw_ek_ak_bind_info,
+ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_ek_ak_bind_info_t ek_ak_bind_info,
                                                        char** outputBuf, size_t* valuelen);
 
 /*!

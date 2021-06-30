@@ -35,26 +35,27 @@ static void ovsa_licgen_help(const char* argv) {
     printf("-l : License limit\n");
     printf("-n : License name\n");
     printf("-v : License version number\n");
-    printf("-u : List of ISV license server URL\n");
+    printf("-u : ISV license server URL, current certificate file, future certificate file\n");
     printf("-k : Keystore name\n");
     printf("-o : Output file to store license config data\n");
     printf("Example for Licgen as below:\n");
     printf(
         "%s licgen -t <License Type> [-l <Usage Count Limit> or <Time Limit>] -n \"License "
-        "name\" -v \"License Version\" -u <License URL> -k <key store file> -o <lic conf "
-        "file>\n\n",
+        "name\" -v \"License Version\" -u <License URL> <Certificate file> [<Future certificate "
+        "file>] [-u <License URL> <Certificate file> [<Future certificate file>]] -k <key store "
+        "file> -o <lic conf file>\n\n",
         argv);
     printf(
         "%s licgen -t Sale -n \"Full unlimited license\" -v 0001 -u "
-        "\"14650@192.166.248.2\" -k key_store -o license_conf\n",
+        "\"14650@192.166.248.2\"url_cert.crt -k key_store -o license_conf\n",
         argv);
     printf(
         "%s licgen -t InstanceLimit -l 10 -n \"Instance limited license\" -v 0001 -u "
-        "\"14650@192.166.248.2\" -k key_store -o license_conf\n",
+        "\"14650@192.166.248.2\" url_cert.crt future_cert.crt -k key_store -o license_conf\n",
         argv);
     printf(
         "%s licgen -t TimeLimit -l 30 -n \"Time bound license\" -v 0001 -u "
-        "\"14650@192.166.248.2\" -k key_store -o license_conf\n",
+        "\"14650@192.166.248.2\" url_cert.crt -k key_store -o license_conf\n",
         argv);
 }
 
@@ -71,16 +72,18 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
     size_t argv_len              = 0;
     ovsa_license_type_t lic_type = MAXLICENSETYPE;
     ovsa_license_config_sig_t license_info;
-    license_info.lic_config.isv_certificate = NULL;
-    ovsa_license_serv_url_list_t* list_head = NULL;
-    ovsa_license_serv_url_list_t* list_tail = NULL;
-    char* lic_name                          = NULL;
-    char* lic_version                       = NULL;
-    char* keystore                          = NULL;
-    char* licconf_file                      = NULL;
-    char* lic_buf_string                    = NULL;
-    char* lic_buf_sig_string                = NULL;
-    FILE* fptr                              = NULL;
+    license_info.lic_config.isv_certificate     = NULL;
+    ovsa_input_url_list_t* list_head            = NULL;
+    ovsa_input_url_list_t* list_tail            = NULL;
+    ovsa_license_serv_url_list_t* url_list_head = NULL;
+    ovsa_license_serv_url_list_t* url_list_tail = NULL;
+    char* lic_name                              = NULL;
+    char* lic_version                           = NULL;
+    char* keystore                              = NULL;
+    char* licconf_file                          = NULL;
+    char* lic_buf_string                        = NULL;
+    char* lic_buf_sig_string                    = NULL;
+    FILE* fptr                                  = NULL;
 
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
 
@@ -131,10 +134,10 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
             case 'u': {
                 int index = 0;
                 index     = optind - 1;
-                while (index < argc) {
+                if (index < argc) {
                     if (strnlen_s(optarg, RSIZE_MAX_STR) < MAX_URL_SIZE) {
                         if (argv[index][0] != '-') {
-                            ret = ovsa_store_license_url_list(argv[index], &list_head, &list_tail);
+                            ret = ovsa_store_input_url_list(argv[index], &list_head, &list_tail);
                             if (ret < OVSA_OK) {
                                 OVSA_DBG(DBG_E, "OVSA: Error load URL list failed with code %d\n",
                                          ret);
@@ -142,10 +145,82 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
                             }
                             list_count++;
                             optind = index + 1;
+                            index++;
+                            if (index < argc) {
+                                if (strnlen_s(argv[index], RSIZE_MAX_STR) < MAX_NAME_SIZE) {
+                                    if (argv[index][0] != '-') {
+                                        FILE* fcur_file = fopen(argv[index], "r");
+                                        if (fcur_file == NULL) {
+                                            OVSA_DBG(DBG_E, "OVSA: Error opening file %s\n",
+                                                     argv[index]);
+                                            ret = OVSA_FILEOPEN_FAIL;
+                                            goto out;
+                                        }
+                                        fclose(fcur_file);
+                                        memcpy_s(list_tail->cur_cert_file, MAX_FILE_NAME,
+                                                 argv[index],
+                                                 strnlen_s(argv[index], MAX_FILE_NAME));
+                                        OVSA_DBG(DBG_D, "OVSA:cur_cert_file is %s\n",
+                                                 list_tail->cur_cert_file);
+                                        optind = index + 1;
+                                    } else {
+                                        OVSA_DBG(DBG_E,
+                                                 "OVSA: Error certificate file for URL not "
+                                                 "specified \n");
+                                        ret = OVSA_INVALID_PARAMETER;
+                                        goto out;
+                                    }
+                                } else {
+                                    OVSA_DBG(DBG_E,
+                                             "OVSA: Error name greater than %d characters not "
+                                             "allowed \n",
+                                             MAX_NAME_SIZE);
+                                    ret = OVSA_INVALID_PARAMETER;
+                                    goto out;
+                                }
+                            } else {
+                                OVSA_DBG(DBG_E,
+                                         "OVSA: Error certificate file for URL not "
+                                         "specified \n");
+                                ret = OVSA_INVALID_PARAMETER;
+                                goto out;
+                            }
+                            index++;
+                            if (index < argc) {
+                                if (strnlen_s(argv[index], RSIZE_MAX_STR) < MAX_NAME_SIZE) {
+                                    if (argv[index][0] != '-') {
+                                        FILE* fcur_file = fopen(argv[index], "r");
+                                        if (fcur_file == NULL) {
+                                            OVSA_DBG(DBG_E, "OVSA: Error opening file %s\n",
+                                                     argv[index]);
+                                            ret = OVSA_FILEOPEN_FAIL;
+                                            goto out;
+                                        }
+                                        fclose(fcur_file);
+                                        memcpy_s(list_tail->fut_cert_file, MAX_FILE_NAME,
+                                                 argv[index],
+                                                 strnlen_s(argv[index], MAX_FILE_NAME));
+                                        OVSA_DBG(DBG_D, "OVSA: fut_cert_file is %s\n",
+                                                 list_tail->fut_cert_file);
+                                        optind = index + 1;
+                                    }
+                                } else {
+                                    OVSA_DBG(DBG_E,
+                                             "OVSA: Error name greater than %d characters not "
+                                             "allowed \n",
+                                             MAX_NAME_SIZE);
+                                    ret = OVSA_INVALID_PARAMETER;
+                                    goto out;
+                                }
+                            } else {
+                                goto out;
+                            }
+                            index++;
                         } else {
-                            break;
+                            OVSA_DBG(DBG_E, "OVSA: Error URL not specified\n");
+                            ret = OVSA_INVALID_PARAMETER;
+                            goto out;
                         }
-                        index++;
                     } else {
                         OVSA_DBG(DBG_E, "OVSA: Error URL greater than %d characters not allowed \n",
                                  MAX_URL_SIZE);
@@ -255,13 +330,42 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
             license_info.lic_config.usage_count = 0;
         }
 
+        char cert_hash[HASH_SIZE], fut_cert_hash[HASH_SIZE];
+        list_tail = list_head;
+        while (list_tail != NULL) {
+            ret = ovsa_store_license_url_list(list_tail->license_serv_url, &url_list_head,
+                                              &url_list_tail);
+            if (ret < OVSA_OK) {
+                OVSA_DBG(DBG_E, "OVSA: Error load URL list failed with code %d\n", ret);
+                goto out;
+            }
+            memset_s(cert_hash, HASH_SIZE, 0);
+            ret = ovsa_generate_cert_hash(list_tail->cur_cert_file, cert_hash);
+            if (ret < OVSA_OK) {
+                OVSA_DBG(DBG_E, "OVSA: Error generating certificate hash with code %d\n", ret);
+                goto out;
+            }
+            memcpy_s(url_list_tail->cur_cert_hash, HASH_SIZE, cert_hash, HASH_SIZE);
+
+            if (list_tail->fut_cert_file[0] != '\0') {
+                memset_s(fut_cert_hash, HASH_SIZE, 0);
+                ret = ovsa_generate_cert_hash(list_tail->fut_cert_file, fut_cert_hash);
+                if (ret < OVSA_OK) {
+                    OVSA_DBG(DBG_E, "OVSA: Error generating certificate hash with code %d\n", ret);
+                    goto out;
+                }
+                memcpy_s(url_list_tail->fut_cert_hash, HASH_SIZE, fut_cert_hash, HASH_SIZE);
+            }
+            list_tail = list_tail->next;
+        }
         memcpy_s(license_info.lic_config.license_name, MAX_NAME_SIZE, lic_name,
                  strnlen_s(lic_name, MAX_NAME_SIZE));
         memcpy_s(license_info.lic_config.license_version, MAX_VERSION_SIZE, lic_version,
                  strnlen_s(lic_version, MAX_VERSION_SIZE));
-        license_info.lic_config.license_url_list = list_head;
+        license_info.lic_config.license_url_list = url_list_head;
     } else {
-        OVSA_DBG(DBG_E, "OVSA: Error wrong command given. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E,
+                 "OVSA: Error Invalid input parameters. Please follow -help for help option\n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
@@ -319,7 +423,7 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
 
     /* Store license config JSON blob on specified output file */
     if (lic_buf_sig_string != NULL) {
-        OVSA_DBG(DBG_I, "OVSA: licbuf %s\n\n", lic_buf_sig_string);
+        OVSA_DBG(DBG_D, "OVSA: licbuf %s\n\n", lic_buf_sig_string);
         if ((fptr = fopen(licconf_file, "w+")) != NULL) {
             ret = ovsa_get_string_length(lic_buf_sig_string, &lic_sig_buf_size);
             if (ret < OVSA_OK) {
@@ -345,8 +449,9 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
 out:
     ovsa_safe_free(&lic_buf_string);
     ovsa_safe_free(&lic_buf_sig_string);
-    ovsa_safe_free_url_list(&list_head);
     ovsa_safe_free(&license_info.lic_config.isv_certificate);
+    ovsa_safe_free_input_url_list(&list_head);
+    ovsa_safe_free_url_list(&url_list_head);
     OVSA_DBG(DBG_D, "%s exit\n", __func__);
     return ret;
 }

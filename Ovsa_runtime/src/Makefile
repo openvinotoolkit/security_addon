@@ -37,7 +37,7 @@ OVSARUN_LIB_DIR := $(OVSARUNTIME_DIR)/lib
 OVSARUN_COM_DIR := $(OVSARUNTIME_DIR)/src/common
 
 LFLAGS += -Wl,-rpath,$(OVSARUN_LIB_DIR) -L$(OVSARUN_LIB_DIR) -L$(OVSATOOL_LIB_DIR)  
-LIBS = -Bstatic -lovsa -lsafestring -lcrypto -lssl -lcurl -lcjson -Bdynamic -lmbedcrypto -lmbedtls -lmbedx509 -ldl -lpthread -Wl,-z,defs,--exclude-libs,ALL
+LIBS = -Bstatic -lovsa -lsafestring -lssl -lcrypto -lcurl -lcjson -Bdynamic -lmbedcrypto -lmbedtls -lmbedx509 -ldl -lpthread -Wl,-z,defs,--exclude-libs,ALL
 LIB_FLAGS := -g -fPIC
 
 # Build Executable

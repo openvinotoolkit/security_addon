@@ -69,13 +69,13 @@ endif
 ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/curl),)
 	$(RM) -R $(SRC_BUILD_DIR)/src/lib/curl
 	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/curl/curl.git
-	cd $(SRC_BUILD_DIR)/src/lib/curl && autoreconf -fi && ./configure --without-zlib --without-ssl
+	cd $(SRC_BUILD_DIR)/src/lib/curl && autoreconf -fi && ./configure --without-zlib --without-ssl --without-libidn2
 	$(MAKE) -C $(SRC_BUILD_DIR)/src/lib/curl
 	$(MV) $(SRC_BUILD_DIR)/src/lib/curl/lib/.libs/libcurl.a $(SRC_BUILD_DIR)/lib
 endif
 ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/openssl),)
 	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/openssl/openssl.git
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1j
+	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1k
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && ./config --prefix=$(shell readlink -f crypto/) shared -fPIC
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && $(MAKE) && $(MAKE) -j1 install_sw
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libcrypto.a ../../../lib

@@ -60,7 +60,7 @@ openssl_build: openssl/libcrypto.a
 openssl/libcrypto.a:
 ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/openssl),)
 	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/openssl/openssl.git
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1j
+	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1k
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && ./config --prefix=$(shell readlink -f crypto/) shared -fPIC
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && $(MAKE) && $(MAKE) -j1 install
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libcrypto.a ../../../lib
@@ -81,10 +81,10 @@ create_dirs:
 	
 ############################# SQLITE DEPENDENCY ##############################
 
-SQLITE_VERSION ?= 3330000
+SQLITE_VERSION ?= 3350500
 SQLITE_SRC ?= sqlite-autoconf-$(SQLITE_VERSION).tar.gz
-SQLITE_URI ?= https://www.sqlite.org/2020/
-SQLITE_CHECKSUM ?= 106a2c48c7f75a298a7557bcc0d5f4f454e5b43811cc738b7ca294d6956bbb15
+SQLITE_URI ?= https://www.sqlite.org/2021/
+SQLITE_CHECKSUM ?= f52b72a5c319c3e516ed7a92e123139a6e87af08a2dc43d7757724f6132e6db0
 
 $(SQLITE_SRC):
 ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/sqlite),)

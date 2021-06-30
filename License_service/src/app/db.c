@@ -128,6 +128,109 @@ end:
     return ret;
 }
 
+ovsa_status_t ovsa_db_get_customer_license_blob(const char* db_name, const char* license_guid,
+                                                const char* model_guid,
+                                                char** customer_license_blob) {
+    int ret       = 0;
+    int db_status = 0;
+    size_t sqllen = 0, licguid_len = 0, modelguid_len = 0;
+    char sql[SQL_BUFFER_LENGTH];
+
+    sqlite3* db        = NULL;
+    sqlite3_stmt* stmt = NULL;
+
+    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+    memset_s(sql, sizeof(sql), 0);
+    /* open the database */
+    db_status = sqlite3_open(db_name, &db);
+    if (db_status) {
+        OVSA_DBG(DBG_E, "OVSA: Error OVSA DB open failed%s \n", sqlite3_errmsg(db));
+        ret = OVSA_DB_INIT_FAIL;
+        goto end;
+    } else {
+        OVSA_DBG(DBG_I, "OVSA: OVSA DB open successful\n");
+    }
+
+    sprintf(sql,
+            "select customer_license_id, customer_license_blob from "
+            "customer_license_info where "
+            "license_guid = @license_guid and model_guid = @model_guid;");
+    OVSA_DBG(DBG_D, "OVSA: SQL: %s\n", sql);
+
+    ret = ovsa_server_get_string_length(sql, &sqllen);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of sql %d\n", ret);
+        goto end;
+    }
+
+    db_status = sqlite3_prepare_v2(db, sql, sqllen, &stmt, 0);
+    if (db_status == SQLITE_OK) {
+        int idx = sqlite3_bind_parameter_index(stmt, "@license_guid");
+        ret     = ovsa_server_get_string_length(license_guid, &licguid_len);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of license_guid %d\n", ret);
+            goto end;
+        }
+        sqlite3_bind_text(stmt, idx, license_guid, licguid_len, SQLITE_STATIC);
+
+        idx = sqlite3_bind_parameter_index(stmt, "@model_guid");
+        ret = ovsa_server_get_string_length(model_guid, &modelguid_len);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of modelguid_len %d\n", ret);
+            goto end;
+        }
+        sqlite3_bind_text(stmt, idx, model_guid, modelguid_len, SQLITE_STATIC);
+    } else {
+        OVSA_DBG(DBG_E, "OVSA: Error failed to execute statement: %s\n", sqlite3_errmsg(db));
+        ret = OVSA_DB_QUERY_FAIL;
+        goto end;
+    }
+
+    db_status = sqlite3_step(stmt);
+    if (db_status == SQLITE_ROW) {
+        /* success */
+        size_t bloblen = 0;
+        ret            = ovsa_server_get_string_length(sqlite3_column_text(stmt, 1), &bloblen);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of customer license blob %d\n", ret);
+            goto end;
+        }
+        if ((!bloblen) || (bloblen > SIZE_MAX)) {
+            OVSA_DBG(DBG_E, "OVSA: Error customer license blob length is invalid \n");
+            ret = OVSA_INVALID_PARAMETER;
+            goto end;
+        }
+        ret = ovsa_server_safe_malloc(sizeof(char) * (bloblen + 1), customer_license_blob);
+        if (ret < OVSA_OK) {
+            sqlite3_finalize(stmt);
+            OVSA_DBG(DBG_E,
+                     "OVSA: Error allocating memory for customer license blob buffer failed with "
+                     "code %d\n",
+                     ret);
+            ret = OVSA_MEMORY_ALLOC_FAIL;
+            goto end;
+        }
+        sprintf(*customer_license_blob, "%s", sqlite3_column_text(stmt, 1));
+        ret = sqlite3_column_int(stmt, 0);
+
+        OVSA_DBG(DBG_D, "OVSA: ROWID %s: \n", sqlite3_column_text(stmt, 0));
+        OVSA_DBG(DBG_D, "OVSA: Customer License Blob %s\n", sqlite3_column_text(stmt, 1));
+        OVSA_DBG(DBG_I, "OVSA: Customer License Blob extracted from DB successfully\n");
+    } else {
+        OVSA_DBG(DBG_E, "OVSA: Error failed to execute statement: %s\n", sqlite3_errmsg(db));
+        ret = OVSA_DB_UPDATE_FAIL;
+        goto end;
+    }
+    sqlite3_finalize(stmt);
+
+end:
+    if (db)
+        sqlite3_close(db);
+
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
+
 ovsa_status_t ovsa_db_validate_license_usage(const char* db_name, const char* license_guid,
                                              const char* model_guid) {
     int ret       = 0;
