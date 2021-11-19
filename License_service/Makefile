@@ -27,6 +27,10 @@ export TOPDIR
 
 SRC_BUILD_DIR  := $(TOPDIR)/License_service
 
+ifeq ($(SGX),1)
+export ENABLE_SGX_GRAMINE=1
+endif
+
 MV             := mv
 DEBUG ?=
 export DEBUG=1
@@ -34,7 +38,21 @@ export DEBUG=1
 export MV
 
 PHONY: all
+ifeq ($(SGX),1)
+ifndef GRAMINE_DIR
+$(error GRAMINE_DIR not set. Please set before compilation)
+endif
+all:  create_dirs install_ratls_lib ovsa_dependency_build ovsa_license_service_build
+else
 all:  create_dirs ovsa_dependency_build ovsa_license_service_build
+endif
+
+ifeq ($(SGX),1)
+.PHONY: install_ratls_lib
+install_ratls_lib: 
+	cp $(GRAMINE_DIR)/build/Pal/src/host/Linux-SGX/tools/ra-tls/libra_tls_verify_dcap.so $(SRC_BUILD_DIR)/lib
+	cp $(GRAMINE_DIR)/build/Pal/src/host/Linux-SGX/tools/common/libsgx_util.so $(SRC_BUILD_DIR)/lib
+endif
 
 .PHONY: ovsa_dependency_build
 ovsa_dependency_build: sqlite openssl_build tls_build
@@ -60,7 +78,7 @@ openssl_build: openssl/libcrypto.a
 openssl/libcrypto.a:
 ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/openssl),)
 	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/openssl/openssl.git
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1k
+	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1l
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && ./config --prefix=$(shell readlink -f crypto/) shared -fPIC
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && $(MAKE) && $(MAKE) -j1 install
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libcrypto.a ../../../lib
@@ -77,7 +95,7 @@ ovsa_license_service_build:
 	CC=$(TARGET_CC)
 
 create_dirs:
-	mkdir -p  $(SRC_BUILD_DIR)/lib  $(SRC_BUILD_DIR)/bin  $(SRC_BUILD_DIR)/src/lib
+	mkdir -p $(SRC_BUILD_DIR)/lib $(SRC_BUILD_DIR)/bin $(SRC_BUILD_DIR)/src/lib 
 	
 ############################# SQLITE DEPENDENCY ##############################
 
@@ -150,12 +168,7 @@ ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/mbedtls),)
 	$(RM) -r $(SRC_BUILD_DIR)/src/lib/mbedtls
 	mv mbedtls $(SRC_BUILD_DIR)/src/lib/mbedtls
 	$(RM) $(MBEDTLS_SRC) $(MBEDCRYPTO_SRC)
-	cp $(SRC_BUILD_DIR)/src/lib/mbedtls/install/lib/libmbedcrypto.so.* lib
-	cp $(SRC_BUILD_DIR)/src/lib/mbedtls/install/lib/libmbedtls.so.* lib
-	cp $(SRC_BUILD_DIR)/src/lib/mbedtls/install/lib/libmbedx509.so.* lib
-	cd lib && ln -s libmbedcrypto.so.* libmbedcrypto.so && ln -s libmbedtls.so.* libmbedtls.so && ln -s libmbedx509.so.* libmbedx509.so
-	cd ../
-    
+	cp $(SRC_BUILD_DIR)/src/lib/mbedtls/install/lib/*.a lib
 endif
 
 
@@ -181,5 +194,6 @@ distclean: clean
 	$(RM) $(SRC_BUILD_DIR)/include/sqlite3.h
 	$(RM) -r $(SRC_BUILD_DIR)/src/lib
 	$(RM) -r $(SRC_BUILD_DIR)/crypto
-	$(RM) -r $(SRC_BUILD_DIR)/lib
+	$(RM) -r $(SRC_BUILD_DIR)/lib/*.a
+	$(RM) -r $(SRC_BUILD_DIR)/lib/libmbed*
 	$(RM) -r $(SRC_BUILD_DIR)/bin

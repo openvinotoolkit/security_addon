@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Copyright (c) 2020-2021 Intel Corporation
 #
@@ -16,43 +17,94 @@
 
 #set -e
 
+echo
 echo "Installing OVSA Developer/ISV Tools"
+echo
 
-sudo rm -vrf /opt/ovsa
-sudo rm -vrf /var/OVSA
+echo "Copying files to /opt/ovsa/kvm/bin directory..."
+mkdir -vp /opt/ovsa/kvm/bin 2>&1 | sed 's/^/    /'
+cp -vR bin/* /opt/ovsa/kvm/bin/  2>&1 | sed 's/^/    /'
 
-sudo mkdir -vp /opt/ovsa/bin
-sudo mkdir -vp /opt/ovsa/scripts
-sudo mkdir -vp /opt/ovsa/DB
-sudo mkdir -vp /opt/ovsa/lib
+echo "Copying files to /opt/ovsa/kvm/scripts directory..."
+mkdir -vp /opt/ovsa/kvm/scripts 2>&1 | sed 's/^/    /'
+cp -vR scripts/* /opt/ovsa/kvm/scripts/ 2>&1 | sed 's/^/    /'
 
-sudo cp -vR bin/* /opt/ovsa/bin/
-sudo cp -vR scripts/* /opt/ovsa/scripts/
-sudo cp -vR DB/* /opt/ovsa/DB/
-sudo cp -vR lib/* /opt/ovsa/lib/
+echo "Copying files to /opt/ovsa/kvm/lib directory..."
+mkdir -vp /opt/ovsa/kvm/lib 2>&1 | sed 's/^/    /'
+cp -vR lib/* /opt/ovsa/kvm/lib/ 2>&1 | sed 's/^/    /'
 
-python3 /opt/ovsa/DB/ovsa_create_db.py /opt/ovsa/DB/ovsa.db
-sudo chown -R ovsa /opt/ovsa
+echo "Setting up the Sealing data..."
+mkdir -vp /var/OVSA/Seal 2>&1 | sed 's/^/    /'
+cp -vR /opt/ovsa/kvm/scripts/OVSA_Seal_Key_TPM_Policy_Authorize.sh /var/OVSA/Seal 2>&1 | sed 's/^/    /'
+if [ -e /var/OVSA/Seal/Seal_data.bin -a \
+     -e /var/OVSA/Seal/session.ctx -a \
+     -e /var/OVSA/Seal/signing_key.ctx -a \
+     -e /var/OVSA/Seal/signing_key.name -a \
+     -e /var/OVSA/Seal/signing_key_private.pem -a \
+     -e /var/OVSA/Seal/signing_key_public.pem -a \
+     -e /var/OVSA/Seal/tpm_authorized.policy -a \
+     -e /var/OVSA/Seal/tpm_auth_pcr_seal_key.ctx -a \
+     -e /var/OVSA/Seal/tpm_auth_pcr_seal_key.name -a \
+     -e /var/OVSA/Seal/tpm_auth_pcr_seal_key.priv -a \
+     -e /var/OVSA/Seal/tpm_auth_pcr_seal_key.pub -a \
+     -e /var/OVSA/Seal/tpm_pcr.policy -a \
+     -e /var/OVSA/Seal/tpm_pcr.signature -a \
+     -e /var/OVSA/Seal/tpm_prim.ctx ]
+then
+    echo "Sealing data already exists..."
+else
+    cd /var/OVSA/Seal && ./OVSA_Seal_Key_TPM_Policy_Authorize.sh 2>&1 | sed 's/^/    /'
+    cd -
+fi
 
-sudo mkdir -vp /var/OVSA/Seal
-sudo cp /opt/ovsa/scripts/OVSA_Seal_Key_TPM_Policy_Authorize.sh /var/OVSA/Seal
-cd /var/OVSA/Seal && ./OVSA_Seal_Key_TPM_Policy_Authorize.sh
-cd -
+echo "Setting up the Quote data..."
+mkdir -vp /var/OVSA/Quote 2>&1 | sed 's/^/    /'
+cp -vR /opt/ovsa/kvm/scripts/OVSA_create_ek_ak_keys.sh /var/OVSA/Quote 2>&1 | sed 's/^/    /'
+if [ -e /var/OVSA/Quote/nonce.bin -a \
+     -e /var/OVSA/Quote/session.ctx -a \
+     -e /var/OVSA/Quote/tpm_ak.ctx -a \
+     -e /var/OVSA/Quote/tpm_ak.name -a \
+     -e /var/OVSA/Quote/tpm_ak.name.hex -a \
+     -e /var/OVSA/Quote/tpm_ak.priv -a \
+     -e /var/OVSA/Quote/tpm_ak.pub -a \
+     -e /var/OVSA/Quote/tpm_ak.pub.pem -a \
+     -e /var/OVSA/Quote/tpm_ek_cert.bin -a \
+     -e /var/OVSA/Quote/tpm_ek_cert.pem -a \
+     -e /var/OVSA/Quote/tpm_ek.ctx -a \
+     -e /var/OVSA/Quote/tpm_ek.pub -a \
+     -e /var/OVSA/Quote/tpm_ek.pub.pem ]
+then
+    echo "Quote data already exists..."
+else
+    cd /var/OVSA/Quote && ./OVSA_create_ek_ak_keys.sh 2>&1 | sed 's/^/    /'
+    cd -
+fi
 
-sudo mkdir -vp /var/OVSA/Quote
-sudo cp /opt/ovsa/scripts/OVSA_create_ek_ak_keys.sh /var/OVSA/Quote
-cd /var/OVSA/Quote && ./OVSA_create_ek_ak_keys.sh
-cd -
+echo "Creating /opt/ovsa/kvm/keystore directory..."
+mkdir -vp /opt/ovsa/kvm/keystore 2>&1 | sed 's/^/    /'
 
-sudo chown -R ovsa /var/OVSA
+echo "Creating /opt/ovsa/kvm/artefacts directory..."
+mkdir -vp /opt/ovsa/kvm/artefacts 2>&1 | sed 's/^/    /'
 
-cd /opt/ovsa/scripts/ && ./OVSA_install_license_server_cert.sh gencert
-sudo chown -R ovsa /opt/ovsa
-cd -
+echo "Creating /opt/ovsa/certs directory..."
+mkdir -vp /opt/ovsa/certs 2>&1 | sed 's/^/    /'
 
+echo "Changing ownership to OVSA group/user..."
+chown -R ovsa /opt/ovsa 2>&1 | sed 's/^/    /'
+chown -R ovsa /var/OVSA 2>&1 | sed 's/^/    /'
+
+echo
+echo "Installing OVSA Developer/ISV Tools completed."
+echo
+echo
 echo "Open the .bashrc file in <user_directory>:"
 echo "vi <user_directory>/.bashrc"
 echo "Add this line to the end of the file:"
-echo "source /opt/ovsa/scripts/setupvars.sh"
+echo "source /opt/ovsa/kvm/scripts/setupvars.sh"
 echo "Save and close the file: press the Esc key and type :wq."
 echo "To test your change, open a new terminal. You will see [setupvars.sh] OVSA environment initialized."
+echo
+echo "To re-provision OVSA use the below scripts:"
+echo "Quote - /var/OVSA/Quote/OVSA_create_ek_ak_keys.sh"
+echo "Seal - /var/OVSA/Seal/OVSA_Seal_Key_TPM_Policy_Authorize.sh"
+echo

@@ -1178,13 +1178,10 @@ static ovsa_status_t ovsa_crypto_ocsp_revocation_check(char* ocsp_uri_field, con
     unsigned const char* common_name   = NULL;
     char* host                         = NULL;
     char* port                         = NULL;
-    char* path                         = "/";
-    char* thost                        = NULL;
-    char* tport                        = NULL;
-    char* tpath                        = NULL;
+    char* path                         = NULL;
     int ocsp_verify = 0, use_ssl = -1;
     int lastpos = -1, req_timeout = OCSP_REQ_TIMEOUT;
-    size_t ocsp_uri_field_len = 0, host_len = 0;
+    size_t ocsp_uri_field_len = 0;
     long nsec = MAX_VALIDITY_PERIOD, maxage = -1;
     char ocsp_uri[MAX_URL_SIZE];
 
@@ -1301,26 +1298,11 @@ static ovsa_status_t ovsa_crypto_ocsp_revocation_check(char* ocsp_uri_field, con
         goto end;
     }
 
-    /* Specify the Proxy for doing the OCSP revocation check */
-    host = secure_getenv("PROXY");
-    if (host == NULL) {
-        /* If proxy is not mentioned, parse the OCSP URL for doing the OCSP revocation check */
-        if (!OCSP_parse_url(ocsp_uri, &host, &port, &path, &use_ssl)) {
-            BIO_printf(g_bio_err, "LibOVSA: Error ocsp revocation check failed in parsing URL\n");
-            ret = OVSA_CRYPTO_GENERIC_ERROR;
-            goto end;
-        }
-        thost = host;
-        tport = port;
-        tpath = path;
-    } else {
-        ret = ovsa_get_string_length(host, &host_len);
-        if ((ret < OVSA_OK) || (host_len == EOK)) {
-            BIO_printf(g_bio_err,
-                       "LibOVSA: Error ocsp revocation check failed since HOST is not set\n");
-            ret = OVSA_INVALID_FILE_PATH;
-            goto end;
-        }
+    /* Parse the OCSP URL for doing the OCSP revocation check */
+    if (!OCSP_parse_url(ocsp_uri, &host, &port, &path, &use_ssl)) {
+        BIO_printf(g_bio_err, "LibOVSA: Error ocsp revocation check failed in parsing URL\n");
+        ret = OVSA_CRYPTO_GENERIC_ERROR;
+        goto end;
     }
 
     /* Get the OCSP response */
@@ -1406,9 +1388,9 @@ end:
     OCSP_BASICRESP_free(basic_response);
     sk_OPENSSL_STRING_free(reqnames);
     sk_OCSP_CERTID_free(ids);
-    ovsa_crypto_openssl_free(&thost);
-    ovsa_crypto_openssl_free(&tport);
-    ovsa_crypto_openssl_free(&tpath);
+    ovsa_crypto_openssl_free(&host);
+    ovsa_crypto_openssl_free(&port);
+    ovsa_crypto_openssl_free(&path);
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);
     }
@@ -1661,7 +1643,7 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
             }
 
             /* Write the CA certificate to chain file */
-            chain_fp = fopen(chain_file, "a+");
+            chain_fp = fopen(chain_file, "a");
             if (chain_fp == NULL) {
                 BIO_printf(g_bio_err,
                            "LibOVSA: Error forming chain failed in opening the chain file\n");
@@ -1838,7 +1820,7 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
         }
 #endif
         /* Write the Intermediate certificate to chain file */
-        chain_fp = fopen(chain_file, "a+");
+        chain_fp = fopen(chain_file, "a");
         if (chain_fp == NULL) {
             BIO_printf(g_bio_err,
                        "LibOVSA: Error forming chain failed in opening the chain file\n");
@@ -1915,7 +1897,6 @@ ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, 
     EVP_PKEY* cert_pkey         = NULL;
     bool check_self_signed_cert = false;
     ovsa_status_t ret           = OVSA_OK;
-    size_t public_key_len       = 0;
     EVP_PKEY* pkey              = NULL;
     X509* xcert                 = NULL;
     int cert_verify             = 0;
@@ -1937,41 +1918,22 @@ ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, 
         }
     }
 
-    public_key_len = strnlen_s(g_key_store[asym_key_slot].public_key, MAX_KEY_SIZE);
-    if (public_key_len == EOK) {
-        BIO_printf(
-            g_bio_err,
-            "LibOVSA: Error verifying certificate failed in getting the size of the public key\n");
-        ret = OVSA_CRYPTO_GENERIC_ERROR;
-        goto end;
+    ret = ovsa_crypto_compare_certkey_and_keystore(asym_key_slot, cert, &pkey, &xcert);
+    if (ret < OVSA_OK) {
+        X509_free(xcert);
+        EVP_PKEY_free(pkey);
+        ret = ovsa_crypto_compare_certkey_and_keystore(asym_key_slot + 1, cert, &pkey, &xcert);
+        if (ret < OVSA_OK) {
+            BIO_printf(g_bio_err,
+                       "LibOVSA: Certificate key is not matching with secondary keystore values\n");
+            goto end;
+        }
     }
 
-    memset_s(public_key, MAX_KEY_SIZE, 0);
-
-    if (memcpy_s(public_key, public_key_len, g_key_store[asym_key_slot].public_key,
-                 public_key_len) != EOK) {
-        BIO_printf(g_bio_err,
-                   "LibOVSA: Error verifying certificate failed in getting the public key\n");
-        ret = OVSA_MEMIO_ERROR;
+    if (xcert == NULL || pkey == NULL) {
+        BIO_printf(g_bio_err, "LibOVSA: Error certificate or public key extracted is NULL\n");
         goto end;
     }
-
-    xcert = ovsa_crypto_load_cert(cert, "certificate");
-    if (xcert == NULL) {
-        BIO_printf(g_bio_err, "LibOVSA: Error verifying certificate failed to read certificate\n");
-        ret = OVSA_CRYPTO_X509_ERROR;
-        goto end;
-    }
-
-    pkey = ovsa_crypto_load_key(public_key, "public Key");
-    if (pkey == NULL) {
-        BIO_printf(
-            g_bio_err,
-            "LibOVSA: Error verifying certificate failed in loading the public key into memory\n");
-        ret = OVSA_CRYPTO_EVP_ERROR;
-        goto end;
-    }
-
     /* Decode public key from certificate */
     cert_pkey = X509_get0_pubkey(xcert);
     if (cert_pkey == NULL) {
@@ -2092,6 +2054,81 @@ end:
             BIO_printf(g_bio_err, "LibOVSA: Warning could not delete %s file\n", chain_file);
         }
     }
+    if (ret < OVSA_OK) {
+        ERR_print_errors(g_bio_err);
+    }
+    return ret;
+}
+
+ovsa_status_t ovsa_crypto_compare_certkey_and_keystore(int asym_key_slot, const char* cert,
+                                                       EVP_PKEY** pkey, X509** xcert) {
+    EVP_PKEY* cert_pkey   = NULL;
+    ovsa_status_t ret     = OVSA_OK;
+    size_t public_key_len = 0;
+    int cert_verify       = 0;
+    char public_key[MAX_KEY_SIZE];
+
+    if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT) || (cert == NULL)) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error verifying certificate failed with invalid parameter\n");
+        return OVSA_INVALID_PARAMETER;
+    }
+
+    public_key_len = strnlen_s(g_key_store[asym_key_slot].public_key, MAX_KEY_SIZE);
+    if (public_key_len == EOK) {
+        BIO_printf(
+            g_bio_err,
+            "LibOVSA: Error verifying certificate failed in getting the size of the public key\n");
+        ret = OVSA_CRYPTO_GENERIC_ERROR;
+        goto end;
+    }
+
+    memset_s(public_key, MAX_KEY_SIZE, 0);
+
+    if (memcpy_s(public_key, public_key_len, g_key_store[asym_key_slot].public_key,
+                 public_key_len) != EOK) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error verifying certificate failed in getting the public key\n");
+        ret = OVSA_MEMIO_ERROR;
+        goto end;
+    }
+
+    *xcert = NULL;
+    *xcert = ovsa_crypto_load_cert(cert, "certificate");
+    if (*xcert == NULL) {
+        BIO_printf(g_bio_err, "LibOVSA: Error verifying certificate failed to read certificate\n");
+        ret = OVSA_CRYPTO_X509_ERROR;
+        goto end;
+    }
+
+    *pkey = NULL;
+    *pkey = ovsa_crypto_load_key(public_key, "public Key");
+    if (*pkey == NULL) {
+        BIO_printf(
+            g_bio_err,
+            "LibOVSA: Error verifying certificate failed in loading the public key into memory\n");
+        ret = OVSA_CRYPTO_EVP_ERROR;
+        goto end;
+    }
+
+    /* Decode public key from certificate */
+    cert_pkey = X509_get0_pubkey(*xcert);
+    if (cert_pkey == NULL) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error verifying certificate failed to decode the public key from "
+                   "certificate\n");
+        ret = OVSA_CRYPTO_X509_ERROR;
+        goto end;
+    }
+
+    cert_verify = EVP_PKEY_cmp(*pkey, cert_pkey);
+    if (cert_verify != 1) {
+        ret = OVSA_CRYPTO_X509_ERROR;
+        goto end;
+    }
+
+end:
+    OPENSSL_cleanse(public_key, MAX_KEY_SIZE);
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);
     }

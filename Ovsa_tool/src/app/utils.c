@@ -267,13 +267,13 @@ out:
     return ret;
 }
 
-void ovsa_safe_free_enc_list(ovsa_enc_models_t** listhead) {
-    ovsa_enc_models_t* head = NULL;
-    ovsa_enc_models_t* cur  = NULL;
-    head                    = *listhead;
+void ovsa_safe_free_model_file_list(ovsa_model_files_t** listhead) {
+    ovsa_model_files_t* head = NULL;
+    ovsa_model_files_t* cur  = NULL;
+    head                     = *listhead;
     while (head != NULL) {
         cur = head->next;
-        ovsa_safe_free(&head->enc_model);
+        ovsa_safe_free(&head->model_file_data);
         ovsa_safe_free((char**)&head);
         head = cur;
     }

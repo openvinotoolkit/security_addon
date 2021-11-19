@@ -1,3 +1,4 @@
+#!/bin/bash -x
 #
 # Copyright (c) 2020-2021 Intel Corporation
 #
@@ -14,11 +15,7 @@
 # limitations under the License.
 #
 
-#set -e
+export LD_LIBRARY_PATH="/opt/ovsa/gramine/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-echo "Installing & Setup OVSA KVM Host Components"
+echo "[setupvars.sh] OVSA environment initialized"
 
-rm -vrf /opt/ovsa
-mkdir -vp /opt/ovsa/scripts
-
-cp -vR scripts/* /opt/ovsa/scripts/

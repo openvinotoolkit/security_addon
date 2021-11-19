@@ -28,23 +28,52 @@ OVSATOOL_DIR ?= $(TOPDIR)/Ovsa_tool
 endif
 export OVSATOOL_DIR
 
-ifeq ($(DEBUG),2)
-CFLAGS += -O0 -ggdb3
-else
-CFLAGS += -O2
-endif
+SGX ?= 0
 
-#SRC_BUILD_DIR  := $(TOPDIR)
-SRC_BUILD_DIR  := $(OVSATOOL_DIR)
-MV             := mv
 DEBUG ?=
 export DEBUG=1
+
+ifeq ($(SGX),1)
+export ENABLE_SGX_GRAMINE=1
+# Relative path to Gramine root and key for enclave signing
+SGX_SIGNER_KEY ?= $(GRAMINE_DIR)/Pal/src/host/Linux-SGX/signer/enclave-key.pem
+ARCH_LIBDIR ?= /lib/$(shell $(CC) -dumpmachine)
+endif
+
+ifeq ($(DEBUG),2)
+	ifeq ($(SGX),1)
+	GRAMINE_DEBUG = all
+	endif
+	CFLAGS += -O0 -ggdb3
+else ifeq ($(DEBUG),1)
+	ifeq ($(SGX),1)
+	GRAMINE_DEBUG = error
+	endif
+	CFLAGS += -O2
+else
+	ifeq ($(SGX),1)
+	GRAMINE_DEBUG = error
+	endif
+	CFLAGS += -O2
+endif
+
+SRC_BUILD_DIR  := $(OVSATOOL_DIR)
+MV             := mv
 
 export MV
 
 .PHONY: all
+ifeq ($(SGX),1)
+ifndef GRAMINE_DIR
+$(error GRAMINE_DIR not set. Please set before compilation)
+endif
+endif
 
 all: create_dirs ovsatool_build
+
+ifeq ($(SGX),1)
+all: ovsatool.manifest.sgx ovsatool.sig ovsatool.token
+endif
 
 create_dirs:
 	mkdir -p  $(SRC_BUILD_DIR)/lib  $(SRC_BUILD_DIR)/bin
@@ -75,7 +104,7 @@ ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/curl),)
 endif
 ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/openssl),)
 	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/openssl/openssl.git
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1k
+	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1l
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && ./config --prefix=$(shell readlink -f crypto/) shared -fPIC
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && $(MAKE) && $(MAKE) -j1 install_sw
 	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libcrypto.a ../../../lib
@@ -87,12 +116,38 @@ endif
 	$(MV) src/app/ovsatool $(SRC_BUILD_DIR)/bin
 	CC=$(TARGET_CC)
 
+ifeq ($(SGX),1)
+ovsatool.manifest: ovsatool.manifest.template
+	gramine-manifest \
+		-Dlog_level=$(GRAMINE_DEBUG) \
+		-Dgramine_dir=$(GRAMINE_DIR) \
+		-Darch_libdir=$(ARCH_LIBDIR) \
+		$< > $@
+
+# Generating the SGX-specific manifest, the enclave signature,
+# and the token for enclave initialization.
+ovsatool.manifest.sgx: ovsatool.manifest
+	gramine-sgx-sign \
+		--key $(SGX_SIGNER_KEY) \
+		--manifest $< \
+		--output $@
+
+ovsatool.sig: ovsatool.manifest.sgx
+
+ovsatool.token: ovsatool.sig
+	gramine-sgx-get-token \
+			--output ovsatool.token --sig ovsatool.sig
+
+endif
+
 .PHONY: clean
 clean:
 	$(MAKE) -C $(SRC_BUILD_DIR)/src/app clean
 	$(MAKE) -C $(SRC_BUILD_DIR)/src/lib/libovsa clean
 	$(RM) $(SRC_BUILD_DIR)/bin/ovsatool
 	$(RM) $(SRC_BUILD_DIR)/lib/libovsa.*
+
+	$(RM) *.manifest *.manifest.sgx *.token *.sig
 	
 .PHONY: format
 format:

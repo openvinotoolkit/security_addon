@@ -1,0 +1,91 @@
+#
+# Copyright (c) 2020-2021 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+ARG BASE_IMAGE=openvino/model_server-build
+FROM $BASE_IMAGE as base_build
+
+LABEL version="1.0.0"
+
+SHELL ["/bin/bash", "-c"]
+RUN apt update && apt install -y \
+        libglib2.0-dev \
+        libjson-c-dev && \
+        apt clean
+
+#TPM2 TSS Build
+WORKDIR /tpm2-tss-build
+
+RUN wget https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz && \
+    tar -xvzf tpm2-tss-3.0.3.tar.gz && \
+    cd tpm2-tss-3.0.3 && \
+    ./configure  --with-udevrulesdir=/etc/udev/rules.d/ --prefix=/usr && \
+    make -j8 && \
+    make install
+
+ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/lib/pkgconfig
+WORKDIR /tpm2-abrmd
+RUN wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz && \
+    tar -xvzf tpm2-abrmd-2.4.0.tar.gz && \
+    pushd tpm2-abrmd-2.4.0 && \
+    ./configure --with-dbuspolicydir=/etc/dbus-1/system.d --prefix=/usr && \
+    make -j8 && \
+    make install
+
+WORKDIR /tpm2-tools-build
+RUN wget https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz && \
+        tar -xzf tpm2-tools-5.0.tar.gz && \
+        cd tpm2-tools-5.0 && \
+        ./configure --prefix=/usr && \
+        make -j8 && \
+        make install
+
+# Copy packages
+RUN mkdir -vp /ovsa-runtime/usr/bin
+RUN cp -rv /usr/bin/tpm2* /ovsa-runtime/usr/bin
+RUN cp -rv /usr/bin/tss2* /ovsa-runtime/usr/bin
+
+RUN mkdir -vp /ovsa-runtime/usr/etc
+RUN cp -rv /usr/etc/sysusers.d /ovsa-runtime/usr/etc
+RUN cp -rv /usr/etc/tmpfiles.d /ovsa-runtime/usr/etc
+RUN cp -rv /usr/etc/tpm2-tss /ovsa-runtime/usr/etc
+
+RUN mkdir -vp /ovsa-runtime/usr/include
+RUN cp -rv /usr/include/tss2 /ovsa-runtime/usr/include
+
+RUN mkdir -vp /ovsa-runtime/usr/lib
+RUN cp -rv /usr/lib/libtss2* /ovsa-runtime/usr/lib
+RUN cp -rv /usr/lib/pkgconfig /ovsa-runtime/usr/lib
+RUN cp -rv /usr/lib/systemd /ovsa-runtime/usr/lib
+
+RUN mkdir -vp /ovsa-runtime/usr/sbin
+RUN cp -rv /usr/sbin/tpm2-abrmd /ovsa-runtime/usr/sbin
+
+RUN mkdir -vp /ovsa-runtime/usr/share
+RUN cp -rv /usr/share/dbus-1 /ovsa-runtime/usr/share
+RUN cp -rv /usr/share/man /ovsa-runtime/usr/share
+
+#RUN mkdir -vp /ovsa-runtime/tpm2-abrmd
+#RUN cp -rv /etc/dbus-1/system.d/tpm2-abrmd.conf /ovsa-runtime/tpm2-abrmd/
+
+RUN mkdir -vp /ovsa-runtime/etc/dbus-1/system.d/
+RUN cp -rv /etc/dbus-1/system.d/tpm2-abrmd.conf /ovsa-runtime/etc/dbus-1/system.d
+
+RUN mkdir -vp /ovsa-runtime/usr/local/bin
+COPY Scripts/guest/OVSA_tpm2_init.sh /ovsa-runtime/usr/local/bin
+
+
+WORKDIR /
+

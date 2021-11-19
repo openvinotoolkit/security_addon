@@ -1,0 +1,60 @@
+#
+# Copyright (c) 2020-2021 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Secret Provisioning library (client-side) is preloaded
+loader.env.LD_PRELOAD = "ovsa-runtime/lib/libra_tls_attest.so"
+
+# Request remote attestation functionality from Gramine
+sgx.remote_attestation = 1
+
+sys.enable_sigterm_injection = true
+
+sgx.enclave_size = "8G"
+sgx.thread_num = 1024
+loader.pal_internal_mem_size = "128M"
+
+sys.brk.max_size = "64M"
+sys.stack.size = "4M"
+
+sgx.protected_mrsigner_files = ["file:/opt/ovsa/gramine/keystore"]
+
+sgx.allowed_files = [
+                        "file:/opt/ovsa/gramine/artefacts",
+                        "file:/certs",
+                        "file:/sampleloader",
+                        "file:/etc/nsswitch.conf",
+                        "file:/etc/ethers",
+                        "file:/etc/host.conf",
+                        "file:/etc/hostname",
+                        "file:/etc/hosts",
+                        "file:/etc/resolv.conf",
+                        "file:/etc/nginx/conf.d/",
+                        "file:/etc/group",
+                        "file:/etc/passwd",
+                        "file:/var/log/nginx/error.log",
+                        "file:/tmp",
+                        "file:/run/nginx.pid",
+                        "file:/var/log/nginx/access.log",
+			"file:/sys"
+                ]
+sgx.trusted_files = [
+"file:/usr/share/nginx/modules/ngx_http_image_filter_module.so",
+"file:/usr/share/nginx/modules/ngx_http_xslt_filter_module.so",
+"file:/usr/share/nginx/modules/ngx_mail_module.so",
+"file:/usr/share/nginx/modules/ngx_stream_module.so",
+"file:/lib/x86_64-linux-gnu/"
+]
+

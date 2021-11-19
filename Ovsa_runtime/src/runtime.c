@@ -23,19 +23,6 @@
 #include "runtime.h"
 #include "utils.h"
 
-/* Help options for Ovsa_runtime tool */
-static void ovsa_runtime_help(char* argv) {
-    printf("Help for Ovsa_Runtime command\n");
-    printf("%s gen-tcb-signature <options>\n", argv);
-    printf("-n : TCB name\n");
-    printf("-v : TCB version\n");
-    printf("-f : TCB file name to generate\n");
-    printf("-k : Keystore name\n");
-    printf("Example for Ovsa_Runtime command as below:\n");
-    printf("%s gen-tcb-signature -n <TCB name> -v <TCB version> -f <TCB file name> -k <Keystore>\n",
-           argv);
-}
-
 int main(int argc, char* argv[]) {
     ovsa_status_t ret = OVSA_OK;
     int i             = 0;
@@ -62,7 +49,7 @@ int main(int argc, char* argv[]) {
         }
     }
     if (!strcmp(argv[1], "-help")) {
-        ovsa_runtime_help(argv[0]);
+        ovsa_tcb_gen_help(argv[0]);
         goto out;
     }
     if (!strcmp(argv[1], "gen-tcb-signature")) {

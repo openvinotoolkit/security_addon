@@ -18,6 +18,7 @@
 #ifndef __OVSA_LIBOVSA_H_
 #define __OVSA_LIBOVSA_H_
 
+#include <openssl/ocsp.h>
 #include <stdbool.h>
 #include <time.h>
 
@@ -39,7 +40,7 @@
 #define MAX_URL_SIZE                                     256
 #define MAX_TCB_SIZE                                     256
 #define MAX_BUF_SIZE                                     4096
-#define KEYSTORE_BLOB_TEXT_SIZE                          135
+#define KEYSTORE_BLOB_TEXT_SIZE                          155
 #define MIN_KEY_SLOT                                     0
 #define MAX_KEY_SLOT                                     64
 #define SYMMETRIC_KEY_SIZE                               32
@@ -97,7 +98,7 @@ ovsa_status_t ovsa_crypto_deinit(void);
  * \param[in]  subject         Contains information needed for CSR generation.
  * \param[in]  isv_name        ISV name.
  * \param[in]  keystore_name   Keystore JSON blob.
- * \param[in]  csr_file_name   CSR file name.
+ * \param[in]  file_name   CSR file name.
  * \param[out] asym_key_slot   Asymmetric key slot index.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
@@ -105,8 +106,7 @@ ovsa_status_t ovsa_crypto_deinit(void);
 ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, const char* subject,
                                                        const char* isv_name,
                                                        const char* keystore_name,
-                                                       const char* csr_file_name,
-                                                       int* asym_key_slot);
+                                                       const char* file_name, int* asym_key_slot);
 
 /** \brief This function reads and extracts key store JSON blob and populate keystore info.
  *
@@ -140,6 +140,17 @@ ovsa_status_t ovsa_crypto_get_asymmetric_key_slot(const char* keystore_name, int
 ovsa_status_t ovsa_crypto_store_certificate_keystore(int asym_key_slot, bool peer_cert,
                                                      const char* cert, bool lifetime_validity_check,
                                                      const char* keystore_name);
+
+/** \brief This function compares the public key from specified certificate with the public key from
+ * keystore in the specified keyslot. Returns OVSA_OK if public key matches else returns OVSA_ERROR
+ *
+ * \param[in]  asym_key_slot  Asymmetric key slot index.
+ * \param[in]  cert           Pointer to certificate.
+ *
+ * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
+ */
+ovsa_status_t ovsa_crypto_compare_certkey_and_keystore(int asym_key_slot, const char* cert,
+                                                       EVP_PKEY** pkey, X509** xcert);
 
 /** \brief This function verifies the certificate signature and writes as a on-disk protected file.
  *

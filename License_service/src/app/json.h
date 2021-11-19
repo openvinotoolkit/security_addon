@@ -21,54 +21,56 @@
 #include "license_service.h"
 
 /*!
- * \brief ovsa_server_json_map_license_type
+ * \brief ovsa_license_service_json_map_license_type
  *
  * \param [in]   lictype string value of licence type
  * \return [out] enum of licence type
  */
-ovsa_license_type_t ovsa_server_json_map_license_type(const char* lictype);
+ovsa_license_type_t ovsa_license_service_json_map_license_type(const char* lictype);
 
 /*!
- * \brief ovsa_server_json_extract_customer_license
+ * \brief ovsa_license_service_json_extract_customer_license
  *
  * \param [in]  inputBuf Buffer having json file contents
  * \param [out] cust_lic_sig structure* containing customer license information
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_server_json_extract_customer_license(const char* inputBuf,
-                                                        ovsa_customer_license_sig_t* cust_lic_sig);
+ovsa_status_t ovsa_license_service_json_extract_customer_license(
+    const char* inputBuf, ovsa_customer_license_sig_t* cust_lic_sig);
 
 /*!
- * \brief ovsa_server_json_extract_element
+ * \brief ovsa_license_service_json_extract_element
  *
  * \param [in]  inputBuf Buffer having json file contents
  * \param [in]  keyName  keyname to be read
  * \param [out] keyValue keyvale read
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_server_json_extract_element(const char* inputBuf, const char* keyName,
-                                               void** keyValue);
+ovsa_status_t ovsa_license_service_json_extract_element(const char* inputBuf, const char* keyName,
+                                                        void** keyValue);
 /*!
- * \brief ovsa_server_json_create_message_blob
+ * \brief ovsa_license_service_json_create_message_blob
  *
  * \param [in]  command type information to update inside blob
  * \param [in]  payloed information to update inside blob
  * \param [out] outputBuf Buffer updated with input parms
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_server_json_create_message_blob(ovsa_command_type_t cmdtype, const char* payload,
-                                                   char** outputBuf, size_t* valuelen);
+ovsa_status_t ovsa_license_service_json_create_message_blob(ovsa_command_type_t cmdtype,
+                                                            const char* payload, char** outputBuf,
+                                                            size_t* valuelen);
 
 /*!
- * \brief ovsa_server_json_extract_tcb_signature
+ * \brief ovsa_license_service_json_extract_tcb_signature
  *
  * \param [in]  inputBuf Buffer having json file contents
  * \param [out] tsig  structure* containing TCB information
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_server_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig_t* tsig);
+ovsa_status_t ovsa_license_service_json_extract_tcb_signature(const char* inputBuf,
+                                                              ovsa_tcb_sig_t* tsig);
 /*!
- * \brief ovsa_json_create_quote_cred_data_blob
+ * \brief ovsa_license_service_json_create_quote_cred_data_blob
  *
  * \param [in]  cred_out information to update inside blob
  * \param [in]  quote_nonce information to update inside blob
@@ -77,7 +79,9 @@ ovsa_status_t ovsa_server_json_extract_tcb_signature(const char* inputBuf, ovsa_
  * \return ovsa_status_t
  */
 
-ovsa_status_t ovsa_json_create_quote_cred_data_blob(const char* cred_out, const char* quote_nonce,
-                                                    char** outputBuf, size_t* valuelen);
+ovsa_status_t ovsa_license_service_json_create_quote_cred_data_blob(const char* cred_out,
+                                                                    const char* quote_nonce,
+                                                                    char** outputBuf,
+                                                                    size_t* valuelen);
 
 #endif

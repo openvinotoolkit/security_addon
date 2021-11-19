@@ -40,18 +40,21 @@ static void ovsa_keygen_help(const char* argv) {
     printf("-r : CSR file path\n");
     printf("-e : Subject element for CSR file generation\n");
     printf("-c : Certificate file to be stored to key store / read from key store\n");
-    printf("-p : Input file to be signed / verified\n");
+    printf("-i : Input file to be signed / verified\n");
     printf("-o : Output file to store signed\n");
-    printf("-s : Signature for verification\n");
+    printf("-v : Signature for verification\n");
+    printf(
+        "-s : Optional parameter used with -getcert to read certificate from secondary "
+        "keystore.\n");
     printf("Example for Keygen as below:\n");
     printf(
         "%s keygen -storekey -t ECDSA -k Mykeystore -n \"ISVName\" -e "
         "\"/C=IN/ST=KA/O=Intel, Inc./CN=intel.com/L=Bangalore/mail=xyz@intel.com\"\n",
         argv);
-    printf("%s keygen -storecert -c cert.crl -k Mykeystore \n", argv);
-    printf("%s keygen -getcert -k Mykeystore -c cert.crl\n", argv);
-    printf("%s keygen -sign -p input.txt -o signed.txt -k Mykeystore\n", argv);
-    printf("%s keygen -verify -p input.txt -s signed.txt -k Mykeystore\n", argv);
+    printf("%s keygen -storecert -c cert.crl -k Mykeystore\n", argv);
+    printf("%s keygen -getcert [-s] -k Mykeystore -c cert.crt\n", argv);
+    printf("%s keygen -sign -i input.txt -o signed.txt -k Mykeystore\n", argv);
+    printf("%s keygen -verify -i input.txt -v signed.txt -k Mykeystore\n", argv);
 }
 
 static ovsa_status_t ovsa_do_cmd_verify(const char* file_to_verify, const char* signature,
@@ -150,7 +153,7 @@ out:
     return ret;
 }
 
-static ovsa_status_t ovsa_do_cmd_getcert(const char* keystore, const char* cert_file) {
+static ovsa_status_t ovsa_do_cmd_getcert(const char* keystore, const char* cert_file, bool seckey) {
     ovsa_status_t ret = OVSA_OK;
     int asym_keyslot  = -1;
 
@@ -168,6 +171,10 @@ static ovsa_status_t ovsa_do_cmd_getcert(const char* keystore, const char* cert_
             OVSA_DBG(DBG_E, "OVSA: Error get keyslot failed with code %d\n", ret);
             goto exit;
         }
+
+        /* If -s option is set, read from secondary keyslot */
+        if (seckey)
+            asym_keyslot += 1;
 
         /* Read certificate to file */
         ret = ovsa_crypto_store_certificate_file(asym_keyslot, /* PEER CERT */ false,
@@ -317,6 +324,7 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
     char* signed_file        = NULL;
     char* signature          = NULL;
     char* csr_filename       = NULL;
+    bool secondary_keyslot   = false;
 
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
     if (argc < 3 || argc > MAX_SAFE_ARGC) {
@@ -341,7 +349,7 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
 
     opcode = ovsa_get_keygen_cmd(argv[2]);
 
-    while ((c = getopt(argc, argv, "ht:n:k:e:c:o:p:s:r:")) != -1) {
+    while ((c = getopt(argc, argv, "hst:n:k:e:c:o:i:v:r:")) != -1) {
         switch (c) {
             case 't':
                 if (strcmp("ECDSA", optarg)) {
@@ -398,7 +406,7 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                 }
                 cert_file = optarg;
                 break;
-            case 'p':
+            case 'i':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
                     OVSA_DBG(
                         DBG_E,
@@ -422,7 +430,7 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                 signed_file = optarg;
                 OVSA_DBG(DBG_D, "Signed File: %s \n", signed_file);
                 break;
-            case 's':
+            case 'v':
                 if (strnlen_s(optarg, RSIZE_MAX_STR) > MAX_FILE_NAME) {
                     OVSA_DBG(
                         DBG_E,
@@ -433,6 +441,10 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                 }
                 signature = optarg;
                 OVSA_DBG(DBG_D, "Signature: %s \n", signature);
+                break;
+            case 's':
+                secondary_keyslot = true;
+                OVSA_DBG(DBG_D, "Option Secondary keystore set to true\n");
                 break;
             case 'h':
                 ovsa_keygen_help(argv[0]);
@@ -446,7 +458,7 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
     }
 
     if (keystore == NULL) {
-        OVSA_DBG(DBG_E, "OVSA: Keystore name is empty. Please follow -help for help option\n");
+        OVSA_DBG(DBG_E, "OVSA: Keystore name is empty. Please follow below help options\n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
@@ -458,8 +470,9 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                 OVSA_DBG(DBG_E, "OVSA: StoreKey command failed with error code %d\n", ret);
                 goto out;
             }
-            OVSA_DBG(DBG_I, "OVSA: Key store %s, %s created successfully\n", keystore,
-                     csr_filename);
+            OVSA_DBG(DBG_I,
+                     "OVSA: Key store %s, primary and secondary csr files created successfully\n",
+                     keystore);
             break;
         case STORECERT:
             ret = ovsa_do_cmd_storecert(keystore, cert_file);
@@ -471,7 +484,7 @@ ovsa_status_t ovsa_keygen_main(int argc, char* argv[]) {
                      keystore);
             break;
         case GETCERT:
-            ret = ovsa_do_cmd_getcert(keystore, cert_file);
+            ret = ovsa_do_cmd_getcert(keystore, cert_file, secondary_keyslot);
             if (ret != OVSA_OK) {
                 OVSA_DBG(DBG_E, "OVSA: GetCert command failed with error code %d\n", ret);
                 goto out;

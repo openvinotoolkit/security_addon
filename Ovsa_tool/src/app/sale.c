@@ -305,6 +305,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     char* time_str                    = NULL;
     char* enc_key                     = NULL;
     ovsa_tcb_sig_list_t* tcb_list     = NULL;
+    ovsa_input_files_t* tcb_list_tail = NULL;
     ovsa_customer_license_sig_t customer_license;
     ovsa_license_config_sig_t lic_conf_sig;
     ovsa_master_license_sig_t master_lic_sig;
@@ -374,8 +375,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
             } break;
             case 't': {
                 int index;
-                ovsa_input_files_t* tcb_list_tail = NULL;
-                index                             = optind - 1;
+                index = optind - 1;
                 while (index < argc) {
                     if (strnlen_s(argv[index], RSIZE_MAX_STR) < MAX_FILE_NAME) {
                         if (argv[index][0] != '-') {

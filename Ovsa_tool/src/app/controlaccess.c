@@ -64,15 +64,15 @@ static void ovsa_controlaccess_help(const char* argv) {
 }
 
 static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_files_t* input_list,
-                                              ovsa_enc_models_t** enc_model_list, size_t* filelen,
+                                              ovsa_model_files_t** enc_model_list, size_t* filelen,
                                               int* file_count) {
     ovsa_status_t ret                  = OVSA_OK;
     size_t size                        = 0;
     size_t outlen                      = 0;
     char* model_buf                    = NULL;
-    ovsa_enc_models_t* enc_model_cur   = NULL;
-    ovsa_enc_models_t* enc_model_tail  = NULL;
-    ovsa_enc_models_t* enc_model_head  = NULL;
+    ovsa_model_files_t* enc_model_cur  = NULL;
+    ovsa_model_files_t* enc_model_tail = NULL;
+    ovsa_model_files_t* enc_model_head = NULL;
     const ovsa_input_files_t* cur_file = NULL;
     int keyiv_hmac_slot                = -1;
     int len                            = 0;
@@ -108,7 +108,7 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
         fclose(fcur_file);
 
         if (enc_model_head == NULL) {
-            ret = ovsa_safe_malloc(sizeof(ovsa_enc_models_t), (char**)&enc_model_head);
+            ret = ovsa_safe_malloc(sizeof(ovsa_model_files_t), (char**)&enc_model_head);
             if (ret < OVSA_OK || enc_model_head == NULL) {
                 OVSA_DBG(DBG_E,
                          "OVSA: Error model encryption list initialization failed with code %d\n",
@@ -118,7 +118,7 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
             enc_model_head->next = NULL;
             enc_model_tail       = enc_model_head;
         } else {
-            ret = ovsa_safe_malloc(sizeof(ovsa_enc_models_t), (char**)&enc_model_cur);
+            ret = ovsa_safe_malloc(sizeof(ovsa_model_files_t), (char**)&enc_model_cur);
             if (ret < OVSA_OK || enc_model_cur == NULL) {
                 OVSA_DBG(DBG_E,
                          "OVSA: Error model encryption list initialization failed with code %d\n",
@@ -129,11 +129,11 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
             enc_model_tail->next = enc_model_cur;
             enc_model_tail       = enc_model_cur;
         }
-        memcpy_s(enc_model_tail->file_name, MAX_FILE_NAME, cur_file->name,
+        memcpy_s(enc_model_tail->model_file_name, MAX_FILE_NAME, cur_file->name,
                  strnlen_s(cur_file->name, MAX_FILE_NAME));
         /* Encrypt model file */
-        ret = ovsa_crypto_encrypt_mem(keyslot, model_buf, size, NULL, &enc_model_tail->enc_model,
-                                      &outlen, &keyiv_hmac_slot);
+        ret = ovsa_crypto_encrypt_mem(keyslot, model_buf, size, NULL,
+                                      &enc_model_tail->model_file_data, &outlen, &keyiv_hmac_slot);
         if (ret != OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error encryption of %s failed with code %d\n", cur_file->name,
                      ret);
@@ -141,6 +141,7 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
             ovsa_crypto_clear_symmetric_key_slot(keyiv_hmac_slot);
             goto out;
         }
+        enc_model_tail->model_file_length = outlen;
         count++;
         len += outlen;
         OVSA_DBG(DBG_D, "OVSA: Encryption of Model file %s successful\n", cur_file->name);
@@ -258,7 +259,7 @@ static ovsa_status_t ovsa_do_create_controlled_access_model_file(
     OVSA_DBG(DBG_I, "OVSA: Create Controlled Access Model JSON Blob\n");
     controlaccess_buf_len = model_file_len + sizeof(ovsa_controlled_access_model_t) +
                             CONTROLLED_ACCESS_MODEL_BLOB_TEXT_SIZE + g_isvcert_len +
-                            (file_count * sizeof(ovsa_enc_models_t) * MODEL_FILE_BLOB_TEXT_SIZE);
+                            (file_count * sizeof(ovsa_model_files_t) * MODEL_FILE_BLOB_TEXT_SIZE);
     OVSA_DBG(DBG_D, "OVSA: controlaccess_buf_len %d\n", (int)controlaccess_buf_len);
     ret = ovsa_safe_malloc(controlaccess_buf_len, &controlaccess_buf_string);
     if (ret < OVSA_OK || controlaccess_buf_string == NULL) {
@@ -325,7 +326,7 @@ static ovsa_status_t ovsa_do_create_controlled_access_model_file(
 out:
     ovsa_safe_free(&controlaccess_buf_string);
     ovsa_safe_free(&controlaccess_buf_sig_string);
-    ovsa_safe_free_enc_list(&controlled_access_sig_model.controlled_access_model.enc_model);
+    ovsa_safe_free_model_file_list(&controlled_access_sig_model.controlled_access_model.enc_model);
     ovsa_safe_free(&controlled_access_sig_model.controlled_access_model.isv_certificate);
     return ret;
 }
@@ -475,6 +476,7 @@ ovsa_status_t ovsa_controlaccess_main(int argc, char* argv[]) {
     int i                          = 0;
     size_t argv_len                = 0;
     ovsa_input_files_t* input_list = NULL;
+    ovsa_input_files_t* list_tail  = NULL;
     char* license_guid             = NULL;
     char* keystore                 = NULL;
     char* masterlic_file           = NULL;
@@ -506,9 +508,8 @@ ovsa_status_t ovsa_controlaccess_main(int argc, char* argv[]) {
     while ((c = getopt(argc, argv, "i:n:d:v:p:m:k:g:h")) != -1) {
         switch (c) {
             case 'i': {
-                int index                     = 0;
-                ovsa_input_files_t* list_tail = NULL;
-                index                         = optind - 1;
+                int index = 0;
+                index     = optind - 1;
                 while (index < argc) {
                     if (strnlen_s(optarg, RSIZE_MAX_STR) < MAX_NAME_SIZE) {
                         if (argv[index][0] != '-') {

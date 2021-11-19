@@ -31,12 +31,20 @@
 using namespace ovms;
 
 extern "C" {
+#define MAX_NAME_SIZE 256
+typedef struct ovsa_model_files {
+    char model_file_name[MAX_NAME_SIZE];
+    char* model_file_data;
+    int model_file_length;
+    struct ovsa_model_files* next;
+} ovsa_model_files_t;
+
 ovsa_status_t ovsa_license_check_module(const char* keystore, const char* controlled_access_model,
-                                        const char* customer_license, char** decrypt_xml,
-                                        char** decrypt_bin, int* xml_len, int* bin_len);
+                                        const char* customer_license,
+                                        ovsa_model_files_t** decrypted_files);
 ovsa_status_t ovsa_crypto_init();
 void ovsa_crypto_deinit();
-void ovsa_safe_free(char** ptr);
+void ovsa_safe_free_model_file_list(ovsa_model_files_t** listhead);
 };
 
 // Time in seconds at which model status will be checked
@@ -52,6 +60,7 @@ void ovsa_safe_free(char** ptr);
 #endif
 
 typedef std::pair<std::string, int> map_key_t;
+typedef std::pair<std::string, uint8_t> model_file_t;
 /*
  * This class implements am example custom model loader for OVMS.
  * It derives the implementation from base class CustomLoaderInterface
@@ -147,7 +156,7 @@ CustomLoaderStatus OvsaCustomLoader::ovsa_json_extract_input_params(
 
     if (doc.HasMember("controlled_access_file")) {
         std::string controlled_access_file = doc["controlled_access_file"].GetString();
-        datFile = fullPath + "/" + controlled_access_file + ".dat";
+        datFile                            = fullPath + "/" + controlled_access_file + ".dat";
         std::cout << "datFile:" << datFile << std::endl;
 
         licFile = fullPath + "/" + controlled_access_file + ".lic";
@@ -156,7 +165,7 @@ CustomLoaderStatus OvsaCustomLoader::ovsa_json_extract_input_params(
 
     if (doc.HasMember("keystore")) {
         std::string ks = doc["keystore"].GetString();
-        ksFile         = fullPath + "/" + ks;
+	ksFile         = ks;
         std::cout << "keystore:" << ksFile << std::endl;
     }
 
@@ -173,15 +182,13 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
                                                std::vector<uint8_t>& modelBuffer,
                                                std::vector<uint8_t>& weights) {
     std::cout << "OvsaCustomLoader: Custom loadModel" << std::endl;
-    char* modelBuf   = NULL;
-    char* weightsBuf = NULL;
-    int xml_len      = 0;
-    int bin_len      = 0;
     std::string type;
     std::string loaderName;
     std::string ksFile;
     std::string licFile;
     std::string datFile;
+    ovsa_model_files_t* decrypted_files = NULL;
+    CustomLoaderStatus retStatus = CustomLoaderStatus::MODEL_LOAD_ERROR;
 
     if (modelName.empty() || basePath.empty() || loaderOptions.empty()) {
         std::cout << "OvsaCustomLoader: Error invalid input parameters to loadModel" << std::endl;
@@ -197,7 +204,7 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
 
     std::unique_lock<std::mutex> lockGuard(critical_ops);
     ovsa_status_t rets = ovsa_license_check_module(ksFile.c_str(), datFile.c_str(), licFile.c_str(),
-                                                   &modelBuf, &weightsBuf, &xml_len, &bin_len);
+                                                   &decrypted_files);
     if (rets != OVSA_OK) {
         if (rets == OVSA_LICENSE_SERVER_CONNECT_FAIL) {
             OVSA_DBG(DBG_E,
@@ -210,16 +217,58 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
             OVSA_DBG(DBG_E, "OvsaCustomLoader: Error ovsa_license_check_module with code %d\n",
                      rets);
         }
-        ovsa_safe_free(&modelBuf);
-        ovsa_safe_free(&weightsBuf);
+        ovsa_safe_free_model_file_list(&decrypted_files);
         return CustomLoaderStatus::MODEL_LOAD_ERROR;
     }
     lockGuard.unlock();
 
-    std::vector<uint8_t> wts(&weightsBuf[0], &weightsBuf[bin_len]);
-    std::vector<uint8_t> mdl(&modelBuf[0], &modelBuf[xml_len]);
-    modelBuffer.insert(modelBuffer.end(), mdl.begin(), mdl.end());
-    weights.insert(weights.end(), wts.begin(), wts.end());
+    std::vector<std::pair<std::string, uint8_t>> modelFileVec;
+    ovsa_model_files_t* head = decrypted_files;
+
+    while (head != NULL) {
+        // model_file_t file_data =  std::make_pair(head->model_file_name,head->model_file_data);
+        // modelFileVec.pushback(file_data);
+        //
+
+        std::string filename(head->model_file_name);
+        size_t found = filename.find(".xml");
+        if (found != std::string::npos) {
+            std::cout << "OvsaCustomLoader: " << head->model_file_name << std::endl;
+            std::vector<uint8_t> mdl(&head->model_file_data[0],
+                                     &head->model_file_data[head->model_file_length]);
+            modelBuffer.insert(modelBuffer.end(), mdl.begin(), mdl.end());
+            retStatus = CustomLoaderStatus::MODEL_TYPE_IR;
+        }
+
+        found = filename.find(".bin");
+        if (found != std::string::npos) {
+            std::cout << "OvsaCustomLoader: " << head->model_file_name << std::endl;
+            std::vector<uint8_t> wts(&head->model_file_data[0],
+                                     &head->model_file_data[head->model_file_length]);
+            weights.insert(weights.end(), wts.begin(), wts.end());
+	    retStatus = CustomLoaderStatus::MODEL_TYPE_IR;
+        }
+
+	found = filename.find(".blob");
+        if (found != std::string::npos) {
+            std::cout << "OvsaCustomLoader: " << head->model_file_name << std::endl;
+            std::vector<uint8_t> mdl(&head->model_file_data[0],
+                                     &head->model_file_data[head->model_file_length]);
+            modelBuffer.insert(modelBuffer.end(), mdl.begin(), mdl.end());
+	    retStatus = CustomLoaderStatus::MODEL_TYPE_BLOB;
+        }
+
+        found = filename.find(".onnx");
+        if (found != std::string::npos) {
+            std::cout << "OvsaCustomLoader: " << head->model_file_name << std::endl;
+            std::vector<uint8_t> mdl(&head->model_file_data[0],
+                                     &head->model_file_data[head->model_file_length]);
+            modelBuffer.insert(modelBuffer.end(), mdl.begin(), mdl.end());
+            retStatus = CustomLoaderStatus::MODEL_TYPE_ONNX;
+        }
+
+        head = head->next;
+    }
 
     std::lock_guard<std::mutex> guard(models_watched_mutex);
     map_key_t key  = std::make_pair(modelName, version);
@@ -230,10 +279,8 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
         itr->second->startWatcher(VALIDITY_CHECK_INTERVAL);
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    ovsa_safe_free(&modelBuf);
-    ovsa_safe_free(&weightsBuf);
-
-    return CustomLoaderStatus::MODEL_TYPE_IR;
+    ovsa_safe_free_model_file_list(&decrypted_files);
+    return retStatus;
 }
 
 // Retire the model

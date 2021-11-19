@@ -145,6 +145,7 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
 ovsa_status_t ovsa_json_extract_element(const char* inputBuf, const char* keyName, void** keyValue);
 
 #ifdef OVSA_RUNTIME
+#ifndef ENABLE_SGX_GRAMINE
 /*!
  * \brief ovsa_json_create_EK_AK_binding_info_blob
  *
@@ -155,6 +156,7 @@ ovsa_status_t ovsa_json_extract_element(const char* inputBuf, const char* keyNam
  */
 ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_ek_ak_bind_info_t ek_ak_bind_info,
                                                        char** outputBuf, size_t* valuelen);
+#endif
 
 /*!
  * \brief ovsa_json_create_message_blob
@@ -168,6 +170,7 @@ ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_ek_ak_bind_info_t ek
 ovsa_status_t ovsa_json_create_message_blob(ovsa_command_type_t cmdtype, const char* payload,
                                             char** outputBuf, size_t* length);
 
+#ifndef ENABLE_SGX_GRAMINE
 /*!
  * \brief ovsa_json_create_quote_info
  *
@@ -181,6 +184,7 @@ ovsa_status_t ovsa_json_create_quote_info_blob(const char* secret,
                                                const ovsa_quote_info_t sw_quote_info,
                                                const ovsa_quote_info_t hw_quote_info,
                                                char** outputBuf, size_t* valuelen);
+#endif
 /*!
  * \brief ovsa_json_append_json_payload_len_to_blob
  *
