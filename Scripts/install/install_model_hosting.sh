@@ -137,5 +137,5 @@ echo
 echo "To re-provision OVSA use the below scripts:"
 echo "Quote - /var/OVSA/Quote/OVSA_create_ek_ak_keys.sh"
 echo "Seal - /var/OVSA/Seal/OVSA_Seal_Key_TPM_Policy_Authorize.sh"
-echo "Generate certificate for Model Server - /opt/ovsa/example_runtime/generate_certs.sh -p /var/OVSA/Modelserver"
+echo "Generate certificate for Model Server - /opt/ovsa/kvm/example_runtime/generate_certs.sh -p /var/OVSA/Modelserver"
 echo

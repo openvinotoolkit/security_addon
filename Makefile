@@ -92,9 +92,6 @@ package: runtime_pkg developer_pkg sgx_pkg lic_server_pkg
 
 .PHONY: docker_build
 docker_build: ovsatool_build ovsaruntime_build
-	docker image rm -f gsc-openvino/model_server-ovsa-nginx-mtls:latest 2>&1
-	docker image rm -f gsc-openvino/model_server-ovsa-nginx-mtls:latest-unsigned 2>&1
-
 ifneq ($(SGX), 1)
 	docker build -f Dockerfile-build-tpm . \
                 --build-arg http_proxy=$(HTTP_PROXY)  \
@@ -105,6 +102,9 @@ ifneq ($(SGX), 1)
 	$(eval BASE_IMAGE = openvino/model_server-ovsa-build:latest)
 endif
 ifeq ($(SGX), 1)
+	docker image rm -f gsc-openvino/model_server-ovsa-nginx-mtls:latest 2>&1
+	docker image rm -f gsc-openvino/model_server-ovsa-nginx-mtls:latest-unsigned 2>&1
+
 	mkdir -p  $(SRC_BUILD_DIR)/Ovsa_runtime/src/gramine/Pal/src/host/Linux-SGX/tools/ra-tls
 	cp $(GRAMINE_DIR)/Pal/src/host/Linux-SGX/tools/ra-tls/ra_tls.h \
                $(SRC_BUILD_DIR)/Ovsa_runtime/src/gramine/Pal/src/host/Linux-SGX/tools/ra-tls

@@ -117,7 +117,7 @@ Building OpenVINO™ Security Add-on depends on OpenVINO™ Model Server docker 
 	```sh
 	git clone https://github.com/openvinotoolkit/model_server.git
     cd model_server
-    git checkout v2021.4.1
+    git checkout v2021.4.2
 	make docker_build
 	```
 ### Step 2: Build the software required for all roles
@@ -402,7 +402,7 @@ For information about the NGINX interface, see https://github.com/openvinotoolki
 	```sh
 	curl --create-dirs https://raw.githubusercontent.com/openvinotoolkit/model_server/master/example_client/images/people/people1.jpeg -o images/people1.jpeg
 	```
-#### Step 7: Run Inference
+#### Step 4: Run Inference
 
 Run the `face_detection.py` script.
 ```sh

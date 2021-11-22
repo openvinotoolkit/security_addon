@@ -22,7 +22,7 @@ sgx.remote_attestation = 1
 
 sys.enable_sigterm_injection = true
 
-sgx.enclave_size = "8G"
+sgx.enclave_size = "16G"
 sgx.thread_num = 1024
 loader.pal_internal_mem_size = "128M"
 
