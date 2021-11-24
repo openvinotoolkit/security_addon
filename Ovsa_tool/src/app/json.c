@@ -273,7 +273,7 @@ ovsa_status_t ovsa_json_create_controlled_access_model(
     }
     cJSON_AddItemToObject(controlled_access_model, "files", model_files);
 
-    struct ovsa_enc_models* list = control_access_model_sig->controlled_access_model.enc_model;
+    ovsa_model_files_t* list = control_access_model_sig->controlled_access_model.enc_model;
     if (list != NULL) {
         int i = 0;
         char name[MAX_FILE_NAME_LEN];
@@ -282,7 +282,7 @@ ovsa_status_t ovsa_json_create_controlled_access_model(
         cJSON* file_name = NULL;
 
         memset_s(name, sizeof(name), 0);
-        while (list->enc_model != NULL) {
+        while (list->model_file_name != NULL) {
             snprintf_s_i(name, MAX_FILE_NAME_LEN, "file_name_%d", (i) % 100u);
 
             cJSON* enc_file = cJSON_CreateObject();
@@ -294,14 +294,14 @@ ovsa_status_t ovsa_json_create_controlled_access_model(
             cJSON_AddItemToArray(model_files, enc_file);
 
             /* Extract only the filename */
-            ret = strlastchar_s(list->file_name, strnlen_s(list->file_name, MAX_NAME_SIZE), '/',
-                                &filename);
+            ret = strlastchar_s(list->model_file_name,
+                                strnlen_s(list->model_file_name, MAX_NAME_SIZE), '/', &filename);
             if (ret == EOK) {
                 file_name = cJSON_CreateString(filename + 1);
                 printf("Filename is %s\n", filename + 1);
             } else if (ret == ESNOTFND) {
-                file_name = cJSON_CreateString(list->file_name);
-                printf("Filename is %s\n", list->file_name);
+                file_name = cJSON_CreateString(list->model_file_name);
+                printf("Filename is %s\n", list->model_file_name);
             } else {
                 ret = OVSA_JSON_ERROR_CREATE_OBJECT;
                 OVSA_DBG(DBG_E, "OVSA: Error could not create string file\n");
@@ -316,7 +316,7 @@ ovsa_status_t ovsa_json_create_controlled_access_model(
             cJSON_AddItemToObject(enc_file, name, file_name);
 
             snprintf_s_i(name, MAX_FILE_NAME_LEN, "file_body_%d", (i++) % 100u);
-            cJSON* file = cJSON_CreateString(list->enc_model);
+            cJSON* file = cJSON_CreateString(list->model_file_data);
             if (file == NULL) {
                 ret = OVSA_JSON_ERROR_CREATE_OBJECT;
                 OVSA_DBG(DBG_E, "OVSA: Error could not create string file\n");
@@ -373,7 +373,7 @@ ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, size_t 
     tcb_sig = cJSON_CreateObject();
     if (tcb_sig == NULL) {
         ret = OVSA_JSON_ERROR_CREATE_OBJECT;
-        OVSA_DBG(DBG_E, "OVSA: Error create license config Json object failed %d\n", ret);
+        OVSA_DBG(DBG_E, "OVSA: Error create tcb signature Json object failed %d\n", ret);
         goto end;
     }
 
@@ -388,26 +388,109 @@ ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, size_t 
         OVSA_DBG(DBG_E, "OVSA: Error add version to tcb info failed %d\n", ret);
         goto end;
     }
-#ifndef DISABLE_TPM2_HWQUOTE
-    if (cJSON_AddStringToObject(tcb_sig, "HW_Quote_PCR", tsig->tcbinfo.hw_quote) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add HW_quote to tcb info failed %d\n", ret);
+
+    cJSON* tcb_sign = cJSON_CreateObject();
+    if (tcb_sign == NULL) {
+        ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+        OVSA_DBG(DBG_E, "OVSA: Error could not create object tcb_sign\n");
         goto end;
     }
-    if (cJSON_AddStringToObject(tcb_sig, "HW_AK_Pub_Key", tsig->tcbinfo.hw_pub_key) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add HW_pub_key to tcb info failed %d\n", ret);
+    cJSON_AddItemToObject(tcb_sig, "TCB Signature", tcb_sign);
+
+#ifndef ENABLE_SGX_GRAMINE
+    if ((*(tsig->tcbinfo.hw_quote) != 0) && (*(tsig->tcbinfo.hw_pub_key) != 0)) {
+        cJSON* hw_tpm_quote = cJSON_CreateObject();
+        if (hw_tpm_quote == NULL) {
+            ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+            OVSA_DBG(DBG_E, "OVSA: Error could not create object hw_tpm_quote\n");
+            goto end;
+        }
+        cJSON_AddItemToObject(tcb_sign, "HW_TPM_Quote", hw_tpm_quote);
+        cJSON* hw_quote = cJSON_CreateObject();
+        if (hw_quote == NULL) {
+            ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+            OVSA_DBG(DBG_E, "OVSA: Error could not create object hw_quote\n");
+            goto end;
+        }
+        cJSON_AddItemToObject(hw_tpm_quote, "Quote", hw_quote);
+        if (cJSON_AddStringToObject(hw_quote, "HW_Quote_PCR", tsig->tcbinfo.hw_quote) == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add HW_quote to tcb info failed %d\n", ret);
+            goto end;
+        }
+        if (cJSON_AddStringToObject(hw_quote, "HW_AK_Pub_Key", tsig->tcbinfo.hw_pub_key) == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add HW_pub_key to tcb info failed %d\n", ret);
+            goto end;
+        }
+        if (cJSON_AddStringToObject(hw_tpm_quote, "PCR_Exclusion", tsig->tcbinfo.hw_pcr_reg_id) ==
+            NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add HW PCR_Exclusion to tcb info failed %d\n", ret);
+            goto end;
+        }
+    }
+    if ((*(tsig->tcbinfo.sw_quote) != 0) && (*(tsig->tcbinfo.sw_pub_key) != 0)) {
+        cJSON* sw_tpm_quote = cJSON_CreateObject();
+        if (sw_tpm_quote == NULL) {
+            ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+            OVSA_DBG(DBG_E, "OVSA: Error could not create object sw_tpm_quote\n");
+            goto end;
+        }
+        cJSON_AddItemToObject(tcb_sign, "SW_TPM_Quote", sw_tpm_quote);
+
+        cJSON* sw_quote = cJSON_CreateObject();
+        if (sw_quote == NULL) {
+            ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+            OVSA_DBG(DBG_E, "OVSA: Error could not create object sw_quote\n");
+            goto end;
+        }
+        cJSON_AddItemToObject(sw_tpm_quote, "Quote", sw_quote);
+
+        if (cJSON_AddStringToObject(sw_quote, "SW_Quote_PCR", tsig->tcbinfo.sw_quote) == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add SW_quote to tcb info failed %d\n", ret);
+            goto end;
+        }
+        if (cJSON_AddStringToObject(sw_quote, "SW_AK_Pub_key", tsig->tcbinfo.sw_pub_key) == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add SW_pub_key to tcb info failed %d\n", ret);
+            goto end;
+        }
+        if (cJSON_AddStringToObject(sw_tpm_quote, "PCR_Exclusion", tsig->tcbinfo.sw_pcr_reg_id) ==
+            NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add SW PCR_Exclusion to tcb info failed %d\n", ret);
+            goto end;
+        }
+    }
+#else
+    cJSON* sgx_quote = cJSON_CreateObject();
+    if (sgx_quote == NULL) {
+        ret = OVSA_JSON_ERROR_CREATE_OBJECT;
+        OVSA_DBG(DBG_E, "OVSA: Error could not create object sgx_quote\n");
         goto end;
     }
-#endif
-    if (cJSON_AddStringToObject(tcb_sig, "SW_Quote_PCR", tsig->tcbinfo.sw_quote) == NULL) {
+    cJSON_AddItemToObject(tcb_sign, "SGX_ENCLAVE_Quote", sgx_quote);
+
+    if (cJSON_AddStringToObject(sgx_quote, "mrenclave", tsig->tcbinfo.mrenclave) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add SW_quote to tcb info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "Error: Add mrenclave to tcb info failed %d\n", ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(tcb_sig, "SW_AK_Pub_key", tsig->tcbinfo.sw_pub_key) == NULL) {
+    if (cJSON_AddStringToObject(sgx_quote, "mrsigner", tsig->tcbinfo.mrsigner) == NULL) {
         ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add SW_pub_key to tcb info failed %d\n", ret);
+        OVSA_DBG(DBG_E, "Error: Add mrenclave to tcb info failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddNumberToObject(sgx_quote, "isv_svn", tsig->tcbinfo.isv_svn) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "Error: Add isv_svn to tcb info failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddNumberToObject(sgx_quote, "isv_prod_id", tsig->tcbinfo.isv_prod_id) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "Error: Add isv_prod_id to customer license failed %d\n", ret);
         goto end;
     }
 
@@ -418,6 +501,7 @@ ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, size_t 
         goto end;
     }
 
+#endif
     str_print = cJSON_Print(tcb_sig);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
@@ -869,20 +953,20 @@ end:
 #ifdef OVSA_RUNTIME
 ovsa_status_t ovsa_json_extract_controlled_access_model(
     const char* inputBuf, ovsa_controlled_access_model_sig_t* control_access_model_sig) {
-    ovsa_status_t ret       = OVSA_OK;
-    cJSON* name             = NULL;
-    cJSON* description      = NULL;
-    cJSON* version          = NULL;
-    cJSON* model_guid       = NULL;
-    cJSON* isv_certificate  = NULL;
-    cJSON* signature        = NULL;
-    cJSON* parse_json       = NULL;
-    cJSON* file             = NULL;
-    ovsa_enc_models_t* head = NULL;
-    ovsa_enc_models_t* cur  = NULL;
-    ovsa_enc_models_t* tail = NULL;
-    char* tail_enc_model    = NULL;
-    int i                   = 0;
+    ovsa_status_t ret        = OVSA_OK;
+    cJSON* name              = NULL;
+    cJSON* description       = NULL;
+    cJSON* version           = NULL;
+    cJSON* model_guid        = NULL;
+    cJSON* isv_certificate   = NULL;
+    cJSON* signature         = NULL;
+    cJSON* parse_json        = NULL;
+    cJSON* file              = NULL;
+    ovsa_model_files_t* head = NULL;
+    ovsa_model_files_t* cur  = NULL;
+    ovsa_model_files_t* tail = NULL;
+    char* tail_enc_model     = NULL;
+    int i                    = 0;
     char fname[MAX_FILE_NAME_LEN];
 
     OVSA_DBG(DBG_D, "%s entry\n", __func__);
@@ -969,25 +1053,25 @@ ovsa_status_t ovsa_json_extract_controlled_access_model(
             cJSON_IsString(file_name) && (file_name->valuestring != NULL)) {
             if (head == NULL) {
                 /* Memory allocated and this needs to be freed by consumer */
-                ret = ovsa_safe_malloc(sizeof(ovsa_enc_models_t), (char**)&head);
+                ret = ovsa_safe_malloc(sizeof(ovsa_model_files_t), (char**)&head);
                 if (ret < OVSA_OK || head == NULL) {
                     OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
-                head->enc_model = NULL;
-                head->next      = NULL;
-                tail            = head;
+                head->model_file_data = NULL;
+                head->next            = NULL;
+                tail                  = head;
             } else {
                 /* Memory allocated and this needs to be freed by consumer */
-                ret = ovsa_safe_malloc(sizeof(ovsa_enc_models_t), (char**)&cur);
+                ret = ovsa_safe_malloc(sizeof(ovsa_model_files_t), (char**)&cur);
                 if (ret < OVSA_OK || cur == NULL) {
                     OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                     goto end;
                 }
-                cur->enc_model = NULL;
-                cur->next      = NULL;
-                tail->next     = cur;
-                tail           = cur;
+                cur->model_file_data = NULL;
+                cur->next            = NULL;
+                tail->next           = cur;
+                tail                 = cur;
             }
             /* Memory allocated and this needs to be freed by consumer */
             size_t str_len = 0;
@@ -996,16 +1080,17 @@ ovsa_status_t ovsa_json_extract_controlled_access_model(
                 OVSA_DBG(DBG_E, "OVSA: Error could not get length of file_body string %d\n", ret);
                 goto end;
             }
-            ret             = ovsa_safe_malloc(str_len + 1, &tail_enc_model);
-            tail->enc_model = tail_enc_model;
-            if (ret < OVSA_OK || tail->enc_model == NULL) {
+            ret                   = ovsa_safe_malloc(str_len + 1, &tail_enc_model);
+            tail->model_file_data = tail_enc_model;
+            if (ret < OVSA_OK || tail->model_file_data == NULL) {
                 OVSA_DBG(DBG_E, "OVSA: Error could not allocate memory %d\n", ret);
                 goto end;
             }
-            memcpy_s(tail->enc_model, str_len, file_body->valuestring, str_len);
-            tail->enc_model[str_len] = '\0';
-            memcpy_s(tail->file_name, MAX_NAME_SIZE, file_name->valuestring,
+            memcpy_s(tail->model_file_data, str_len, file_body->valuestring, str_len);
+            tail->model_file_data[str_len] = '\0';
+            memcpy_s(tail->model_file_name, MAX_NAME_SIZE, file_name->valuestring,
                      strnlen_s(file_name->valuestring, MAX_NAME_SIZE));
+            tail->model_file_length = str_len;
             OVSA_DBG(DBG_D, "%s\n", file_name->valuestring);
         }
     }
@@ -1021,12 +1106,19 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
     ovsa_status_t ret = OVSA_OK;
     cJSON* name       = NULL;
     cJSON* version    = NULL;
-#ifndef DISABLE_TPM2_HWQUOTE
+#ifndef ENABLE_SGX_GRAMINE
+#ifdef ENABLE_QUOTE_FROM_NVRAM
     cJSON* hw_quote   = NULL;
     cJSON* hw_pub_key = NULL;
 #endif
-    cJSON* sw_quote        = NULL;
-    cJSON* sw_pub_key      = NULL;
+    cJSON* sw_quote   = NULL;
+    cJSON* sw_pub_key = NULL;
+#else
+    cJSON* mrenclave   = NULL;
+    cJSON* mrsigner    = NULL;
+    cJSON* isv_svn     = NULL;
+    cJSON* isv_prod_id = NULL;
+#endif
     cJSON* isv_certificate = NULL;
     cJSON* signature       = NULL;
     cJSON* parse_json      = NULL;
@@ -1059,8 +1151,14 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
                  strnlen_s(version->valuestring, MAX_VERSION_SIZE));
         OVSA_DBG(DBG_D, "version %s\n", version->valuestring);
     }
-#ifndef DISABLE_TPM2_HWQUOTE
-    hw_quote = cJSON_GetObjectItemCaseSensitive(parse_json, "HW_Quote_PCR");
+
+    cJSON* tcb_sign = cJSON_GetObjectItemCaseSensitive(parse_json, "TCB Signature");
+
+#ifndef ENABLE_SGX_GRAMINE
+#ifdef ENABLE_QUOTE_FROM_NVRAM
+    cJSON* hw_tpm_quote = cJSON_GetObjectItemCaseSensitive(tcb_sign, "HW_TPM_Quote");
+    cJSON* quote_hw     = cJSON_GetObjectItemCaseSensitive(hw_tpm_quote, "Quote");
+    hw_quote            = cJSON_GetObjectItemCaseSensitive(quote_hw, "HW_Quote_PCR");
     if (cJSON_IsString(hw_quote) && (hw_quote->valuestring != NULL)) {
         size_t str_len = 0;
         ret            = ovsa_get_string_length(hw_quote->valuestring, &str_len);
@@ -1071,14 +1169,16 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
         memcpy_s(tsig->tcbinfo.hw_quote, TPM2_QUOTE_SIZE, hw_quote->valuestring, str_len);
         OVSA_DBG(DBG_D, "HW_quote %s\n", hw_quote->valuestring);
     }
-    hw_pub_key = cJSON_GetObjectItemCaseSensitive(parse_json, "HW_AK_Pub_Key");
+    hw_pub_key = cJSON_GetObjectItemCaseSensitive(quote_hw, "HW_AK_Pub_Key");
     if (cJSON_IsString(hw_pub_key) && (hw_pub_key->valuestring != NULL)) {
         memcpy_s(tsig->tcbinfo.hw_pub_key, TPM2_PUBKEY_SIZE, hw_pub_key->valuestring,
                  strnlen_s(hw_pub_key->valuestring, TPM2_PUBKEY_SIZE));
         OVSA_DBG(DBG_D, "hw_pub_key %s\n", hw_pub_key->valuestring);
     }
 #endif
-    sw_quote = cJSON_GetObjectItemCaseSensitive(parse_json, "SW_Quote_PCR");
+    cJSON* sw_tpm_quote = cJSON_GetObjectItemCaseSensitive(tcb_sign, "SW_TPM_Quote");
+    cJSON* quote_sw     = cJSON_GetObjectItemCaseSensitive(sw_tpm_quote, "Quote");
+    sw_quote            = cJSON_GetObjectItemCaseSensitive(quote_sw, "SW_Quote_PCR");
     if (cJSON_IsString(sw_quote) && (sw_quote->valuestring != NULL)) {
         size_t str_len = 0;
         ret            = ovsa_get_string_length(sw_quote->valuestring, &str_len);
@@ -1089,12 +1189,41 @@ ovsa_status_t ovsa_json_extract_tcb_signature(const char* inputBuf, ovsa_tcb_sig
         memcpy_s(tsig->tcbinfo.sw_quote, TPM2_QUOTE_SIZE, sw_quote->valuestring, str_len);
         OVSA_DBG(DBG_D, "SW_quote %s\n", sw_quote->valuestring);
     }
-    sw_pub_key = cJSON_GetObjectItemCaseSensitive(parse_json, "SW_AK_Pub_key");
+    sw_pub_key = cJSON_GetObjectItemCaseSensitive(quote_sw, "SW_AK_Pub_key");
     if (cJSON_IsString(sw_pub_key) && (sw_pub_key->valuestring != NULL)) {
         memcpy_s(tsig->tcbinfo.sw_pub_key, TPM2_PUBKEY_SIZE, sw_pub_key->valuestring,
                  strnlen_s(sw_pub_key->valuestring, TPM2_PUBKEY_SIZE));
         OVSA_DBG(DBG_D, "SW_pub_key %s\n", sw_pub_key->valuestring);
     }
+
+#else
+    cJSON* sgx_quote   = cJSON_GetObjectItemCaseSensitive(tcb_sign, "SGX_ENCLAVE_Quote");
+    mrenclave          = cJSON_GetObjectItemCaseSensitive(sgx_quote, "mrenclave");
+    if (cJSON_IsString(mrenclave) && (mrenclave->valuestring != NULL)) {
+        memcpy_s(tsig->tcbinfo.mrenclave, strnlen_s(mrenclave->valuestring, SGX_ENCLAVE_HASH_SIZE),
+                 mrenclave->valuestring, strnlen_s(mrenclave->valuestring, SGX_ENCLAVE_HASH_SIZE));
+        OVSA_DBG(DBG_D, "OVSA:mrenclave %s\n", mrenclave->valuestring);
+    }
+
+    mrsigner = cJSON_GetObjectItemCaseSensitive(sgx_quote, "mrsigner");
+    if (cJSON_IsString(mrsigner) && (mrsigner->valuestring != NULL)) {
+        memcpy_s(tsig->tcbinfo.mrsigner, strnlen_s(mrsigner->valuestring, SGX_ENCLAVE_HASH_SIZE),
+                 mrsigner->valuestring, strnlen_s(mrsigner->valuestring, SGX_ENCLAVE_HASH_SIZE));
+        OVSA_DBG(DBG_D, "OVSA:mrsigner %s\n", mrsigner->valuestring);
+    }
+
+    isv_svn = cJSON_GetObjectItemCaseSensitive(sgx_quote, "isv_svn");
+    if (cJSON_IsNumber(isv_svn)) {
+        tsig->tcbinfo.isv_svn = isv_svn->valueint;
+        OVSA_DBG(DBG_D, "OVSA:isv_svn %d\n", isv_svn->valueint);
+    }
+
+    isv_prod_id = cJSON_GetObjectItemCaseSensitive(sgx_quote, "isv_prod_id");
+    if (cJSON_IsNumber(isv_prod_id)) {
+        tsig->tcbinfo.isv_prod_id = isv_prod_id->valueint;
+        OVSA_DBG(DBG_D, "OVSA:isv_prod_id %d\n", isv_prod_id->valueint);
+    }
+#endif
 
     isv_certificate = cJSON_GetObjectItemCaseSensitive(parse_json, "isv_certificate");
     if (cJSON_IsString(isv_certificate) && (isv_certificate->valuestring != NULL)) {
@@ -1541,11 +1670,15 @@ ovsa_status_t ovsa_json_create_message_blob(ovsa_command_type_t cmdtype, const c
         goto end;
     }
     memset_s(command, sizeof(command), 0);
-
     if (cmdtype == OVSA_SEND_SIGN_NONCE) {
         memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_SIGN_NONCE",
                  strnlen_s("OVSA_SEND_SIGN_NONCE", RSIZE_MAX_STR));
-    } else if (cmdtype == OVSA_SEND_HW_QUOTE) {
+    } else if (cmdtype == OVSA_SEND_CUST_LICENSE) {
+        memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_CUST_LICENSE",
+                 strnlen_s("OVSA_SEND_CUST_LICENSE", RSIZE_MAX_STR));
+    }
+#ifndef ENABLE_SGX_GRAMINE
+    else if (cmdtype == OVSA_SEND_HW_QUOTE) {
         memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_HW_QUOTE",
                  strnlen_s("OVSA_SEND_HW_QUOTE", RSIZE_MAX_STR));
     } else if (cmdtype == OVSA_SEND_QUOTE_INFO) {
@@ -1554,10 +1687,9 @@ ovsa_status_t ovsa_json_create_message_blob(ovsa_command_type_t cmdtype, const c
     } else if (cmdtype == OVSA_SEND_EK_AK_BIND_INFO) {
         memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_EK_AK_BIND_INFO",
                  strnlen_s("OVSA_SEND_EK_AK_BIND_INFO", RSIZE_MAX_STR));
-    } else if (cmdtype == OVSA_SEND_CUST_LICENSE) {
-        memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_CUST_LICENSE",
-                 strnlen_s("OVSA_SEND_CUST_LICENSE", RSIZE_MAX_STR));
-    } else if (cmdtype == OVSA_SEND_UPDATE_CUST_LICENSE_ACK) {
+    }
+#endif
+    else if (cmdtype == OVSA_SEND_UPDATE_CUST_LICENSE_ACK) {
         memcpy_s(command, MAX_COMMAND_TYPE_LENGTH, "OVSA_SEND_UPDATE_CUST_LICENSE_ACK",
                  strnlen_s("OVSA_SEND_UPDATE_CUST_LICENSE_ACK", RSIZE_MAX_STR));
     } else {
@@ -1613,6 +1745,7 @@ end:
     return ret;
 }
 
+#ifndef ENABLE_SGX_GRAMINE
 ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_ek_ak_bind_info_t ek_ak_bind_info,
                                                        char** outputBuf, size_t* valuelen) {
     ovsa_status_t ret = OVSA_OK;
@@ -1712,9 +1845,78 @@ end:
     OVSA_DBG(DBG_D, "%s exit\n", __func__);
     return ret;
 }
+static ovsa_status_t ovsa_create_hw_quote_blob(cJSON** message,
+                                               const ovsa_quote_info_t* hw_quote_info) {
+    ovsa_status_t ret = OVSA_OK;
+    OVSA_DBG(DBG_D, "%s entry\n", __func__);
+    if (cJSON_AddStringToObject(*message, "HW_Quote_MSG", hw_quote_info->quote_message) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_Quote_MSG to message info failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(*message, "HW_Quote_SIG", hw_quote_info->quote_sig) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_Quote_SIG to json failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(*message, "HW_Quote_PCR", hw_quote_info->quote_pcr) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_Quote_PCR to json failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(*message, "HW_AK_Pub_Key", hw_quote_info->ak_pub_key) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_AK_Pub_Key to json failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(*message, "HW_EK_Cert", hw_quote_info->ek_cert) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add HW_EK_Cert to json failed %d\n", ret);
+        goto end;
+    }
 
+end:
+    OVSA_DBG(DBG_D, "%s exit\n", __func__);
+    return ret;
+}
+#ifdef KVM
+static ovsa_status_t ovsa_create_sw_quote_blob(cJSON** message,
+                                               const ovsa_quote_info_t* quote_info) {
+    ovsa_status_t ret = OVSA_OK;
+    OVSA_DBG(DBG_D, "%s entry\n", __func__);
+
+    if (cJSON_AddStringToObject(*message, "SW_Quote_MSG", quote_info->quote_message) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_Quote_MSG to message info failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(*message, "SW_Quote_SIG", quote_info->quote_sig) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_Quote_SIG to json failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(*message, "SW_Quote_PCR", quote_info->quote_pcr) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_Quote_PCR to json failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(*message, "SW_AK_Pub_key", quote_info->ak_pub_key) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_AK_Pub_key to json failed %d\n", ret);
+        goto end;
+    }
+    if (cJSON_AddStringToObject(*message, "SW_EK_Cert", quote_info->ek_cert) == NULL) {
+        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+        OVSA_DBG(DBG_E, "OVSA: Error add SW_EK_Cert to json failed %d\n", ret);
+        goto end;
+    }
+end:
+    OVSA_DBG(DBG_D, "%s exit\n", __func__);
+    return ret;
+}
+#endif
 ovsa_status_t ovsa_json_create_quote_info_blob(const char* secret,
-                                               const ovsa_quote_info_t sw_quote_info,
+                                               const ovsa_quote_info_t quote_info,
                                                const ovsa_quote_info_t hw_quote_info,
                                                char** outputBuf, size_t* valuelen) {
     ovsa_status_t ret = OVSA_OK;
@@ -1741,55 +1943,23 @@ ovsa_status_t ovsa_json_create_quote_info_blob(const char* secret,
         OVSA_DBG(DBG_E, "OVSA: Error add secret to message info failed %d\n", ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(message, "SW_Quote_MSG", sw_quote_info.quote_message) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add SW_Quote_MSG to message info failed %d\n", ret);
+#ifdef KVM
+    ret = ovsa_create_sw_quote_blob(&message, &quote_info);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error create sw quote blob failed %d\n", ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(message, "SW_Quote_SIG", sw_quote_info.quote_sig) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add SW_Quote_SIG to json failed %d\n", ret);
+#else
+    ret = ovsa_create_hw_quote_blob(&message, &quote_info);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error create hw quote blob failed %d\n", ret);
         goto end;
     }
-    if (cJSON_AddStringToObject(message, "SW_Quote_PCR", sw_quote_info.quote_pcr) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add SW_Quote_PCR to json failed %d\n", ret);
-        goto end;
-    }
-    if (cJSON_AddStringToObject(message, "SW_AK_Pub_key", sw_quote_info.ak_pub_key) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add SW_AK_Pub_key to json failed %d\n", ret);
-        goto end;
-    }
-    if (cJSON_AddStringToObject(message, "SW_EK_Cert", sw_quote_info.ek_cert) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add SW_EK_Cert to json failed %d\n", ret);
-        goto end;
-    }
-#ifndef DISABLE_TPM2_HWQUOTE
-    if (cJSON_AddStringToObject(message, "HW_Quote_MSG", hw_quote_info.quote_message) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add HW_Quote_MSG to message info failed %d\n", ret);
-        goto end;
-    }
-    if (cJSON_AddStringToObject(message, "HW_Quote_SIG", hw_quote_info.quote_sig) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add HW_Quote_SIG to json failed %d\n", ret);
-        goto end;
-    }
-    if (cJSON_AddStringToObject(message, "HW_Quote_PCR", hw_quote_info.quote_pcr) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add HW_Quote_PCR to json failed %d\n", ret);
-        goto end;
-    }
-    if (cJSON_AddStringToObject(message, "HW_AK_Pub_Key", hw_quote_info.ak_pub_key) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add HW_AK_Pub_Key to json failed %d\n", ret);
-        goto end;
-    }
-    if (cJSON_AddStringToObject(message, "HW_EK_Cert", hw_quote_info.ek_cert) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add HW_EK_Cert to json failed %d\n", ret);
+#endif
+#ifdef ENABLE_QUOTE_FROM_NVRAM
+    ret = ovsa_create_hw_quote_blob(&message, &hw_quote_info);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error create hw quote blob failed %d\n", ret);
         goto end;
     }
 #endif
@@ -1820,4 +1990,5 @@ end:
     OVSA_DBG(DBG_D, "%s exit\n", __func__);
     return ret;
 }
+#endif
 #endif

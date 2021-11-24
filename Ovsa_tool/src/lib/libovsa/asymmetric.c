@@ -17,6 +17,7 @@
 
 #include "asymmetric.h"
 
+#include <libgen.h>
 #include <openssl/bio.h>
 #include <openssl/conf.h>
 #include <openssl/ec.h>
@@ -314,8 +315,7 @@ ovsa_status_t ovsa_crypto_add_cert_keystore_array(int asym_key_slot, const char*
 ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, const char* subject,
                                                        const char* isv_name,
                                                        const char* keystore_name,
-                                                       const char* csr_file_name,
-                                                       int* asym_key_slot) {
+                                                       const char* file_name, int* asym_key_slot) {
     size_t keystore_buff_len = 0, isv_name_len = 0;
     ovsa_status_t ret     = OVSA_OK;
     char* keystore_buff   = NULL;
@@ -324,13 +324,16 @@ ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, 
     ovsa_isv_keystore_t keystore[MAX_KEYPAIR];
     int sym_key_slot = -1;
     char magic_salt_buff[MAX_MAGIC_SALT_LENGTH];
+    char csr_file_name[MAX_FILE_NAME];
 
     if ((ECDSA != alg_type) || (subject == NULL) || (isv_name == NULL) || (keystore_name == NULL) ||
-        (csr_file_name == NULL) || (asym_key_slot == NULL)) {
+        (file_name == NULL) || (asym_key_slot == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error generating asymmetric key pair failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
+    char* path = strdup(file_name);
+    char* file = strdup(file_name);
 
     memset_s(&keystore, sizeof(ovsa_isv_keystore_t) * MAX_KEYPAIR, 0);
 
@@ -386,6 +389,7 @@ ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, 
     }
 
     keystore[0].isv_certificate = "";
+    keystore[1].isv_certificate = "";
     keystore_buff               = (char*)ovsa_crypto_app_malloc(
         (sizeof(ovsa_isv_keystore_t) * MAX_KEYPAIR) + KEYSTORE_BLOB_TEXT_SIZE, "keystore buffer");
     if (keystore_buff == NULL) {
@@ -413,6 +417,7 @@ ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, 
         goto end;
     }
 
+#ifndef ENABLE_SGX_GRAMINE
     memset_s(magic_salt_buff, sizeof(magic_salt_buff), 0);
     ret = ovsa_crypto_derive_unsealing_key(magic_salt_buff, &sym_key_slot);
     if (ret < OVSA_OK) {
@@ -421,7 +426,7 @@ ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, 
             "LibOVSA: Error generating asymmetric key pair failed in deriving unsealing key\n");
         goto end;
     }
-
+#endif
     ret = ovsa_crypto_encrypt_keystore(sym_key_slot, keystore_name, keystore_buff,
                                        keystore_buff_len, magic_salt_buff);
     if (ret < OVSA_OK) {
@@ -430,11 +435,21 @@ ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, 
         goto end;
     }
 
+    char* dir      = dirname(path);
+    char* filename = basename(file);
+    memset_s(csr_file_name, MAX_FILE_NAME, 0);
+    snprintf(csr_file_name, MAX_FILE_NAME, "%s/primary_%s", dir, filename);
     ret = ovsa_crypto_generate_csr(keystore[0].private_key, subject, csr_file_name);
     if (ret < OVSA_OK) {
-        BIO_printf(
-            g_bio_err,
-            "LibOVSA: Error generating asymmetric key pair failed in generating the csr file\n");
+        BIO_printf(g_bio_err, "LibOVSA: Error generating primary csr file\n");
+        goto end;
+    }
+
+    memset_s(csr_file_name, MAX_FILE_NAME, 0);
+    snprintf(csr_file_name, MAX_FILE_NAME, "%s/secondary_%s", dir, filename);
+    ret = ovsa_crypto_generate_csr(keystore[1].private_key, subject, csr_file_name);
+    if (ret < OVSA_OK) {
+        BIO_printf(g_bio_err, "LibOVSA: Error generating secondary csr file\n");
         goto end;
     }
 
@@ -477,9 +492,13 @@ exit:
     }
 
 end:
+#ifndef ENABLE_SGX_GRAMINE
     OPENSSL_cleanse(magic_salt_buff, sizeof(magic_salt_buff));
+#endif
     memset_s(&keystore, sizeof(ovsa_isv_keystore_t) * MAX_KEYPAIR, 0);
     BIO_free_all(keystore_bio);
+    free(file);
+    free(path);
     ovsa_crypto_openssl_free(&keystore_buff);
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);
@@ -494,11 +513,13 @@ static ovsa_status_t ovsa_crypto_extract_keystore(const char* keystore_name,
     char* keystore_data       = NULL;
     FILE* keystore_fp         = NULL;
     size_t cert_len           = 0;
+#ifndef ENABLE_SGX_GRAMINE
     char* decrypted_buff      = NULL;
     size_t decrypted_buff_len = 0;
     int sym_key_slot          = -1;
     char magic_salt_buff[MAX_MAGIC_SALT_LENGTH];
 
+#endif
     if (keystore_name == NULL) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error loading asymmetric key failed with invalid file path\n");
@@ -539,6 +560,7 @@ static ovsa_status_t ovsa_crypto_extract_keystore(const char* keystore_name,
     }
 
     keystore_data[keystore_file_size - 1] = '\0';
+#ifndef ENABLE_SGX_GRAMINE
     memset_s(magic_salt_buff, sizeof(magic_salt_buff), 0);
 
     ret = ovsa_crypto_derive_unsealing_key(magic_salt_buff, &sym_key_slot);
@@ -575,6 +597,7 @@ static ovsa_status_t ovsa_crypto_extract_keystore(const char* keystore_name,
         ret = OVSA_MEMIO_ERROR;
         goto end;
     }
+#endif
 
     ret = ovsa_json_getitem_size("certificate", keystore_data, &cert_len);
     if (ret < OVSA_OK) {
@@ -596,6 +619,26 @@ static ovsa_status_t ovsa_crypto_extract_keystore(const char* keystore_name,
         }
     }
 
+    ret = ovsa_json_getitem_size("certificate_2", keystore_data, &cert_len);
+    if (ret < OVSA_OK) {
+        BIO_printf(
+            g_bio_err,
+            "LibOVSA: Error loading asymmetric key failed in getting the certificate size\n");
+        goto end;
+    }
+
+    if (cert_len != 0) {
+        keystore[1].isv_certificate =
+            (char*)ovsa_crypto_app_malloc(cert_len + NULL_TERMINATOR, "certificate_2");
+        if (keystore[1].isv_certificate == NULL) {
+            BIO_printf(g_bio_err,
+                       "LibOVSA: Error loading asymmetric key failed in allocating memory for "
+                       "certificate\n");
+            ret = OVSA_MEMORY_ALLOC_FAIL;
+            goto end;
+        }
+    }
+
     ret = ovsa_json_extract_keystore_info(keystore_data, keystore);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
@@ -605,8 +648,10 @@ static ovsa_status_t ovsa_crypto_extract_keystore(const char* keystore_name,
     }
 
 end:
+#ifndef ENABLE_SGX_GRAMINE
     OPENSSL_cleanse(magic_salt_buff, sizeof(magic_salt_buff));
     ovsa_crypto_openssl_free(&decrypted_buff);
+#endif
     if (keystore_fp != NULL) {
         fclose(keystore_fp);
     }
@@ -813,6 +858,9 @@ ovsa_status_t ovsa_crypto_store_certificate_keystore(int asym_key_slot, bool pee
     char* keystore_buff      = NULL;
     BIO* keystore_bio        = NULL;
     int sym_key_slot         = -1;
+    int store_key_slot       = -1;
+    EVP_PKEY* pkey           = NULL;
+    X509* xcert              = NULL;
     char magic_salt_buff[MAX_MAGIC_SALT_LENGTH];
 
     if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT) || (cert == NULL) ||
@@ -848,8 +896,22 @@ ovsa_status_t ovsa_crypto_store_certificate_keystore(int asym_key_slot, bool pee
         ret = OVSA_MUTEX_LOCK_FAIL;
         goto end;
     }
-
-    ret = ovsa_crypto_add_cert_keystore_array(asym_key_slot, cert);
+    /* Compare certificate key and keystore key to store the certificate */
+    store_key_slot = asym_key_slot;
+    ret            = ovsa_crypto_compare_certkey_and_keystore(store_key_slot, cert, &pkey, &xcert);
+    if (ret < OVSA_OK) {
+        store_key_slot++;
+        X509_free(xcert);
+        EVP_PKEY_free(pkey);
+        ret = ovsa_crypto_compare_certkey_and_keystore(store_key_slot, cert, &pkey, &xcert);
+        if (ret < OVSA_OK) {
+            BIO_printf(
+                g_bio_err,
+                "LibOVSA: Certificate key is not matching with secondary keystore publickeys\n");
+            goto end;
+        }
+    }
+    ret = ovsa_crypto_add_cert_keystore_array(store_key_slot, cert);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error storing certificate to keystore failed in adding certificate to "
@@ -893,6 +955,7 @@ ovsa_status_t ovsa_crypto_store_certificate_keystore(int asym_key_slot, bool pee
         goto end;
     }
 
+#ifndef ENABLE_SGX_GRAMINE
     memset_s(magic_salt_buff, sizeof(magic_salt_buff), 0);
     ret = ovsa_crypto_derive_unsealing_key(magic_salt_buff, &sym_key_slot);
     if (ret < OVSA_OK) {
@@ -901,6 +964,7 @@ ovsa_status_t ovsa_crypto_store_certificate_keystore(int asym_key_slot, bool pee
             "LibOVSA: Error storing certificate to keystore failed in deriving unsealing key\n");
         goto end;
     }
+#endif
 
     ret = ovsa_crypto_encrypt_keystore(sym_key_slot, keystore_name, keystore_buff,
                                        keystore_buff_len, magic_salt_buff);
@@ -923,9 +987,13 @@ exit:
     }
 
 end:
+#ifndef ENABLE_SGX_GRAMINE
     OPENSSL_cleanse(magic_salt_buff, sizeof(magic_salt_buff));
+#endif
     ovsa_crypto_openssl_free(&keystore_buff);
     BIO_free_all(keystore_bio);
+    X509_free(xcert);
+    EVP_PKEY_free(pkey);
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);
     }

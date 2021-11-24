@@ -21,6 +21,10 @@ else
 CFLAGS += -O2
 endif
 
+ifeq ($(ENABLE_SGX_GRAMINE),1)
+CFLAGS += -DENABLE_SGX_GRAMINE
+endif
+
 DEBUG ?=
 export DEBUG=1
 
@@ -40,8 +44,13 @@ INC_DIR := -I$(SRC_BUILD_DIR)/src/lib/mbedtls/install/include \
 	   -I$(SRC_BUILD_DIR)/src/lib/cJSON \
 	   -I$(SRC_BUILD_DIR)/src/lib/safestringlib/include
 
-LFLAGS += -Wl,-rpath,$(INC_LIBS)  -L$(INC_LIBS) -fpic -D_GNU_SOURCE
-LIBS = -Bstatic -lssl -lcrypto -lsqlite3 -lsafestring -lcjson -Bdynamic -lcurl -lmbedtls -lmbedcrypto -lmbedx509 -ldl -lm -lpthread
+LFLAGS += -Wl,-rpath,$(INC_LIBS) -L$(INC_LIBS) -fpic -D_GNU_SOURCE
+
+ifneq ($(ENABLE_SGX_GRAMINE),1)
+LIBS = -Bstatic -lsqlite3 -lsafestring -lssl -lcrypto -lcurl -lcjson -lmbedx509 -lmbedtls -lmbedcrypto -Bdynamic -ldl -lm -lpthread
+else
+LIBS = -Bstatic -lsqlite3 -lsafestring -lssl -lcrypto -lcurl -lcjson -lmbedx509 -lmbedtls -lmbedcrypto -Bdynamic -lsgx_util -lra_tls_verify_dcap -ldl -lm -lpthread
+endif
 
 # Build Executable
 #===================================
@@ -62,7 +71,11 @@ OBJS := $(C_SRC_FILES:.c=.o)
 	$(CC) $(CFLAGS) $(INC_DIR) $(LFLAGS) -c -o $@ $<
 
 $(TARGET): $(OBJS)
+ifneq ($(ENABLE_SGX_GRAMINE),1)
 	$(CC) $^ $(LFLAGS)  $(LIBS) -o $@
+else
+	$(CC)  -o $@ $(OBJS) $(LFLAGS)  $(LIBS) -Wl,--no-as-needed -lsgx_urts  -lsgx_dcap_quoteverify
+endif
 
 .PHONY: clean
 clean:

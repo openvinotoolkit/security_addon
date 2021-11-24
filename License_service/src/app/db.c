@@ -55,7 +55,7 @@ ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* 
             "license_guid = @license_guid and model_guid = @model_guid;");
     OVSA_DBG(DBG_D, "OVSA: SQL: %s\n", sql);
 
-    ret = ovsa_server_get_string_length(sql, &sqllen);
+    ret = ovsa_license_service_get_string_length(sql, &sqllen);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error could not get length of sql %d\n", ret);
         goto end;
@@ -64,7 +64,7 @@ ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* 
     db_status = sqlite3_prepare_v2(db, sql, sqllen, &stmt, 0);
     if (db_status == SQLITE_OK) {
         int idx = sqlite3_bind_parameter_index(stmt, "@license_guid");
-        ret     = ovsa_server_get_string_length(license_guid, &licguid_len);
+        ret     = ovsa_license_service_get_string_length(license_guid, &licguid_len);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error could not get length of license_guid %d\n", ret);
             goto end;
@@ -72,7 +72,7 @@ ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* 
         sqlite3_bind_text(stmt, idx, license_guid, licguid_len, SQLITE_STATIC);
 
         idx = sqlite3_bind_parameter_index(stmt, "@model_guid");
-        ret = ovsa_server_get_string_length(model_guid, &modelguid_len);
+        ret = ovsa_license_service_get_string_length(model_guid, &modelguid_len);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error could not get length of modelguid_len %d\n", ret);
             goto end;
@@ -88,7 +88,7 @@ ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* 
     if (db_status == SQLITE_ROW) {
         /* success */
         size_t certlen = 0;
-        ret            = ovsa_server_get_string_length(sqlite3_column_text(stmt, 1), &certlen);
+        ret = ovsa_license_service_get_string_length(sqlite3_column_text(stmt, 1), &certlen);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error could not get length of certificate %d\n", ret);
             goto end;
@@ -98,7 +98,7 @@ ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* 
             ret = OVSA_INVALID_PARAMETER;
             goto end;
         }
-        ret = ovsa_server_safe_malloc(sizeof(char) * (certlen + 1), customer_certificate);
+        ret = ovsa_license_service_safe_malloc(sizeof(char) * (certlen + 1), customer_certificate);
         if (ret < OVSA_OK) {
             sqlite3_finalize(stmt);
             OVSA_DBG(DBG_E,
@@ -157,7 +157,7 @@ ovsa_status_t ovsa_db_get_customer_license_blob(const char* db_name, const char*
             "license_guid = @license_guid and model_guid = @model_guid;");
     OVSA_DBG(DBG_D, "OVSA: SQL: %s\n", sql);
 
-    ret = ovsa_server_get_string_length(sql, &sqllen);
+    ret = ovsa_license_service_get_string_length(sql, &sqllen);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error could not get length of sql %d\n", ret);
         goto end;
@@ -166,7 +166,7 @@ ovsa_status_t ovsa_db_get_customer_license_blob(const char* db_name, const char*
     db_status = sqlite3_prepare_v2(db, sql, sqllen, &stmt, 0);
     if (db_status == SQLITE_OK) {
         int idx = sqlite3_bind_parameter_index(stmt, "@license_guid");
-        ret     = ovsa_server_get_string_length(license_guid, &licguid_len);
+        ret     = ovsa_license_service_get_string_length(license_guid, &licguid_len);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error could not get length of license_guid %d\n", ret);
             goto end;
@@ -174,7 +174,7 @@ ovsa_status_t ovsa_db_get_customer_license_blob(const char* db_name, const char*
         sqlite3_bind_text(stmt, idx, license_guid, licguid_len, SQLITE_STATIC);
 
         idx = sqlite3_bind_parameter_index(stmt, "@model_guid");
-        ret = ovsa_server_get_string_length(model_guid, &modelguid_len);
+        ret = ovsa_license_service_get_string_length(model_guid, &modelguid_len);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error could not get length of modelguid_len %d\n", ret);
             goto end;
@@ -190,7 +190,7 @@ ovsa_status_t ovsa_db_get_customer_license_blob(const char* db_name, const char*
     if (db_status == SQLITE_ROW) {
         /* success */
         size_t bloblen = 0;
-        ret            = ovsa_server_get_string_length(sqlite3_column_text(stmt, 1), &bloblen);
+        ret = ovsa_license_service_get_string_length(sqlite3_column_text(stmt, 1), &bloblen);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error could not get length of customer license blob %d\n", ret);
             goto end;
@@ -200,7 +200,7 @@ ovsa_status_t ovsa_db_get_customer_license_blob(const char* db_name, const char*
             ret = OVSA_INVALID_PARAMETER;
             goto end;
         }
-        ret = ovsa_server_safe_malloc(sizeof(char) * (bloblen + 1), customer_license_blob);
+        ret = ovsa_license_service_safe_malloc(sizeof(char) * (bloblen + 1), customer_license_blob);
         if (ret < OVSA_OK) {
             sqlite3_finalize(stmt);
             OVSA_DBG(DBG_E,
@@ -263,7 +263,7 @@ ovsa_status_t ovsa_db_validate_license_usage(const char* db_name, const char* li
             "@model_guid;");
     OVSA_DBG(DBG_D, "OVSA: SQL: %s\n", sql);
 
-    ret = ovsa_server_get_string_length(sql, &sqllen);
+    ret = ovsa_license_service_get_string_length(sql, &sqllen);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error could not get length of sql %d\n", ret);
         goto end;
@@ -271,7 +271,7 @@ ovsa_status_t ovsa_db_validate_license_usage(const char* db_name, const char* li
     db_status = sqlite3_prepare_v2(db, sql, sqllen, &stmt, 0);
     if (db_status == SQLITE_OK) {
         int idx = sqlite3_bind_parameter_index(stmt, "@license_guid");
-        ret     = ovsa_server_get_string_length(license_guid, &licguid_len);
+        ret     = ovsa_license_service_get_string_length(license_guid, &licguid_len);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error could not get length of license_guid %d\n", ret);
             goto end;
@@ -279,7 +279,7 @@ ovsa_status_t ovsa_db_validate_license_usage(const char* db_name, const char* li
         sqlite3_bind_text(stmt, idx, license_guid, licguid_len, SQLITE_STATIC);
 
         idx = sqlite3_bind_parameter_index(stmt, "@model_guid");
-        ret = ovsa_server_get_string_length(model_guid, &modelguid_len);
+        ret = ovsa_license_service_get_string_length(model_guid, &modelguid_len);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error could not get length of modelguid_len %d\n", ret);
             goto end;
@@ -377,7 +377,7 @@ ovsa_status_t ovsa_db_validate_license_usage(const char* db_name, const char* li
                 "update customer_license_info set usage_count = usage_count - 1 "
                 "where license_guid = @license_guid and model_guid = @model_guid;");
         OVSA_DBG(DBG_D, "OVSA: SQL: %s\n", sql);
-        ret = ovsa_server_get_string_length(sql, &sqllen);
+        ret = ovsa_license_service_get_string_length(sql, &sqllen);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error could not get length of sql %d\n", ret);
             goto end;
@@ -385,7 +385,7 @@ ovsa_status_t ovsa_db_validate_license_usage(const char* db_name, const char* li
         db_status = sqlite3_prepare_v2(db, sql, sqllen, &stmt, 0);
         if (db_status == SQLITE_OK) {
             int idx = sqlite3_bind_parameter_index(stmt, "@license_guid");
-            ret     = ovsa_server_get_string_length(license_guid, &licguid_len);
+            ret     = ovsa_license_service_get_string_length(license_guid, &licguid_len);
             if (ret < OVSA_OK) {
                 OVSA_DBG(DBG_E, "OVSA: Error could not get length of license_guid %d\n", ret);
                 goto end;
@@ -393,7 +393,7 @@ ovsa_status_t ovsa_db_validate_license_usage(const char* db_name, const char* li
             sqlite3_bind_text(stmt, idx, license_guid, licguid_len, SQLITE_STATIC);
 
             idx = sqlite3_bind_parameter_index(stmt, "@model_guid");
-            ret = ovsa_server_get_string_length(model_guid, &modelguid_len);
+            ret = ovsa_license_service_get_string_length(model_guid, &modelguid_len);
             if (ret < OVSA_OK) {
                 OVSA_DBG(DBG_E, "OVSA: Error could not get length of modelguid_len %d\n", ret);
                 goto end;

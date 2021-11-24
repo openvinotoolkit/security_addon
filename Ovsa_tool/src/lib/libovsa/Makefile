@@ -23,6 +23,7 @@ MINOR = 0
 SRC_BUILD_DIR  := $(OVSATOOL_DIR)
 
 OVSALIB_EXT = .so.$(VERSION)
+
 IDIR = $(SRC_BUILD_DIR)/src/lib/safestringlib/include -I$(SRC_BUILD_DIR)/include -I$(SRC_BUILD_DIR)/src/lib/openssl/include -I$(SRC_BUILD_DIR)/src/lib/curl/include
 OVSA_LIB_OBJ = $(SRC_BUILD_DIR)/src/lib/libovsa
 
@@ -34,6 +35,10 @@ endif
 
 CC = gcc
 CFLAGS = -I$(IDIR) -g -Wall -DENABLE_SELF_SIGNED_CERT -DENABLE_OCSP_CHECK -fstack-protector-strong -fPIE -fPIC -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -D_GNU_SOURCE -DDEBUG=$(DEBUG)
+ifeq ($(ENABLE_SGX_GRAMINE),1)
+CFLAGS += -DENABLE_SGX_GRAMINE
+endif
+
 CNF_CFLAGS := -pthread -m64 -Wa,--noexecstack
 CNF_EX_LIBS := -ldl -lpthread
 LIB_CFLAGS := -fPIC -Wno-attributes $(CNF_CFLAGS) $(CFLAGS)
@@ -42,14 +47,17 @@ LIB_PATH := -Wl, -Bstatic -L$(SRC_BUILD_DIR)/lib/ -lcjson
 
 LIBS = libovsa.a #libovsa$(OVSALIB_EXT) 
 
-_CLIB = asymmetric.c symmetric.c cert_verify.c utils.c tpm.c
+_CLIB = asymmetric.c symmetric.c cert_verify.c utils.c
+ifneq ($(ENABLE_SGX_GRAMINE),1)
+_CLIB += tpm.c
+endif
 
 _CLIST = $(addprefix $(OVSA_LIB_OBJ)/,$(_CLIB))
 OBJ = $(patsubst %.c,%.o,$(_CLIST))
 
 $(OVSA_LIB_OBJ)/%.o: %.c 
 	$(CC) $(LIB_CFLAGS) $(LIB_PATH) -c $< -o $@
-	
+
 libovsa.a: $(OBJ)
 	@ar rcs $@ $^
 	@echo "LINK =>  $@"	      

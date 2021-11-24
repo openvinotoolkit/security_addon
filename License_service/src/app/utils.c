@@ -35,7 +35,7 @@
 #include "mbedtls/ssl.h"
 #include "safe_str_lib.h"
 
-ovsa_status_t ovsa_server_safe_add(size_t* var1, size_t var2) {
+ovsa_status_t ovsa_license_service_safe_add(size_t* var1, size_t var2) {
     ovsa_status_t ret = OVSA_OK;
 
     if (*var1 >= 0) {
@@ -59,7 +59,7 @@ out:
     return ret;
 }
 
-ovsa_status_t ovsa_server_get_string_length(const char* in_buff, size_t* in_buff_len) {
+ovsa_status_t ovsa_license_service_get_string_length(const char* in_buff, size_t* in_buff_len) {
     ovsa_status_t ret = OVSA_OK;
     size_t total_len = 0, buff_len = 0;
 
@@ -74,14 +74,14 @@ ovsa_status_t ovsa_server_get_string_length(const char* in_buff, size_t* in_buff
         *in_buff_len = buff_len;
     } else {
         while (buff_len == RSIZE_MAX_STR) {
-            ret = ovsa_server_safe_add(&total_len, RSIZE_MAX_STR);
+            ret = ovsa_license_service_safe_add(&total_len, RSIZE_MAX_STR);
             if (ret < OVSA_OK) {
                 OVSA_DBG(DBG_E, "OVSA: Error ovsa_safe_add failed %d\n", ret);
                 return ret;
             }
             buff_len = strnlen_s((in_buff + total_len), RSIZE_MAX_STR);
             if (buff_len < RSIZE_MAX_STR) {
-                ret = ovsa_server_safe_add(&total_len, buff_len);
+                ret = ovsa_license_service_safe_add(&total_len, buff_len);
                 if (ret < OVSA_OK) {
                     OVSA_DBG(DBG_E, "OVSA: Error ovsa_safe_add failed %d\n", ret);
                     return ret;
@@ -93,7 +93,7 @@ ovsa_status_t ovsa_server_get_string_length(const char* in_buff, size_t* in_buff
     }
     return ret;
 }
-ovsa_status_t ovsa_server_safe_malloc(size_t size, char** aloc_buf) {
+ovsa_status_t ovsa_license_service_safe_malloc(size_t size, char** aloc_buf) {
     ovsa_status_t ret = OVSA_OK;
 
     *aloc_buf = (char*)malloc(size * sizeof(char));
@@ -107,7 +107,7 @@ out:
     return ret;
 }
 
-void ovsa_server_safe_free(char** ptr) {
+void ovsa_license_service_safe_free(char** ptr) {
     if (*ptr != NULL) {
         free(*ptr);
         *ptr = NULL;
@@ -116,37 +116,37 @@ void ovsa_server_safe_free(char** ptr) {
     return;
 }
 
-void ovsa_server_safe_free_url_list(ovsa_license_serv_url_list_t** lhead) {
+void ovsa_license_service_safe_free_url_list(ovsa_license_serv_url_list_t** lhead) {
     ovsa_license_serv_url_list_t* head = NULL;
     ovsa_license_serv_url_list_t* cur  = NULL;
     head                               = *lhead;
     while (head != NULL) {
         cur = head->next;
-        ovsa_server_safe_free((char**)&head);
+        ovsa_license_service_safe_free((char**)&head);
         head = cur;
     }
     *lhead = NULL;
 }
 
-void ovsa_server_safe_free_tcb_list(ovsa_tcb_sig_list_t** listhead) {
+void ovsa_license_service_safe_free_tcb_list(ovsa_tcb_sig_list_t** listhead) {
     ovsa_tcb_sig_list_t* head = NULL;
     ovsa_tcb_sig_list_t* cur  = NULL;
     head                      = *listhead;
     while (head != NULL) {
         cur = head->next;
-        ovsa_server_safe_free(&head->tcb_signature);
-        ovsa_server_safe_free((char**)&head);
+        ovsa_license_service_safe_free(&head->tcb_signature);
+        ovsa_license_service_safe_free((char**)&head);
         head = cur;
     }
     *listhead = NULL;
 }
 
-void ovsa_hexdump_mem(const void* data, size_t size) {
+void ovsa_license_service_mem(const void* data, size_t size) {
     uint8_t* ptr = (uint8_t*)data;
     for (size_t i = 0; i < size; i++) OVSA_DBG(DBG_D, "%02x", ptr[i]);
 }
 
-ovsa_status_t ovsa_do_string_concat(const char* in_buff, char** out_buff) {
+ovsa_status_t ovsa_license_service_string_concat(const char* in_buff, char** out_buff) {
     ovsa_status_t ret = OVSA_OK;
     size_t buff_len   = 0;
     char* cur_buff    = NULL;
@@ -176,14 +176,15 @@ ovsa_status_t ovsa_do_string_concat(const char* in_buff, char** out_buff) {
     }
     return ret;
 }
-ovsa_status_t ovsa_append_payload_len_to_blob(const char* input_buf, char** json_payload) {
+ovsa_status_t ovsa_license_service_append_payload_len_to_blob(const char* input_buf,
+                                                              char** json_payload) {
     ovsa_status_t ret         = OVSA_OK;
     uint64_t json_payload_len = 0;
     unsigned char payload_len[PAYLOAD_LENGTH + 1];
     size_t size = 0;
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
     memset_s(payload_len, sizeof(payload_len), 0);
-    ret = ovsa_server_get_string_length(input_buf, &json_payload_len);
+    ret = ovsa_license_service_get_string_length(input_buf, &json_payload_len);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error could not get length of input_buf string %d\n", ret);
         return ret;
@@ -192,7 +193,7 @@ ovsa_status_t ovsa_append_payload_len_to_blob(const char* input_buf, char** json
     size = strnlen_s(payload_len, RSIZE_MAX_STR) + 1;
     strcpy_s(*json_payload, size, payload_len);
     /*concatenate input_buf and json_payload*/
-    ret = ovsa_do_string_concat(input_buf, json_payload);
+    ret = ovsa_license_service_string_concat(input_buf, json_payload);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error string concat failed with error code %d\n", ret);
         return ret;
@@ -201,7 +202,8 @@ ovsa_status_t ovsa_append_payload_len_to_blob(const char* input_buf, char** json
     return ret;
 }
 
-ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, size_t* filesize) {
+ovsa_status_t ovsa_license_service_read_file_content(const char* filename, char** filecontent,
+                                                     size_t* filesize) {
     ovsa_status_t ret = OVSA_OK;
     size_t file_size  = 0;
     FILE* fptr        = NULL;
@@ -221,7 +223,7 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
         goto out;
     }
 
-    file_size = ovsa_server_crypto_get_file_size(fptr);
+    file_size = ovsa_license_service_crypto_get_file_size(fptr);
     if (file_size == 0) {
         OVSA_DBG(DBG_E, "OVSA: Error getting file size for %s failed\n", filename);
         ret = OVSA_FILEIO_FAIL;
@@ -229,7 +231,7 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
         goto out;
     }
 
-    ret = ovsa_server_safe_malloc((sizeof(char) * file_size), filecontent);
+    ret = ovsa_license_service_safe_malloc((sizeof(char) * file_size), filecontent);
     if ((ret < OVSA_OK) || (*filecontent == NULL)) {
         OVSA_DBG(DBG_E, "OVSA: Error PCR quote buffer allocation failed %d\n", ret);
         fclose(fptr);
@@ -248,7 +250,7 @@ out:
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }
-int ovsa_server_crypto_get_file_size(FILE* fp) {
+int ovsa_license_service_crypto_get_file_size(FILE* fp) {
     size_t file_size = 0;
     int ret          = 0;
 

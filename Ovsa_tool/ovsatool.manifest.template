@@ -1,0 +1,105 @@
+#
+# Copyright (c) 2020-2021 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# The binary to execute.
+libos.entrypoint = "bin/ovsatool"
+loader.log_level = "{{ log_level }}"
+
+# Gramine environment, including the path to the library OS
+loader.preload = "file:/usr/local/lib/x86_64-linux-gnu/gramine/libsysdb.so"
+
+# Environment variables
+loader.env.LD_LIBRARY_PATH = "/lib:{{ arch_libdir }}:/usr/{{ arch_libdir }}"
+
+# Read application arguments directly from the command line. Don't use this on production!
+loader.insecure__use_cmdline_argv = true
+
+# Default glibc files, mounted from the Runtime directory in GRAMINE_DIR.
+fs.mount.lib.type = "chroot"
+fs.mount.lib.path = "/lib"
+fs.mount.lib.uri = "file:{{ gramine.runtimedir() }}"
+
+fs.mount.tmp.type = "chroot"
+fs.mount.tmp.path = "/tmp"
+fs.mount.tmp.uri = "file:/tmp"
+
+fs.mount.opt.type = "chroot"
+fs.mount.opt.path = "/opt/ovsa/certs"
+fs.mount.opt.uri = "file:/opt/ovsa/certs"
+
+fs.mount.ks.type = "chroot"
+fs.mount.ks.path = "/opt/ovsa/gramine/keystore"
+fs.mount.ks.uri = "file:/opt/ovsa/gramine/keystore"
+
+fs.mount.artefacts.type = "chroot"
+fs.mount.artefacts.path = "/opt/ovsa/gramine/artefacts"
+fs.mount.artefacts.uri = "file:/opt/ovsa/gramine/artefacts"
+
+fs.mount.etc.type = "chroot"
+fs.mount.etc.path = "/etc"
+fs.mount.etc.uri = "file:/etc"
+
+# SGX general options
+
+# Set the virtual memory size of the SGX enclave. For SGX v1, the enclave
+# size must be specified during signing. If OpenVINO needs more virtual memory
+# than the enclave size, Gramine will not be able to allocate it.
+sgx.enclave_size = "2G"
+
+# Set the maximum number of enclave threads. For SGX v1, the number of enclave
+# TCSes must be specified during signing, so the application cannot use more
+# threads than the number of TCSes. Note that Gramine also creates an internal
+# thread for handling inter-process communication (IPC), and potentially another
+# thread for asynchronous events. Therefore, the actual number of threads that
+# the application can create is (sgx.thread_num - 2).
+#
+# We (somewhat arbitrarily) specify 16 threads since OpenVINO is multithreaded.
+sgx.thread_num = 16
+
+# Allow Gramine-SGX to create files (needed for output image out_0.bmp)
+sgx.allow_file_creation  = 1
+
+# SGX trusted libraries
+sgx.trusted_files = [
+# Glibc libraries
+"file:{{ gramine.runtimedir() }}/ld-linux-x86-64.so.2",
+"file:{{ gramine.runtimedir() }}/libc.so.6",
+"file:{{ gramine.runtimedir() }}/libm.so.6",
+"file:{{ gramine.runtimedir() }}/libdl.so.2",
+"file:{{ gramine.runtimedir() }}/librt.so.1",
+"file:{{ gramine.runtimedir() }}/libutil.so.1",
+"file:{{ gramine.runtimedir() }}/libpthread.so.0",
+
+"file:bin/ovsatool"
+]
+
+#For protected file system
+sgx.protected_mrsigner_files = ["file:/opt/ovsa/gramine/keystore"]
+
+
+sgx.allowed_files = [
+"file:/opt/ovsa/gramine/artefacts",
+"file:/opt/ovsa/certs",
+"file:/etc/nsswitch.conf",
+"file:/etc/ethers",
+"file:/etc/host.conf",
+"file:/etc/hostname",
+"file:/etc/hosts",
+"file:/etc/resolv.conf",
+
+"file:/tmp"
+]
+

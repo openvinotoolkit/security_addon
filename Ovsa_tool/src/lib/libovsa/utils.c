@@ -1730,10 +1730,19 @@ ovsa_status_t ovsa_json_create_isv_keystore(const ovsa_isv_keystore_t keystore[]
         goto end;
     }
 
-    if (cJSON_AddStringToObject(isv_keystore, "certificate", keystore[0].isv_certificate) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "LibOVSA: Error could not add certificate string object %d\n", ret);
-        goto end;
+    if (keystore[0].isv_certificate == NULL) {
+        if (cJSON_AddStringToObject(isv_keystore, "certificate", "") == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "LibOVSA: Error could not add certificate string object %d\n", ret);
+            goto end;
+        }
+    } else {
+        if (cJSON_AddStringToObject(isv_keystore, "certificate", keystore[0].isv_certificate) ==
+            NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "LibOVSA: Error could not add certificate string object %d\n", ret);
+            goto end;
+        }
     }
 
     if (cJSON_AddStringToObject(isv_keystore, "public_key_2", keystore[1].public_key) == NULL) {
@@ -1748,6 +1757,20 @@ ovsa_status_t ovsa_json_create_isv_keystore(const ovsa_isv_keystore_t keystore[]
         goto end;
     }
 
+    if (keystore[1].isv_certificate == NULL) {
+        if (cJSON_AddStringToObject(isv_keystore, "certificate_2", "") == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "LibOVSA: Error could not add certificate2 string object %d\n", ret);
+            goto end;
+        }
+    } else {
+        if (cJSON_AddStringToObject(isv_keystore, "certificate_2", keystore[1].isv_certificate) ==
+            NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "LibOVSA: Error could not add certificate2 string object %d\n", ret);
+            goto end;
+        }
+    }
     str_print = cJSON_Print(isv_keystore);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
@@ -1761,6 +1784,7 @@ ovsa_status_t ovsa_json_create_isv_keystore(const ovsa_isv_keystore_t keystore[]
         goto end;
     }
     memcpy_s(outputBuf, str_len, str_print, str_len);
+    OVSA_DBG(DBG_D, "keystore json: %s\n", str_print);
 
 end:
     cJSON_Delete(isv_keystore);
@@ -1789,6 +1813,7 @@ ovsa_status_t ovsa_json_extract_keystore_info(const char* inputBuf,
         goto end;
     }
 
+    OVSA_DBG(DBG_D, "inputBuf:  %s\n", inputBuf);
     parse_json = cJSON_Parse(inputBuf);
     if (parse_json == NULL) {
         ret = OVSA_JSON_PARSE_FAIL;
@@ -1846,6 +1871,18 @@ ovsa_status_t ovsa_json_extract_keystore_info(const char* inputBuf,
     if (cJSON_IsString(private_key_2) && (private_key_2->valuestring != NULL)) {
         memcpy_s(keystore[1].private_key, MAX_KEY_SIZE, private_key_2->valuestring,
                  strnlen_s(private_key_2->valuestring, MAX_KEY_SIZE));
+    }
+
+    cJSON* certificate_2 = cJSON_GetObjectItemCaseSensitive(parse_json, "certificate_2");
+    if (cJSON_IsString(certificate_2) && (certificate_2->valuestring != NULL)) {
+        size_t str_len = 0;
+        ret            = ovsa_get_string_length(certificate_2->valuestring, &str_len);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "LibOVSA: Error could not get length of certificate string %d\n", ret);
+            goto end;
+        }
+        memcpy_s(keystore[1].isv_certificate, str_len, certificate_2->valuestring, str_len);
+        OVSA_DBG(DBG_D, "certificate_2 %s\n", keystore[1].isv_certificate);
     }
 
 end:

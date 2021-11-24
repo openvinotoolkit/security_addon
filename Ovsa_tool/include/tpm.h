@@ -15,6 +15,7 @@
  *****************************************************************************
  */
 
+#ifndef ENABLE_SGX_GRAMINE
 #ifndef __OVSA_TPM_H_
 #define __OVSA_TPM_H_
 
@@ -29,7 +30,7 @@
 #define TPM2_SWQUOTE_SIG "/tmp/pcr_quote.signature"
 
 #define TPM2_PROVISION_DIR     "/var/OVSA/"
-#define TPM2_SW_EK_CERT        TPM2_PROVISION_DIR "Quote/tpm_ek_cert.pem"
+#define TPM2_EK_CERT           TPM2_PROVISION_DIR "Quote/tpm_ek_cert.pem"
 #define TPM2_EK_PUB_KEY        TPM2_PROVISION_DIR "Quote/tpm_ek.pub"
 #define TPM2_AK_NAME_HEX       TPM2_PROVISION_DIR "Quote/tpm_ak.name.hex"
 #define TPM2_AK_PUB_PEM_KEY    TPM2_PROVISION_DIR "Quote/tpm_ak.pub.pem"
@@ -83,3 +84,4 @@ ovsa_status_t ovsa_do_run_tpm2_command(char* const argv[], char* output);
 ovsa_status_t ovsa_tpm2_generatequote(char* nonce);
 
 #endif /* __OVSA_TPM_H_ */
+#endif /* ENABLE_SGX_GRAMINE */

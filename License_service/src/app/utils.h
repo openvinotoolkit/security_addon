@@ -29,7 +29,7 @@ static BIO* g_bio_err = NULL;
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_server_get_string_length(const char* in_buff, size_t* in_buff_len);
+ovsa_status_t ovsa_license_service_get_string_length(const char* in_buff, size_t* in_buff_len);
 
 /** \brief This function is used for dynamic memory allocation.
  *
@@ -38,32 +38,33 @@ ovsa_status_t ovsa_server_get_string_length(const char* in_buff, size_t* in_buff
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_server_safe_malloc(size_t size, char** aloc_buf);
+ovsa_status_t ovsa_license_service_safe_malloc(size_t size, char** aloc_buf);
 
 /** \brief This function is used to free the allocated memory.
  *
  * \param[in] ptr  Pointer to be freed.
  */
-void ovsa_server_safe_free(char** ptr);
+void ovsa_license_service_safe_free(char** ptr);
 
 /** \brief This function is used to free the allocated memory for url list.
  *
  * \param[in] listhead  Pointer to the list of urls.
  */
-void ovsa_server_safe_free_url_list(ovsa_license_serv_url_list_t** lhead);
+void ovsa_license_service_safe_free_url_list(ovsa_license_serv_url_list_t** lhead);
 
 /** \brief This function is used to get the hex dump of input data
  *
  * \param[in] data Pointer to input data
  */
-void ovsa_hexdump_mem(const void* data, size_t size);
+void ovsa_license_service_hexdump_mem(const void* data, size_t size);
 
 /** \brief This function is append payload length to received input buffer
  *
  * \param[in] input buf pointer.
  * \param[in] outbuf pointer.
  */
-ovsa_status_t ovsa_append_payload_len_to_blob(const char* input_buf, char** json_payload);
+ovsa_status_t ovsa_license_service_append_payload_len_to_blob(const char* input_buf,
+                                                              char** json_payload);
 /*!
  * \brief This function reads the file content.
  *
@@ -73,7 +74,8 @@ ovsa_status_t ovsa_append_payload_len_to_blob(const char* input_buf, char** json
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, size_t* filesize);
+ovsa_status_t ovsa_license_service_read_file_content(const char* filename, char** filecontent,
+                                                     size_t* filesize);
 /*!
  * \brief This function reads the file size.
  *
@@ -81,19 +83,19 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
  *
  * \return ovsa_status_t: file size in bytes or OVSA_ERROR
  */
-int ovsa_server_crypto_get_file_size(FILE* fp);
+int ovsa_license_service_crypto_get_file_size(FILE* fp);
 
 /** \brief This function is used to free the allocated memory for tcb files.
  *
  * \param[in] listhead  Pointer to the list of tcbs.
  */
-void ovsa_server_safe_free_tcb_list(ovsa_tcb_sig_list_t** listhead);
+void ovsa_license_service_safe_free_tcb_list(ovsa_tcb_sig_list_t** listhead);
 /*!
- *  * \brief ovsa_server_safe_add
+ *  * \brief ovsa_license_service_safe_add
  *
  * \param [in]  size_t Variable1,sum of var1+var2 stored in var1
  * \param [in]  size_t Variable2
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_server_safe_add(size_t* var1, size_t var2);
+ovsa_status_t ovsa_license_service_safe_add(size_t* var1, size_t var2);
 #endif

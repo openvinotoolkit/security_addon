@@ -23,24 +23,19 @@ ARG build_type=dbg
 
 USER root
 
-RUN yum install -y \
-        sudo && \
-        yum clean all
-
+RUN apt update && apt install -y \
+        sudo \
+        dbus \
+        libglib2.0-0 \
+        curl && \
+        apt clean
 
 WORKDIR /
 RUN mkdir -vp /ovsa-runtime/lib
 
 COPY /release_files/ovsa-runtime/lib /ovsa-runtime/lib
-COPY /release_files/ovsa-runtime/usr/bin /usr/bin
-COPY /release_files/ovsa-runtime/usr/etc /usr/etc
-COPY /release_files/ovsa-runtime/usr/include /usr/include
-COPY /release_files/ovsa-runtime/usr/lib /usr/lib
-COPY /release_files/ovsa-runtime/usr/sbin /usr/sbin
-COPY /release_files/ovsa-runtime/usr/share /usr/share
-COPY /release_files/ovsa-runtime/usr/var /usr
-COPY /release_files/ovsa-runtime/tpm2-abrmd/tpm2-abrmd.conf /etc/dbus-1/system.d/tpm2-abrmd.conf
-COPY Scripts/guest/OVSA_tpm2_init.sh /usr/local/bin/OVSA_tpm2_init.sh
+COPY /release_files/ovsa-runtime/usr /usr
+COPY /release_files/ovsa-runtime/etc /etc
 
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/lib/:/ovsa-runtime/lib/
 
@@ -61,7 +56,7 @@ RUN chmod +x /usr/local/bin/OVSA_tpm2_init.sh
 
 USER ovsa
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/lib/:/ovsa-runtime/lib/
+
 USER root
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--", "./usr/local/bin/OVSA_tpm2_init.sh"]
-#ENTRYPOINT []

@@ -36,71 +36,74 @@
 /* Specify the timeout for OCSP request in seconds */
 #define OCSP_REQ_TIMEOUT 10
 
-static int ovsa_server_crypto_cert_check(X509_STORE* ctx, const char* cert);
+static int ovsa_license_service_crypto_cert_check(X509_STORE* ctx, const char* cert);
 
-static X509_STORE* ovsa_server_crypto_setup_chain(const char* cafile);
+static X509_STORE* ovsa_license_service_crypto_setup_chain(const char* cafile);
 
-static void ovsa_server_crypto_nodes_print(const char* name, STACK_OF(X509_POLICY_NODE) * nodes);
+static void ovsa_license_service_crypto_nodes_print(const char* name,
+                                                    STACK_OF(X509_POLICY_NODE) * nodes);
 
-static void ovsa_server_crypto_policies_print(X509_STORE_CTX* ctx);
+static void ovsa_license_service_crypto_policies_print(X509_STORE_CTX* ctx);
 
-static int ovsa_server_crypto_verify_cb(int ok, X509_STORE_CTX* ctx);
+static int ovsa_license_service_crypto_verify_cb(int ok, X509_STORE_CTX* ctx);
 
-static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cert,
-                                                                 const char* chain_file,
-                                                                 const char* chain_cert);
+static ovsa_status_t ovsa_license_service_crypto_form_chain_do_ocsp_check(const char* cert,
+                                                                          const char* chain_file,
+                                                                          const char* chain_cert);
 
-static size_t ovsa_server_crypto_write_callback(void* data, size_t size, size_t num_items,
-                                                FILE* issuer_fp);
+static size_t ovsa_license_service_crypto_write_callback(void* data, size_t size, size_t num_items,
+                                                         FILE* issuer_fp);
 
-static ovsa_status_t ovsa_server_crypto_get_issuer_cert(const char* issuer_file_name,
-                                                        const char* ca_issuers_uri);
+static ovsa_status_t ovsa_license_service_crypto_get_issuer_cert(const char* issuer_file_name,
+                                                                 const char* ca_issuers_uri);
 
-static ovsa_status_t ovsa_server_crypto_extract_ca_cert(X509* xcert, char** ca_cert);
+static ovsa_status_t ovsa_license_service_crypto_extract_ca_cert(X509* xcert, char** ca_cert);
 
-static void ovsa_server_crypto_print_name(BIO* out, const char* title, X509_NAME* name,
-                                          unsigned long flags);
+static void ovsa_license_service_crypto_print_name(BIO* out, const char* title, X509_NAME* name,
+                                                   unsigned long flags);
 
-static ovsa_status_t ovsa_server_crypto_print_x509v3_exts(BIO* bio, const X509* xcert,
-                                                          const char* ext_name);
+static ovsa_status_t ovsa_license_service_crypto_print_x509v3_exts(BIO* bio, const X509* xcert,
+                                                                   const char* ext_name);
 
-static ovsa_status_t ovsa_server_crypto_check_issuer_subject_match(const X509* issuer_cert,
-                                                                   const X509* xcert,
-                                                                   bool* ca_cert);
+static ovsa_status_t ovsa_license_service_crypto_check_issuer_subject_match(const X509* issuer_cert,
+                                                                            const X509* xcert,
+                                                                            bool* ca_cert);
 
 #ifdef ENABLE_OCSP_CHECK
-static ovsa_status_t ovsa_server_crypto_ocsp_revocation_check(char* ocsp_uri, const X509* xcert,
-                                                              const char* issuer_cert);
+static ovsa_status_t ovsa_license_service_crypto_ocsp_revocation_check(char* ocsp_uri,
+                                                                       const X509* xcert,
+                                                                       const char* issuer_cert);
 
-static ovsa_status_t ovsa_server_crypto_extract_ocsp_uri(X509* xcert, char** ocsp_uri);
+static ovsa_status_t ovsa_license_service_crypto_extract_ocsp_uri(X509* xcert, char** ocsp_uri);
 
-static ovsa_status_t ovsa_server_crypto_add_ocsp_cert(OCSP_REQUEST** req, const X509* xcert,
-                                                      const EVP_MD* cert_id_md, const X509* issuer,
-                                                      STACK_OF(OCSP_CERTID) * ids);
+static ovsa_status_t ovsa_license_service_crypto_add_ocsp_cert(OCSP_REQUEST** req,
+                                                               const X509* xcert,
+                                                               const EVP_MD* cert_id_md,
+                                                               const X509* issuer,
+                                                               STACK_OF(OCSP_CERTID) * ids);
 
-static OCSP_RESPONSE* ovsa_server_crypto_process_responder(OCSP_REQUEST* req, const char* host,
-                                                           const char* path, const char* port,
-                                                           int use_ssl, int req_timeout);
+static OCSP_RESPONSE* ovsa_license_service_crypto_process_responder(OCSP_REQUEST* req,
+                                                                    const char* host,
+                                                                    const char* path,
+                                                                    const char* port, int use_ssl,
+                                                                    int req_timeout);
 
-static ovsa_status_t ovsa_server_crypto_print_ocsp_summary(BIO* out, OCSP_BASICRESP* basic_response,
-                                                           OCSP_REQUEST* req,
-                                                           STACK_OF(OPENSSL_STRING) * names,
-                                                           STACK_OF(OCSP_CERTID) * ids, long nsec,
-                                                           long maxage);
+static ovsa_status_t ovsa_license_service_crypto_print_ocsp_summary(
+    BIO* out, OCSP_BASICRESP* basic_response, OCSP_REQUEST* req, STACK_OF(OPENSSL_STRING) * names,
+    STACK_OF(OCSP_CERTID) * ids, long nsec, long maxage);
 
-static OCSP_RESPONSE* ovsa_server_crypto_query_responder(BIO* connect_bio, const char* host,
-                                                         const char* path, OCSP_REQUEST* req,
-                                                         int req_timeout);
+static OCSP_RESPONSE* ovsa_license_service_crypto_query_responder(
+    BIO* connect_bio, const char* host, const char* path, OCSP_REQUEST* req, int req_timeout);
 #endif /* ENABLE_OCSP_CHECK */
 
-static int ovsa_server_crypto_cert_check(X509_STORE* ctx, const char* cert) {
+static int ovsa_license_service_crypto_cert_check(X509_STORE* ctx, const char* cert) {
     ovsa_status_t ret   = OVSA_OK;
     X509* xcert         = NULL;
     X509_STORE_CTX* csc = NULL;
     static int vflags   = 0;
     int verify_cert     = 0;
 
-    xcert = ovsa_server_crypto_load_cert(cert, "certificate");
+    xcert = ovsa_license_service_crypto_load_cert(cert, "certificate");
     if (xcert == NULL) {
         BIO_printf(g_bio_err, "OVSA: Error certificate check failed to read certificate\n");
         ret = OVSA_CRYPTO_X509_ERROR;
@@ -142,7 +145,7 @@ end:
     return ret;
 }
 
-static X509_STORE* ovsa_server_crypto_setup_chain(const char* ca_file) {
+static X509_STORE* ovsa_license_service_crypto_setup_chain(const char* ca_file) {
     X509_LOOKUP* lookup = NULL;
 
     if (ca_file == NULL) {
@@ -172,7 +175,8 @@ end:
     return NULL;
 }
 
-static void ovsa_server_crypto_nodes_print(const char* name, STACK_OF(X509_POLICY_NODE) * nodes) {
+static void ovsa_license_service_crypto_nodes_print(const char* name,
+                                                    STACK_OF(X509_POLICY_NODE) * nodes) {
     X509_POLICY_NODE* node = NULL;
     int index              = 0;
 
@@ -188,7 +192,7 @@ static void ovsa_server_crypto_nodes_print(const char* name, STACK_OF(X509_POLIC
     }
 }
 
-static void ovsa_server_crypto_policies_print(X509_STORE_CTX* ctx) {
+static void ovsa_license_service_crypto_policies_print(X509_STORE_CTX* ctx) {
     X509_POLICY_TREE* tree = NULL;
     int explicit_policy    = 0;
     tree                   = X509_STORE_CTX_get0_policy_tree(ctx);
@@ -196,11 +200,11 @@ static void ovsa_server_crypto_policies_print(X509_STORE_CTX* ctx) {
 
     BIO_printf(g_bio_err, "Require explicit Policy: %s\n", explicit_policy ? "True" : "False");
 
-    ovsa_server_crypto_nodes_print("Authority", X509_policy_tree_get0_policies(tree));
-    ovsa_server_crypto_nodes_print("User", X509_policy_tree_get0_user_policies(tree));
+    ovsa_license_service_crypto_nodes_print("Authority", X509_policy_tree_get0_policies(tree));
+    ovsa_license_service_crypto_nodes_print("User", X509_policy_tree_get0_user_policies(tree));
 }
 
-static int ovsa_server_crypto_verify_cb(int ok, X509_STORE_CTX* ctx) {
+static int ovsa_license_service_crypto_verify_cb(int ok, X509_STORE_CTX* ctx) {
     int cert_error       = X509_STORE_CTX_get_error(ctx);
     X509* current_cert   = X509_STORE_CTX_get_current_cert(ctx);
     static int v_verbose = 0;
@@ -223,7 +227,7 @@ static int ovsa_server_crypto_verify_cb(int ok, X509_STORE_CTX* ctx) {
          */
         switch (cert_error) {
             case X509_V_ERR_NO_EXPLICIT_POLICY:
-                ovsa_server_crypto_policies_print(ctx);
+                ovsa_license_service_crypto_policies_print(ctx);
                 /* fall through */
             case X509_V_ERR_CERT_HAS_EXPIRED:
                 /* Continue even if the leaf is a self signed cert */
@@ -243,7 +247,7 @@ static int ovsa_server_crypto_verify_cb(int ok, X509_STORE_CTX* ctx) {
     }
 
     if (cert_error == X509_V_OK && ok == 2) {
-        ovsa_server_crypto_policies_print(ctx);
+        ovsa_license_service_crypto_policies_print(ctx);
     }
 
     if (!v_verbose) {
@@ -253,9 +257,11 @@ static int ovsa_server_crypto_verify_cb(int ok, X509_STORE_CTX* ctx) {
 }
 
 #ifdef ENABLE_OCSP_CHECK
-static ovsa_status_t ovsa_server_crypto_add_ocsp_cert(OCSP_REQUEST** req, const X509* xcert,
-                                                      const EVP_MD* cert_id_md, const X509* issuer,
-                                                      STACK_OF(OCSP_CERTID) * ids) {
+static ovsa_status_t ovsa_license_service_crypto_add_ocsp_cert(OCSP_REQUEST** req,
+                                                               const X509* xcert,
+                                                               const EVP_MD* cert_id_md,
+                                                               const X509* issuer,
+                                                               STACK_OF(OCSP_CERTID) * ids) {
     ovsa_status_t ret = OVSA_OK;
     OCSP_CERTID* id   = NULL;
 
@@ -295,9 +301,8 @@ end:
     return ret;
 }
 
-static OCSP_RESPONSE* ovsa_server_crypto_query_responder(BIO* connect_bio, const char* host,
-                                                         const char* path, OCSP_REQUEST* req,
-                                                         int req_timeout) {
+static OCSP_RESPONSE* ovsa_license_service_crypto_query_responder(
+    BIO* connect_bio, const char* host, const char* path, OCSP_REQUEST* req, int req_timeout) {
     OCSP_REQ_CTX* ctx   = NULL;
     OCSP_RESPONSE* resp = NULL;
     int fd = 0, ret = 0, add_host = 1;
@@ -398,9 +403,11 @@ end:
     return resp;
 }
 
-static OCSP_RESPONSE* ovsa_server_crypto_process_responder(OCSP_REQUEST* req, const char* host,
-                                                           const char* path, const char* port,
-                                                           int use_ssl, int req_timeout) {
+static OCSP_RESPONSE* ovsa_license_service_crypto_process_responder(OCSP_REQUEST* req,
+                                                                    const char* host,
+                                                                    const char* path,
+                                                                    const char* port, int use_ssl,
+                                                                    int req_timeout) {
     BIO* connect_bio    = NULL;
     BIO* ssl_bio        = NULL;
     SSL_CTX* ctx        = NULL;
@@ -433,7 +440,7 @@ static OCSP_RESPONSE* ovsa_server_crypto_process_responder(OCSP_REQUEST* req, co
         connect_bio = BIO_push(ssl_bio, connect_bio);
     }
 
-    resp = ovsa_server_crypto_query_responder(connect_bio, host, path, req, req_timeout);
+    resp = ovsa_license_service_crypto_query_responder(connect_bio, host, path, req, req_timeout);
     if (resp == NULL) {
         BIO_printf(g_bio_err, "OVSA: Error OCSP process responder failed in querying\n");
     }
@@ -444,11 +451,9 @@ end:
     return resp;
 }
 
-static ovsa_status_t ovsa_server_crypto_print_ocsp_summary(BIO* out, OCSP_BASICRESP* basic_response,
-                                                           OCSP_REQUEST* req,
-                                                           STACK_OF(OPENSSL_STRING) * names,
-                                                           STACK_OF(OCSP_CERTID) * ids, long nsec,
-                                                           long maxage) {
+static ovsa_status_t ovsa_license_service_crypto_print_ocsp_summary(
+    BIO* out, OCSP_BASICRESP* basic_response, OCSP_REQUEST* req, STACK_OF(OPENSSL_STRING) * names,
+    STACK_OF(OCSP_CERTID) * ids, long nsec, long maxage) {
     ovsa_status_t ret                 = OVSA_OK;
     ASN1_GENERALIZEDTIME* revocation  = NULL;
     ASN1_GENERALIZEDTIME* this_update = NULL;
@@ -516,8 +521,8 @@ static ovsa_status_t ovsa_server_crypto_print_ocsp_summary(BIO* out, OCSP_BASICR
 }
 #endif
 
-static ovsa_status_t ovsa_server_crypto_print_x509v3_exts(BIO* bio, const X509* xcert,
-                                                          const char* ext_name) {
+static ovsa_status_t ovsa_license_service_crypto_print_x509v3_exts(BIO* bio, const X509* xcert,
+                                                                   const char* ext_name) {
     ovsa_status_t ret                    = OVSA_OK;
     const STACK_OF(X509_EXTENSION)* exts = NULL;
     STACK_OF(X509_EXTENSION)* exts_stack = NULL;
@@ -554,7 +559,7 @@ static ovsa_status_t ovsa_server_crypto_print_x509v3_exts(BIO* bio, const X509* 
         if (ext_check == NULL) {
             continue;
         } else {
-            ret = ovsa_server_get_string_length((char*)ext_check, &ext_check_len);
+            ret = ovsa_license_service_get_string_length((char*)ext_check, &ext_check_len);
             if ((ret < OVSA_OK) || (ext_check_len == EOK)) {
                 BIO_printf(g_bio_err,
                            "OVSA: Error printing x509v3 extensions failed in "
@@ -578,7 +583,7 @@ static ovsa_status_t ovsa_server_crypto_print_x509v3_exts(BIO* bio, const X509* 
         }
 
         for (ext_match_count = 0; ext_match_count < ext_name_size; ext_match_count++) {
-            ret = ovsa_server_get_string_length((char*)ext_check, &ext_check_len);
+            ret = ovsa_license_service_get_string_length((char*)ext_check, &ext_check_len);
             if ((ret < OVSA_OK) || (ext_check_len == EOK)) {
                 BIO_printf(g_bio_err,
                            "OVSA: Error printing x509v3 extensions failed in "
@@ -640,8 +645,8 @@ end:
     return ret;
 }
 
-static void ovsa_server_crypto_print_name(BIO* out, const char* title, X509_NAME* name,
-                                          unsigned long flags) {
+static void ovsa_license_service_crypto_print_name(BIO* out, const char* title, X509_NAME* name,
+                                                   unsigned long flags) {
     char* name_buff = NULL;
     char mline      = 0;
     int indent      = 0;
@@ -660,7 +665,7 @@ static void ovsa_server_crypto_print_name(BIO* out, const char* title, X509_NAME
         if (name_buff != NULL) {
             BIO_puts(out, name_buff);
             BIO_puts(out, "\n");
-            ovsa_server_safe_free(&name_buff);
+            ovsa_license_service_safe_free(&name_buff);
         }
     } else {
         if (mline) {
@@ -674,13 +679,13 @@ static void ovsa_server_crypto_print_name(BIO* out, const char* title, X509_NAME
 }
 
 /* Write the received certificate into issuer_fp */
-static size_t ovsa_server_crypto_write_callback(void* data, size_t size, size_t num_items,
-                                                FILE* issuer_fp) {
+static size_t ovsa_license_service_crypto_write_callback(void* data, size_t size, size_t num_items,
+                                                         FILE* issuer_fp) {
     return fwrite(data, size, num_items, issuer_fp);
 }
 
-static ovsa_status_t ovsa_server_crypto_get_issuer_cert(const char* issuer_file_name,
-                                                        const char* ca_issuers_uri) {
+static ovsa_status_t ovsa_license_service_crypto_get_issuer_cert(const char* issuer_file_name,
+                                                                 const char* ca_issuers_uri) {
     ovsa_status_t ret = OVSA_OK;
     FILE* issuer_fp   = NULL;
 
@@ -718,8 +723,8 @@ static ovsa_status_t ovsa_server_crypto_get_issuer_cert(const char* issuer_file_
     /* If the specified URL is redirected, tell curl to follow redirection */
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-    /* When data arrives, curl will call ovsa_crypto_write_callback */
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ovsa_server_crypto_write_callback);
+    /* When data arrives, curl will call ovsa_license_service_crypto_write_callback */
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ovsa_license_service_crypto_write_callback);
 
     /* Received data will be written to issuer_fp */
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)issuer_fp);
@@ -746,9 +751,9 @@ end:
     return ret;
 }
 
-static ovsa_status_t ovsa_server_crypto_check_issuer_subject_match(const X509* issuer_cert,
-                                                                   const X509* xcert,
-                                                                   bool* ca_cert) {
+static ovsa_status_t ovsa_license_service_crypto_check_issuer_subject_match(const X509* issuer_cert,
+                                                                            const X509* xcert,
+                                                                            bool* ca_cert) {
     ovsa_status_t ret    = OVSA_OK;
     BIO* issuer_bio      = NULL;
     BIO* subject_bio     = NULL;
@@ -786,8 +791,8 @@ static ovsa_status_t ovsa_server_crypto_check_issuer_subject_match(const X509* i
     }
 
     /* Extract the issuer name from the certificate */
-    ovsa_server_crypto_print_name(issuer_bio, NULL, X509_get_issuer_name(issuer_cert),
-                                  XN_FLAG_ONELINE);
+    ovsa_license_service_crypto_print_name(issuer_bio, NULL, X509_get_issuer_name(issuer_cert),
+                                           XN_FLAG_ONELINE);
 
     BIO_get_mem_ptr(issuer_bio, &issuer_ptr);
     if (issuer_ptr == NULL) {
@@ -799,7 +804,7 @@ static ovsa_status_t ovsa_server_crypto_check_issuer_subject_match(const X509* i
         goto end;
     }
 
-    ret = ovsa_server_safe_malloc(issuer_ptr->length + NULL_TERMINATOR, &issuer);
+    ret = ovsa_license_service_safe_malloc(issuer_ptr->length + NULL_TERMINATOR, &issuer);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "OVSA: Error checking whether issuer and subject match failed in allocating "
@@ -817,7 +822,8 @@ static ovsa_status_t ovsa_server_crypto_check_issuer_subject_match(const X509* i
     }
 
     /* Extract the subject name from the certificate */
-    ovsa_server_crypto_print_name(subject_bio, NULL, X509_get_subject_name(xcert), XN_FLAG_ONELINE);
+    ovsa_license_service_crypto_print_name(subject_bio, NULL, X509_get_subject_name(xcert),
+                                           XN_FLAG_ONELINE);
 
     BIO_get_mem_ptr(subject_bio, &subject_ptr);
     if (subject_ptr == NULL) {
@@ -829,7 +835,7 @@ static ovsa_status_t ovsa_server_crypto_check_issuer_subject_match(const X509* i
         goto end;
     }
 
-    ret = ovsa_server_safe_malloc(subject_ptr->length + NULL_TERMINATOR, &subject);
+    ret = ovsa_license_service_safe_malloc(subject_ptr->length + NULL_TERMINATOR, &subject);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "OVSA: Error checking whether issuer and subject match failed in allocating "
@@ -864,8 +870,8 @@ static ovsa_status_t ovsa_server_crypto_check_issuer_subject_match(const X509* i
     }
 
 end:
-    ovsa_server_safe_free(&issuer);
-    ovsa_server_safe_free(&subject);
+    ovsa_license_service_safe_free(&issuer);
+    ovsa_license_service_safe_free(&subject);
     BIO_free_all(issuer_bio);
     BIO_free_all(subject_bio);
     if (ret < OVSA_OK) {
@@ -874,7 +880,7 @@ end:
     return ret;
 }
 
-static ovsa_status_t ovsa_server_crypto_extract_ca_cert(X509* xcert, char** ca_cert) {
+static ovsa_status_t ovsa_license_service_crypto_extract_ca_cert(X509* xcert, char** ca_cert) {
     ovsa_status_t ret     = OVSA_OK;
     X509_STORE* store     = NULL;
     X509_STORE_CTX* csc   = NULL;
@@ -894,7 +900,7 @@ static ovsa_status_t ovsa_server_crypto_extract_ca_cert(X509* xcert, char** ca_c
         return OVSA_INVALID_PARAMETER;
     }
 
-    if ((store = ovsa_server_crypto_setup_chain(ROOT_CA_CERTIFICATES)) == NULL) {
+    if ((store = ovsa_license_service_crypto_setup_chain(ROOT_CA_CERTIFICATES)) == NULL) {
         BIO_printf(g_bio_err,
                    "OVSA: Error extracting ca certificate failed in storing "
                    "the certificate chain\n");
@@ -902,7 +908,7 @@ static ovsa_status_t ovsa_server_crypto_extract_ca_cert(X509* xcert, char** ca_c
         goto end;
     }
 
-    X509_STORE_set_verify_cb(store, ovsa_server_crypto_verify_cb);
+    X509_STORE_set_verify_cb(store, ovsa_license_service_crypto_verify_cb);
 
     csc = X509_STORE_CTX_new();
     if (csc == NULL) {
@@ -945,7 +951,7 @@ static ovsa_status_t ovsa_server_crypto_extract_ca_cert(X509* xcert, char** ca_c
         }
 
         /* Check whether certificate's issuer and subject is matching */
-        ret = ovsa_server_crypto_check_issuer_subject_match(xcert, cert, &check_ca_cert);
+        ret = ovsa_license_service_crypto_check_issuer_subject_match(xcert, cert, &check_ca_cert);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error extracting ca certificate failed to check whether issuer and "
@@ -982,7 +988,7 @@ static ovsa_status_t ovsa_server_crypto_extract_ca_cert(X509* xcert, char** ca_c
                 goto end;
             }
 
-            ret = ovsa_server_safe_malloc(cert_ptr->length + NULL_TERMINATOR, ca_cert);
+            ret = ovsa_license_service_safe_malloc(cert_ptr->length + NULL_TERMINATOR, ca_cert);
             if (ret < OVSA_OK) {
                 BIO_printf(g_bio_err,
                            "OVSA: Error extracting ca certificate failed in allocating memory "
@@ -1002,17 +1008,17 @@ static ovsa_status_t ovsa_server_crypto_extract_ca_cert(X509* xcert, char** ca_c
 
 #ifdef ENABLE_OCSP_CHECK
             /* Extract the OCSP URI from the certificate */
-            ret = ovsa_server_crypto_extract_ocsp_uri(xcert, &ocsp_uri);
+            ret = ovsa_license_service_crypto_extract_ocsp_uri(xcert, &ocsp_uri);
             if (ret < OVSA_OK) {
                 BIO_printf(g_bio_err,
                            "OVSA: Error extracting ca certificate failed to "
                            "extract the ocsp_uri\n");
-                ovsa_server_safe_free(&ocsp_uri);
+                ovsa_license_service_safe_free(&ocsp_uri);
                 goto end;
             }
 
             /* If OCSP URI available, check for OCSP revocation */
-            ret = ovsa_server_crypto_ocsp_revocation_check(ocsp_uri, xcert, *ca_cert);
+            ret = ovsa_license_service_crypto_ocsp_revocation_check(ocsp_uri, xcert, *ca_cert);
             if (ret < OVSA_OK) {
                 BIO_printf(g_bio_err,
                            "OVSA: Error extracting ca certificate failed to perform the OCSP "
@@ -1035,9 +1041,9 @@ end:
 }
 
 #ifdef ENABLE_OCSP_CHECK
-static ovsa_status_t ovsa_server_crypto_ocsp_revocation_check(char* ocsp_uri_field,
-                                                              const X509* xcert,
-                                                              const char* issuer_cert) {
+static ovsa_status_t ovsa_license_service_crypto_ocsp_revocation_check(char* ocsp_uri_field,
+                                                                       const X509* xcert,
+                                                                       const char* issuer_cert) {
     ovsa_status_t ret                  = OVSA_OK;
     STACK_OF(X509)* issuers            = NULL;
     X509* issuer                       = NULL;
@@ -1052,13 +1058,10 @@ static ovsa_status_t ovsa_server_crypto_ocsp_revocation_check(char* ocsp_uri_fie
     unsigned const char* common_name   = NULL;
     char* host                         = NULL;
     char* port                         = NULL;
-    char* path                         = "/";
-    char* thost                        = NULL;
-    char* tport                        = NULL;
-    char* tpath                        = NULL;
+    char* path                         = NULL;
     int ocsp_verify = 0, use_ssl = -1;
     int lastpos = -1, req_timeout = OCSP_REQ_TIMEOUT;
-    size_t ocsp_uri_field_len = 0, host_len = 0;
+    size_t ocsp_uri_field_len = 0;
     long nsec = MAX_VALIDITY_PERIOD, maxage = -1;
     char ocsp_uri[MAX_URL_SIZE];
 
@@ -1067,7 +1070,7 @@ static ovsa_status_t ovsa_server_crypto_ocsp_revocation_check(char* ocsp_uri_fie
         return OVSA_INVALID_PARAMETER;
     }
 
-    issuer = ovsa_server_crypto_load_cert(issuer_cert, "certificate");
+    issuer = ovsa_license_service_crypto_load_cert(issuer_cert, "certificate");
     if (issuer == NULL) {
         BIO_printf(g_bio_err, "OVSA: Error OCSP revocation check failed to read certificate\n");
         ret = OVSA_CRYPTO_X509_ERROR;
@@ -1098,7 +1101,7 @@ static ovsa_status_t ovsa_server_crypto_ocsp_revocation_check(char* ocsp_uri_fie
     }
 
     /* Add the certificates along with issuer for checking OCSP revocation */
-    ret = ovsa_server_crypto_add_ocsp_cert(&req, xcert, EVP_sha1(), issuer, ids);
+    ret = ovsa_license_service_crypto_add_ocsp_cert(&req, xcert, EVP_sha1(), issuer, ids);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "OVSA: Error OCSP revocation check failed to add "
@@ -1156,7 +1159,7 @@ static ovsa_status_t ovsa_server_crypto_ocsp_revocation_check(char* ocsp_uri_fie
 
     memset_s(ocsp_uri, MAX_URL_SIZE, 0);
 
-    ret = ovsa_server_get_string_length(ocsp_uri_field, &ocsp_uri_field_len);
+    ret = ovsa_license_service_get_string_length(ocsp_uri_field, &ocsp_uri_field_len);
     if ((ret < OVSA_OK) || (ocsp_uri_field_len == EOK)) {
         BIO_printf(g_bio_err,
                    "OVSA: Error OCSP revocation check failed in getting the size of the "
@@ -1172,31 +1175,16 @@ static ovsa_status_t ovsa_server_crypto_ocsp_revocation_check(char* ocsp_uri_fie
         goto end;
     }
 
-    /* Specify the Proxy for doing the OCSP revocation check */
-    host = secure_getenv("PROXY");
-    if (host == NULL) {
-        /* If proxy is not mentioned, parse the OCSP URL for doing the OCSP
-         * revocation check */
-        if (!OCSP_parse_url(ocsp_uri, &host, &port, &path, &use_ssl)) {
-            BIO_printf(g_bio_err, "OVSA: Error OCSP revocation check failed in parsing URL\n");
-            ret = OVSA_CRYPTO_GENERIC_ERROR;
-            goto end;
-        }
-        thost = host;
-        tport = port;
-        tpath = path;
-    } else {
-        ret = ovsa_server_get_string_length(host, &host_len);
-        if ((ret < OVSA_OK) || (host_len == EOK)) {
-            BIO_printf(g_bio_err,
-                       "OVSA: Error OCSP revocation check failed since HOST is not set\n");
-            ret = OVSA_INVALID_FILE_PATH;
-            goto end;
-        }
+    /* Parse the OCSP URL for doing the OCSP revocation check */
+    if (!OCSP_parse_url(ocsp_uri, &host, &port, &path, &use_ssl)) {
+        BIO_printf(g_bio_err, "OVSA: Error OCSP revocation check failed in parsing URL\n");
+        ret = OVSA_CRYPTO_GENERIC_ERROR;
+        goto end;
     }
 
     /* Get the OCSP response */
-    resp = ovsa_server_crypto_process_responder(req, host, ocsp_uri, port, use_ssl, req_timeout);
+    resp = ovsa_license_service_crypto_process_responder(req, host, ocsp_uri, port, use_ssl,
+                                                         req_timeout);
     if (resp == NULL) {
         BIO_printf(g_bio_err,
                    "OVSA: Error OCSP revocation check failed in getting the ocsp "
@@ -1262,8 +1250,8 @@ static ovsa_status_t ovsa_server_crypto_ocsp_revocation_check(char* ocsp_uri_fie
     }
 
     /* Print the OCSP summary */
-    ret = ovsa_server_crypto_print_ocsp_summary(g_bio_err, basic_response, req, reqnames, ids, nsec,
-                                                maxage);
+    ret = ovsa_license_service_crypto_print_ocsp_summary(g_bio_err, basic_response, req, reqnames,
+                                                         ids, nsec, maxage);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "OVSA: Error OCSP revocation check failed in getting the ocsp status\n");
@@ -1272,23 +1260,23 @@ static ovsa_status_t ovsa_server_crypto_ocsp_revocation_check(char* ocsp_uri_fie
     }
 
 end:
-    ovsa_server_safe_free(&ocsp_uri_field);
+    ovsa_license_service_safe_free(&ocsp_uri_field);
     sk_X509_pop_free(issuers, X509_free);
     OCSP_REQUEST_free(req);
     OCSP_RESPONSE_free(resp);
     OCSP_BASICRESP_free(basic_response);
     sk_OPENSSL_STRING_free(reqnames);
     sk_OCSP_CERTID_free(ids);
-    ovsa_server_safe_free(&thost);
-    ovsa_server_safe_free(&tport);
-    ovsa_server_safe_free(&tpath);
+    ovsa_license_service_safe_free(&host);
+    ovsa_license_service_safe_free(&port);
+    ovsa_license_service_safe_free(&path);
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);
     }
     return ret;
 }
 
-static ovsa_status_t ovsa_server_crypto_extract_ocsp_uri(X509* xcert, char** ocsp_uri) {
+static ovsa_status_t ovsa_license_service_crypto_extract_ocsp_uri(X509* xcert, char** ocsp_uri) {
     STACK_OF(OPENSSL_STRING)* ocsp_uri_list = NULL;
     ovsa_status_t ret                       = OVSA_OK;
     BIO* ocsp_bio                           = NULL;
@@ -1324,7 +1312,7 @@ static ovsa_status_t ovsa_server_crypto_extract_ocsp_uri(X509* xcert, char** ocs
             goto end;
         }
 
-        ret = ovsa_server_safe_malloc(ocsp_ptr->length + NULL_TERMINATOR, ocsp_uri);
+        ret = ovsa_license_service_safe_malloc(ocsp_ptr->length + NULL_TERMINATOR, ocsp_uri);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error extracting ocsp uri failed in allocating memory for the "
@@ -1357,9 +1345,9 @@ end:
 }
 #endif
 
-static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cert,
-                                                                 const char* chain_file,
-                                                                 const char* chain_cert) {
+static ovsa_status_t ovsa_license_service_crypto_form_chain_do_ocsp_check(const char* cert,
+                                                                          const char* chain_file,
+                                                                          const char* chain_cert) {
     ovsa_status_t ret        = OVSA_OK;
     BIO* ca_issuers_bio      = NULL;
     BIO* issuer_cert_bio     = NULL;
@@ -1421,7 +1409,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
     }
 
     if (chain_cert != NULL) {
-        ret = ovsa_server_get_string_length(chain_cert, &cert_len);
+        ret = ovsa_license_service_get_string_length(chain_cert, &cert_len);
         if ((ret < OVSA_OK) || (cert_len == EOK)) {
             BIO_printf(
                 g_bio_err,
@@ -1438,7 +1426,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
         }
     }
 
-    ret = ovsa_server_get_string_length(cert, &cert_len);
+    ret = ovsa_license_service_get_string_length(cert, &cert_len);
     if ((ret < OVSA_OK) || (cert_len == EOK)) {
         BIO_printf(g_bio_err,
                    "OVSA: Error forming chain failed in getting the size of the certificate\n");
@@ -1460,7 +1448,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
             cert_len = issuer_cert_len;
         }
 
-        ret = ovsa_server_safe_malloc(cert_len + NULL_TERMINATOR, &cert_dup);
+        ret = ovsa_license_service_safe_malloc(cert_len + NULL_TERMINATOR, &cert_dup);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error forming chain failed in allocating memory for the "
@@ -1488,7 +1476,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
             (void)BIO_reset(issuer_cert_bio);
         }
 
-        xcert = ovsa_server_crypto_load_cert(cert_dup, "certificate");
+        xcert = ovsa_license_service_crypto_load_cert(cert_dup, "certificate");
         if (xcert == NULL) {
             BIO_printf(g_bio_err, "OVSA: Error forming chain failed to read certificate\n");
             ret = OVSA_CRYPTO_X509_ERROR;
@@ -1496,7 +1484,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
         }
 
         /* Check whether certificate's issuer and subject is matching */
-        ret = ovsa_server_crypto_check_issuer_subject_match(xcert, xcert, &check_ca_cert);
+        ret = ovsa_license_service_crypto_check_issuer_subject_match(xcert, xcert, &check_ca_cert);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error forming chain failed to check whether issuer and "
@@ -1509,7 +1497,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
         }
 
         /* Extract the AIA field from certificate */
-        ret = ovsa_server_crypto_print_x509v3_exts(ca_issuers_bio, xcert, exts);
+        ret = ovsa_license_service_crypto_print_x509v3_exts(ca_issuers_bio, xcert, exts);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error forming chain failed in getting the x509 extensions\n");
@@ -1534,14 +1522,14 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
          * Intermediate certificate else get the CA certificate */
         if (ca_issuers == NULL) {
             /* Extract the CA certificate from host */
-            ret = ovsa_server_crypto_extract_ca_cert(xcert, &ca_cert);
+            ret = ovsa_license_service_crypto_extract_ca_cert(xcert, &ca_cert);
             if (ret < OVSA_OK) {
                 BIO_printf(g_bio_err,
                            "OVSA: Error forming chain failed to extract the CA certificate\n");
                 goto end;
             }
 
-            ret = ovsa_server_get_string_length(ca_cert, &ca_cert_len);
+            ret = ovsa_license_service_get_string_length(ca_cert, &ca_cert_len);
             if ((ret < OVSA_OK) || (ca_cert_len == EOK)) {
                 BIO_printf(g_bio_err,
                            "OVSA: Error forming chain failed in getting the size of the "
@@ -1551,7 +1539,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
             }
 
             /* Write the CA certificate to chain file */
-            chain_fp = fopen(chain_file, "a+");
+            chain_fp = fopen(chain_file, "a");
             if (chain_fp == NULL) {
                 BIO_printf(g_bio_err,
                            "OVSA: Error forming chain failed in opening the chain file\n");
@@ -1582,7 +1570,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
             count++;
         }
 
-        ret = ovsa_server_get_string_length(ca_issuers_field, &ca_issuers_field_len);
+        ret = ovsa_license_service_get_string_length(ca_issuers_field, &ca_issuers_field_len);
         if ((ret < OVSA_OK) || (ca_issuers_field_len == EOK)) {
             BIO_printf(g_bio_err,
                        "OVSA: Error forming chain failed in getting the size of the CA issuers "
@@ -1611,7 +1599,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
         }
 
         /* Get the issuer certificate from CAIssuers URI */
-        ret = ovsa_server_crypto_get_issuer_cert(issuer_file_name, ca_issuers_uri);
+        ret = ovsa_license_service_crypto_get_issuer_cert(issuer_file_name, ca_issuers_uri);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error forming chain failed in getting the issuer certificate\n");
@@ -1628,7 +1616,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
         }
 
         safe_exit      = 0;
-        cert_file_size = ovsa_server_crypto_get_file_size(issuer_fp);
+        cert_file_size = ovsa_license_service_crypto_get_file_size(issuer_fp);
         if (cert_file_size == 0) {
             BIO_printf(g_bio_err,
                        "OVSA: Error forming chain failed in reading the issuer certificate file "
@@ -1637,7 +1625,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
             goto exit;
         }
 
-        ret = ovsa_server_safe_malloc(cert_file_size, &issuer_cert);
+        ret = ovsa_license_service_safe_malloc(cert_file_size, &issuer_cert);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error forming chain failed in allocating memory for issuer "
@@ -1685,7 +1673,8 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
             goto exit;
         }
 
-        ret = ovsa_server_safe_malloc(issuer_cert_ptr->length + NULL_TERMINATOR, &issuer_dup);
+        ret = ovsa_license_service_safe_malloc(issuer_cert_ptr->length + NULL_TERMINATOR,
+                                               &issuer_dup);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error forming chain failed in allocating memory for "
@@ -1706,15 +1695,15 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
 
 #ifdef ENABLE_OCSP_CHECK
         /* Extract the OCSP URI from the certificate */
-        ret = ovsa_server_crypto_extract_ocsp_uri(xcert, &ocsp_uri);
+        ret = ovsa_license_service_crypto_extract_ocsp_uri(xcert, &ocsp_uri);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err, "OVSA: Error forming chain failed to extract the ocsp_uri\n");
-            ovsa_server_safe_free(&ocsp_uri);
+            ovsa_license_service_safe_free(&ocsp_uri);
             goto exit;
         }
 
         /* If OCSP URI available, check for OCSP revocation */
-        ret = ovsa_server_crypto_ocsp_revocation_check(ocsp_uri, xcert, issuer_dup);
+        ret = ovsa_license_service_crypto_ocsp_revocation_check(ocsp_uri, xcert, issuer_dup);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error forming chain failed to perform the OCSP revocation "
@@ -1724,7 +1713,7 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
 #endif
 
         /* Write the Intermediate certificate to chain file */
-        chain_fp = fopen(chain_file, "a+");
+        chain_fp = fopen(chain_file, "a");
         if (chain_fp == NULL) {
             BIO_printf(g_bio_err, "OVSA: Error forming chain failed in opening the chain file\n");
             ret = OVSA_FILEOPEN_FAIL;
@@ -1747,11 +1736,14 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
         if (issuer_fp != NULL) {
             fclose(issuer_fp);
         }
-        ovsa_server_safe_free(&issuer_cert);
-        ovsa_server_safe_free(&issuer_dup);
-        ovsa_server_safe_free(&cert_dup);
+        ovsa_license_service_safe_free(&issuer_cert);
+        ovsa_license_service_safe_free(&issuer_dup);
+        ovsa_license_service_safe_free(&cert_dup);
         (void)BIO_reset(ca_issuers_bio);
-        BIO_free_all(issuer_cert_mem);
+        if (issuer_cert_mem != NULL) {
+            BIO_free_all(issuer_cert_mem);
+            issuer_cert_mem = NULL;
+        }
         X509_free(xcert);
         xcert = NULL;
         X509_free(d2i_xcert);
@@ -1763,8 +1755,8 @@ static ovsa_status_t ovsa_server_crypto_form_chain_do_ocsp_check(const char* cer
 
 end:
     cert_flag = 0;
-    ovsa_server_safe_free(&cert_dup);
-    ovsa_server_safe_free(&ca_cert);
+    ovsa_license_service_safe_free(&cert_dup);
+    ovsa_license_service_safe_free(&ca_cert);
     BIO_free_all(ca_issuers_bio);
     BIO_free_all(issuer_cert_bio);
     X509_free(xcert);
@@ -1778,11 +1770,31 @@ end:
     return ret;
 }
 
-ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert, const char* chain_cert) {
+static ovsa_status_t ovsa_license_service_crypto_check_cert_is_self_signed(
+    const X509* xcert, bool* check_self_signed_cert) {
     ovsa_status_t ret = OVSA_OK;
-    X509_STORE* store = NULL;
-    X509* xcert       = NULL;
-    char* chain_file  = "/tmp/chain.pem";
+
+    ret = ovsa_license_service_crypto_check_issuer_subject_match(xcert, xcert,
+                                                                 check_self_signed_cert);
+    if (ret < OVSA_OK) {
+        BIO_printf(g_bio_err,
+                   "OVSA: Error checking self signed cert failed to check whether issuer and "
+                   "subject is matching\n");
+        ERR_print_errors(g_bio_err);
+    }
+
+    return ret;
+}
+
+ovsa_status_t ovsa_license_service_crypto_verify_certificate(const char* cert,
+                                                             const char* chain_cert) {
+    ovsa_status_t ret           = OVSA_OK;
+    X509_STORE* store           = NULL;
+    X509* xcert                 = NULL;
+    char* chain_file            = "/tmp/chain.pem";
+    bool check_self_signed_cert = false;
+    int cert_verify             = 0;
+    EVP_PKEY* pkey              = NULL;
 
     g_bio_err = BIO_new_fp(stdout, BIO_NOCLOSE);
     if (g_bio_err == NULL) {
@@ -1796,38 +1808,71 @@ ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert, const char
         goto end;
     }
 
-    xcert = ovsa_server_crypto_load_cert(cert, "certificate");
+    xcert = ovsa_license_service_crypto_load_cert(cert, "certificate");
     if (xcert == NULL) {
         BIO_printf(g_bio_err, "OVSA: Error verifying certificate failed to read certificate\n");
         ret = OVSA_CRYPTO_X509_ERROR;
         goto end;
     }
 
-    ret = ovsa_server_crypto_form_chain_do_ocsp_check(cert, chain_file, chain_cert);
+    /* Decode public key from certificate */
+    pkey = X509_get0_pubkey(xcert);
+    if (pkey == NULL) {
+        BIO_printf(g_bio_err,
+                   "OVSA: Error verifying certificate failed to decode the public key from "
+                   "certificate\n");
+        ret = OVSA_CRYPTO_X509_ERROR;
+        goto end;
+    }
+    ret = ovsa_license_service_crypto_check_cert_is_self_signed(xcert, &check_self_signed_cert);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
-                   "OVSA: Error verifying certificate failed since chain file "
-                   "could not be created\n");
+                   "OVSA: Error verifying certificate failed to check whether certificate is"
+                   "self signed created\n");
         goto end;
     }
 
-    if ((store = ovsa_server_crypto_setup_chain(chain_file)) == NULL) {
-        BIO_printf(g_bio_err,
-                   "OVSA: Error verifying certificate failed in storing the "
-                   "certificate chain\n");
-        ret = OVSA_CRYPTO_X509_ERROR;
-        goto end;
+    if (check_self_signed_cert == true) {
+        cert_verify = X509_verify(xcert, pkey);
+        if (cert_verify < 0) {
+            BIO_printf(g_bio_err,
+                       "OVSA: Error verifying certificate failed to verify the signature\n");
+            ret = OVSA_CRYPTO_X509_ERROR;
+            goto end;
+        }
+        if (cert_verify == 0) {
+            BIO_printf(g_bio_err, "OVSA: Certificate signature verification failed\n");
+            ret = OVSA_CRYPTO_X509_ERROR;
+            goto end;
+        } else {
+            BIO_printf(g_bio_err, "OVSA: Certificate signature verified OK\n");
+        }
+    } else {
+        ret = ovsa_license_service_crypto_form_chain_do_ocsp_check(cert, chain_file, chain_cert);
+        if (ret < OVSA_OK) {
+            BIO_printf(g_bio_err,
+                       "OVSA: Error verifying certificate failed since chain file "
+                       "could not be created\n");
+            goto end;
+        }
+
+        if ((store = ovsa_license_service_crypto_setup_chain(chain_file)) == NULL) {
+            BIO_printf(g_bio_err,
+                       "OVSA: Error verifying certificate failed in storing the "
+                       "certificate chain\n");
+            ret = OVSA_CRYPTO_X509_ERROR;
+            goto end;
+        }
+
+        X509_STORE_set_verify_cb(store, ovsa_license_service_crypto_verify_cb);
+
+        if (ovsa_license_service_crypto_cert_check(store, cert) != 0) {
+            BIO_printf(g_bio_err,
+                       "OVSA: Error verifying certificate failed in certificate verification\n");
+            ret = OVSA_CRYPTO_X509_ERROR;
+            goto end;
+        }
     }
-
-    X509_STORE_set_verify_cb(store, ovsa_server_crypto_verify_cb);
-
-    if (ovsa_server_crypto_cert_check(store, cert) != 0) {
-        BIO_printf(g_bio_err,
-                   "OVSA: Error verifying certificate failed in certificate verification\n");
-        ret = OVSA_CRYPTO_X509_ERROR;
-        goto end;
-    }
-
 end:
     X509_free(xcert);
     X509_STORE_free(store);

@@ -66,6 +66,7 @@ typedef enum {
     OVSA_JSON_PARSE_FAIL          = -21,
     OVSA_JSON_PRINT_FAIL          = -22,
 
+#ifndef ENABLE_SGX_GRAMINE
     /* SYSCALL EXECUTION ERRORS */
     OVSA_SYSCALL_EXECVE_FAIL      = -23,
     OVSA_SYSCALL_GETENV_PATH_FAIL = -24,
@@ -74,15 +75,18 @@ typedef enum {
     OVSA_SYSCALL_FORK_FAIL        = -27,
     OVSA_SYSCALL_DUP2_FAIL        = -28,
     OVSA_SYSCALL_WAITPID_FAIL     = -29,
+#endif
 
     /* Runtime ERRORS */
     OVSA_LICENSE_CHECK_FAIL          = -30,
     OVSA_INVALID_CMD_TYPE            = -31,
     OVSA_LICENSE_SERVER_CONNECT_FAIL = -32,
 
+#ifndef ENABLE_SGX_GRAMINE
     /* TPM ERRORS */
     OVSA_TPM2_CMD_EXEC_FAIL = -33,
     OVSA_TPM2_GENERIC_ERROR = -34,
+#endif
 
     /* License Time calculation ERRORS */
     OVSA_TIME_SYSTIME_ERROR         = -35,

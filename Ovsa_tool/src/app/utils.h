@@ -67,11 +67,12 @@ void ovsa_safe_free_url_list(ovsa_license_serv_url_list_t** listhead);
  * \param[in] listhead  Pointer to the list of urls.
  */
 void ovsa_safe_free_input_url_list(ovsa_input_url_list_t** lhead);
+
 /** \brief This function is used to free the allocated memory for model files.
  *
  * \param[in] listhead  Pointer to the list of model files.
  */
-void ovsa_safe_free_enc_list(ovsa_enc_models_t** listhead);
+void ovsa_safe_free_model_file_list(ovsa_model_files_t** listhead);
 
 /** \brief This function is used to free the allocated memory for tcb files.
  *

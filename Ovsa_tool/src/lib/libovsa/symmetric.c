@@ -19,13 +19,16 @@
 #include <openssl/conf.h>
 #include <openssl/ec.h>
 #include <openssl/err.h>
+#include <openssl/kdf.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <string.h>
 
+#ifndef ENABLE_SGX_GRAMINE
 #include "tpm.h"
+#endif
 #include "utils.h"
 /* Include at last due to dependency */
 #include "symmetric.h"
@@ -456,6 +459,8 @@ ovsa_status_t ovsa_crypto_derive_keyiv_hmac(int sym_key_slot, const char* in_buf
     BIO* b64                  = NULL;
     BIO* keyiv_hmac_b64       = NULL;
     BUF_MEM* keyiv_hmac_ptr   = NULL;
+    EVP_PKEY_CTX* pctx        = NULL;
+    size_t outlen             = 0;
     size_t secret_len         = 0;
     unsigned char salt[PKCS5_SALT_LEN];
     char mbuff[sizeof(magic) - 1];
@@ -524,10 +529,45 @@ ovsa_status_t ovsa_crypto_derive_keyiv_hmac(int sym_key_slot, const char* in_buf
     ivlen   = EVP_CIPHER_iv_length(cipher);
     hmaclen = EVP_CIPHER_key_length(cipher);
     islen   = (salt != NULL ? sizeof(salt) : 0);
-    if (!PKCS5_PBKDF2_HMAC(secret, secret_len, salt, islen, PBKDF2_ITERATION_COUNT, EVP_sha384(),
-                           iklen + ivlen + hmaclen, tmpkeyiv_hmac)) {
+
+    pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
+
+    outlen = iklen + ivlen + hmaclen;
+
+    if (EVP_PKEY_derive_init(pctx) <= 0) {
+        BIO_printf(g_bio_err, "LibOVSA: EVP_PKEY_derive_init failed during key derivation\n");
+        ret = OVSA_CRYPTO_GENERIC_ERROR;
+        goto end;
+    }
+
+    if (EVP_PKEY_CTX_set_hkdf_md(pctx, EVP_sha384()) <= 0) {
+        BIO_printf(g_bio_err, "LibOVSA: EVP_PKEY_CTX_set_hkdf_md failed during key derivation\n");
+        ret = OVSA_CRYPTO_GENERIC_ERROR;
+        goto end;
+    }
+
+    if (EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, islen) <= 0) {
         BIO_printf(g_bio_err,
-                   "LibOVSA: Error generating key/IV/HMAC failed in deriving the key/iv\n");
+                   "LibOVSA: EVP_PKEY_CTX_set1_hkdf_salt failed during key derivation\n");
+        ret = OVSA_CRYPTO_GENERIC_ERROR;
+        goto end;
+    }
+
+    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, secret, secret_len) <= 0) {
+        BIO_printf(g_bio_err, "LibOVSA: EVP_PKEY_CTX_set1_hkdf_key failed during key derivation\n");
+        ret = OVSA_CRYPTO_GENERIC_ERROR;
+        goto end;
+    }
+
+    if (EVP_PKEY_CTX_add1_hkdf_info(pctx, "label", 5) <= 0) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: EVP_PKEY_CTX_add1_hkdf_info failed during key derivation\n");
+        ret = OVSA_CRYPTO_GENERIC_ERROR;
+        goto end;
+    }
+
+    if (EVP_PKEY_derive(pctx, tmpkeyiv_hmac, &outlen) <= 0) {
+        BIO_printf(g_bio_err, "LibOVSA: EVP_PKEY_derive failed during key derivation\n");
         ret = OVSA_CRYPTO_GENERIC_ERROR;
         goto end;
     }
@@ -598,6 +638,7 @@ end:
     OPENSSL_cleanse(keyiv_hmac, MAX_KEYIV_HMAC_LENGTH);
     OPENSSL_cleanse(tmpkeyiv_hmac, MAX_KEYIV_HMAC_LENGTH);
     OPENSSL_cleanse(salt, sizeof(salt));
+    EVP_PKEY_CTX_free(pctx);
     BIO_free(b64);
     BIO_free(keyiv_hmac_b64);
     BIO_free_all(read_mem);
@@ -1288,6 +1329,7 @@ end:
     return ret;
 }
 
+#ifndef ENABLE_SGX_GRAMINE
 ovsa_status_t ovsa_crypto_derive_unsealing_key(char* magic_salt_buff, int* sym_key_slot) {
     ovsa_status_t ret         = OVSA_OK;
     size_t encryption_key_len = 0, encryption_key_b64_len = 0;
@@ -1366,26 +1408,34 @@ end:
 
     return ret;
 }
+#endif
 
 ovsa_status_t ovsa_crypto_encrypt_keystore(int sym_key_slot, const char* enc_keystore_name,
                                            const char* in_buff, size_t in_buff_len,
                                            char* magic_salt_buff) {
+#ifndef ENABLE_SGX_GRAMINE
     char* enc_keystore_hmac_buff  = NULL;
     char* enc_keystore_buff       = NULL;
-    BIO* enc_keystore_bio         = NULL;
     char* encrypt_buff            = NULL;
-    ovsa_status_t ret             = OVSA_OK;
     int keyiv_hmac_slot           = -1;
-    size_t enc_keystore_hmac_size = 0, enc_keystore_buff_len = 0;
-    size_t enc_keystore_size = 0, encrypt_buff_len = 0, cert_len = 0;
+    size_t enc_keystore_hmac_size = 0;
+    size_t enc_keystore_size = 0, enc_keystore_buff_len = 0, encrypt_buff_len = 0;
+#endif
+    BIO* enc_keystore_bio = NULL;
+    size_t cert_len       = 0;
+    ovsa_status_t ret     = OVSA_OK;
 
-    if ((sym_key_slot < MIN_KEY_SLOT) || (sym_key_slot >= MAX_KEY_SLOT) ||
-        (enc_keystore_name == NULL) || (in_buff == NULL) || (in_buff_len == 0) ||
-        (magic_salt_buff == NULL)) {
+    if (
+#ifndef ENABLE_SGX_GRAMINE
+        (sym_key_slot < MIN_KEY_SLOT) || (sym_key_slot >= MAX_KEY_SLOT) ||
+        (magic_salt_buff == NULL) ||
+#endif
+        (enc_keystore_name == NULL) || (in_buff == NULL) || (in_buff_len == 0)) {
         BIO_printf(g_bio_err, "LibOVSA: Error encrypting keystore failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
 
+#ifndef ENABLE_SGX_GRAMINE
     ret = ovsa_crypto_encrypt_mem(sym_key_slot, in_buff, in_buff_len, magic_salt_buff,
                                   &encrypt_buff, &encrypt_buff_len, &keyiv_hmac_slot);
     if (ret < OVSA_OK) {
@@ -1404,7 +1454,6 @@ ovsa_status_t ovsa_crypto_encrypt_keystore(int sym_key_slot, const char* enc_key
         ret = OVSA_MEMORY_ALLOC_FAIL;
         goto end;
     }
-
     ret = ovsa_json_create_encrypted_keystore(encrypt_buff, enc_keystore_buff);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
@@ -1412,7 +1461,6 @@ ovsa_status_t ovsa_crypto_encrypt_keystore(int sym_key_slot, const char* enc_key
                    "json blob\n");
         goto end;
     }
-
     enc_keystore_hmac_size =
         encrypt_buff_len + ENC_KEYSTORE_BLOB_TEXT_SIZE + MAX_MAC_SIZE + SIGNATURE_BLOB_TEXT_SIZE;
     enc_keystore_hmac_buff =
@@ -1442,6 +1490,7 @@ ovsa_status_t ovsa_crypto_encrypt_keystore(int sym_key_slot, const char* enc_key
         ret = OVSA_CRYPTO_GENERIC_ERROR;
         goto end;
     }
+#endif
 
     ret = ovsa_json_getitem_size("certificate", in_buff, &cert_len);
     if (ret < OVSA_OK) {
@@ -1449,6 +1498,16 @@ ovsa_status_t ovsa_crypto_encrypt_keystore(int sym_key_slot, const char* enc_key
             g_bio_err,
             "LibOVSA: Error loading asymmetric key failed in getting the certificate size\n");
         goto end;
+    }
+
+    if (cert_len == 0) {
+        ret = ovsa_json_getitem_size("certificate_2", in_buff, &cert_len);
+        if (ret < OVSA_OK) {
+            BIO_printf(
+                g_bio_err,
+                "LibOVSA: Error loading asymmetric key failed in getting the certificate size\n");
+            goto end;
+        }
     }
 
     /*
@@ -1469,7 +1528,11 @@ ovsa_status_t ovsa_crypto_encrypt_keystore(int sym_key_slot, const char* enc_key
     }
 
     /* Write encrypted keystore file on to disk */
+#ifndef ENABLE_SGX_GRAMINE
     if (!BIO_write(enc_keystore_bio, enc_keystore_hmac_buff, enc_keystore_buff_len)) {
+#else
+    if (!BIO_write(enc_keystore_bio, in_buff, in_buff_len)) {
+#endif
         BIO_printf(
             g_bio_err,
             "LibOVSA: Error encrypting keystore failed in writing to encrypted keystore file\n");
@@ -1478,6 +1541,7 @@ ovsa_status_t ovsa_crypto_encrypt_keystore(int sym_key_slot, const char* enc_key
     }
 
 end:
+#ifndef ENABLE_SGX_GRAMINE
     /* Clear key/IV/HMAC from the key slot */
     ovsa_crypto_clear_symmetric_key_slot(keyiv_hmac_slot);
     /* Clear symmetric key from the key slot */
@@ -1485,6 +1549,7 @@ end:
     ovsa_crypto_openssl_free(&enc_keystore_hmac_buff);
     ovsa_crypto_openssl_free(&enc_keystore_buff);
     ovsa_crypto_openssl_free(&encrypt_buff);
+#endif
     BIO_free_all(enc_keystore_bio);
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);
@@ -1492,6 +1557,7 @@ end:
     return ret;
 }
 
+#ifndef ENABLE_SGX_GRAMINE
 ovsa_status_t ovsa_crypto_decrypt_keystore(int sym_key_slot, const char* in_buff,
                                            size_t in_buff_len, const char* magic_salt_buff,
                                            char** out_buff, size_t* out_buff_len) {
@@ -1594,3 +1660,4 @@ end:
     }
     return ret;
 }
+#endif

@@ -1,4 +1,20 @@
 #!/bin/bash
+#
+# Copyright (c) 2020-2021 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 LD_CONF_FILE=/etc/ld.so.conf.d/ovsa.conf
 echo "I am $(whoami)"
 
@@ -8,28 +24,6 @@ if [ $OVSA_UID != $ALREADY_SET_ID ]
 then
 	usermod -u $OVSA_UID ovsa
 fi
-
-chown root:root -R anaconda-post.log
-chown root:root -R bin
-chown root:root -R boot
-chown root:root -R etc
-chown root:root -R home
-chown root:root -R lib
-chown root:root -R lib64
-chown root:root -R media
-chown root:root -R mnt
-chown root:root -R model_server.conf.template
-chown root:root -R opt
-chown root:root -R ovms
-chown ovsa:ovsa -R ovms_wrapper
-chown ovsa:ovsa -R ovsa-runtime
-chown root:root -R root
-chown root:root -R run
-chown root:root -R sbin
-chown root:root -R srv
-chown root:root -R tmp
-chown root:root -R usr
-chown root:root -R var
 
 chown -R ovsa /var/OVSA
 dbus-daemon --config-file=/usr/share/dbus-1/system.conf --print-address &

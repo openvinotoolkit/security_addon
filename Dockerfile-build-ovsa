@@ -14,108 +14,42 @@
 # limitations under the License.
 #
 
-FROM openvino/model_server-build as base_build
+ARG BASE_IMAGE=openvino/model_server-build
+FROM $BASE_IMAGE as base_build
 
 LABEL version="1.0.0"
 
-ARG DL_DIR=/tmp
-ARG build_type=dbg
+SHELL ["/bin/bash", "-c"]
+RUN apt update && apt install -y \
+        libglib2.0-dev \
+        libjson-c-dev && \
+        apt clean
 
-#TPM Tool Specific installs
-RUN yum install -y \
-        autoconf-archive \
-        bison \
-        dbus-devel \
-        flex \
-        glib2-devel \
-        glibc-static \
-        json-c-devel \
-        libiconv \
-        libstdc++-devel  \
-        libgcrypt-devel \
-        openssl-devel \
-        strip \
-        uriparser-devel && \
-        yum clean all
-
-SHELL [ "/usr/bin/scl", "enable", "devtoolset-8" ]
-ENV CC=/opt/rh/devtoolset-8/root/bin/gcc
-ENV CXX=/opt/rh/devtoolset-8/root/bin/g++
-
-#DOXYGEN
-WORKDIR /doxygen
-RUN git clone https://github.com/doxygen/doxygen.git  && \
-    cd doxygen  && \
-    git checkout Release_1_8_7 && \
-    ./configure && \
-    make && \
-    make install
-
-#TPM2 TSS Build
-WORKDIR /tpm2-tss-build
-
-RUN wget https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz && \
-    tar -xvzf tpm2-tss-3.0.3.tar.gz && \
-    cd tpm2-tss-3.0.3 && \
-    ./configure  --with-udevrulesdir=/etc/udev/rules.d/ --prefix=/usr && \
-    make -j8 && \
-    make install
-
-ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/lib/pkgconfig
-WORKDIR /tpm2-abrmd
-RUN wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz && \
-    tar -xvzf tpm2-abrmd-2.4.0.tar.gz && \
-    pushd tpm2-abrmd-2.4.0 && \
-    ./configure --with-dbuspolicydir=/etc/dbus-1/system.d --prefix=/usr && \
-    make -j8 && \
-    make install
-
-WORKDIR /tpm2-tools-build
-RUN wget https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz && \
-        tar -xzf tpm2-tools-5.0.tar.gz && \
-        cd tpm2-tools-5.0 && \
-        ./configure --prefix=/usr && \
-        make -j8 && \
-        make install
-
-
+# Setting OVMS path to reference the interface header
 ENV OVMS_DIR=/ovms/src
 
+ARG use_sgx=0
+
+# Copy OVSA src 
 WORKDIR /ovsa
 COPY  Ovsa_runtime/ /ovsa/Ovsa_runtime/
 COPY  Ovsa_tool/ /ovsa/Ovsa_tool
-#RUN cd /ovsa/Ovsa_tool && make clean all
-#RUN cd /ovsa/Ovsa_runtime && make clean all
-RUN cd /ovsa/Ovsa_runtime/src/ovms && make clean all
-RUN cp /ovsa/Ovsa_runtime/src/ovms/libovsaruntime.so /ovsa/Ovsa_runtime/lib/
 
-# Copy packages
 RUN mkdir -vp /ovsa-runtime/lib
 RUN mkdir -vp /ovsa-runtime/usr
-RUN mkdir -vp /ovsa-runtime/usr/bin
-RUN mkdir -vp /ovsa-runtime/usr/etc
-RUN mkdir -vp /ovsa-runtime/usr/include
-RUN mkdir -vp /ovsa-runtime/usr/lib
-RUN mkdir -vp /ovsa-runtime/usr/sbin
-RUN mkdir -vp /ovsa-runtime/usr/share
-RUN mkdir -vp /ovsa-runtime/usr/var
-RUN mkdir -vp /ovsa-runtime/tpm2-abrmd
+RUN mkdir -vp /ovsa-runtime/etc
+
+# Build OVSA Runtime
+RUN if [ "$use_sgx" == "1" ]; then \
+        export GRAMINE_DIR=/ovsa/Ovsa_runtime/src/gramine && \
+        cd /ovsa/Ovsa_runtime/src/ovms && \
+        SGX=1 make clean all; \
+    else \
+        cd /ovsa/Ovsa_runtime/src/ovms && \
+        make clean all; \
+    fi
+RUN cp /ovsa/Ovsa_runtime/src/ovms/libovsaruntime.so /ovsa/Ovsa_runtime/lib/
 RUN cp -rv /ovsa/Ovsa_runtime/lib/* /ovsa-runtime/lib/
-RUN cp -rv /usr/bin/tpm2* /ovsa-runtime/usr/bin
-RUN cp -rv /usr/bin/tss2* /ovsa-runtime/usr/bin
-RUN cp -rv /usr/etc/sysusers.d /ovsa-runtime/usr/etc
-RUN cp -rv /usr/etc/tmpfiles.d /ovsa-runtime/usr/etc
-RUN cp -rv /usr/etc/tpm2-tss /ovsa-runtime/usr/etc
-RUN cp -rv /usr/include/tss2 /ovsa-runtime/usr/include
-RUN cp -rv /usr/lib/libtss2* /ovsa-runtime/usr/lib
-RUN cp -rv /usr/lib/pkgconfig /ovsa-runtime/usr/lib
-RUN cp -rv /usr/lib/systemd /ovsa-runtime/usr/lib
-RUN cp -rv /usr/sbin/tpm2-abrmd /ovsa-runtime/usr/sbin
-RUN cp -rv /usr/share/dbus-1 /ovsa-runtime/usr/share
-RUN cp -rv /usr/share/man /ovsa-runtime/usr/share
-RUN cp -rv /usr/share/bash-completion /ovsa-runtime/usr/share
-RUN cp -rv /usr/var /ovsa-runtime/usr/var
-RUN cp -rv /etc/dbus-1/system.d/tpm2-abrmd.conf /ovsa-runtime/tpm2-abrmd/
 
 WORKDIR /
 RUN tar cvzf ovsa-runtime.tar.gz /ovsa-runtime

@@ -50,7 +50,8 @@
 #define NULL_TERMINATOR          1
 #define TCB_INFO_MAX_QUOTE_SIZE  3072
 #define TCB_INFO_MAX_PUBKEY_SIZE 512
-#define DEFAULT_PORT             "4451"
+#define DEFAULT_RATLS_PORT       "4451"
+#define DEFAULT_TLS_PORT         "4452"
 #define MAX_BUF_SIZE             4096
 #define MAX_FILE_LEN             64
 #define TPM2_TPMU_HA_SIZE        64
@@ -91,6 +92,12 @@
 #define TPM2_HWQUOTE_NONCE_FILE "hw_quote_nonce.bin"
 #define TPM2_SWQUOTE_NONCE_FILE "sw_quote_nonce.bin"
 
+#ifdef ENABLE_SGX_GRAMINE
+#define SGX_ENCLAVE_HASH_SIZE 65
+#endif
+
+#define TPM2_MAX_PCRS 32
+
 #define DBG_E 0x01
 #define DBG_I 0x02
 #define DBG_D 0x04
@@ -121,7 +128,13 @@
     memset_s(key_file, sizeof(key_file), 0);                          \
     memcpy_s(key_file, MAX_FILE_LEN, tmp_dir_path, sizeof(key_file)); \
     strcat_s(key_file, MAX_FILE_LEN, TPM2_QUOTE_INFO);
-typedef int (*ovsa_license_service_cb_t)(void* ssl, int client_fd);
+
+#ifdef ENABLE_SGX_GRAMINE
+typedef int (*sgx_measurements_cb_t)(const char* mrenclave, const char* mrsigner,
+                                     const char* isv_prod_id, const char* isv_svn);
+#endif
+
+typedef int (*ovsa_license_service_cb_t)(void* ssl, void* data);
 typedef char GUID[GUID_SIZE + 1];
 
 typedef struct ovsa_quote_info {
@@ -238,6 +251,7 @@ typedef enum {
     OVSA_INTEGER_UNDERFLOW     = -55,
     OVSA_PCR_VALIDATION_FAILED = -56,
     OVSA_PCR_ID_NOT_VALID      = -57,
+    OVSA_TCB_NOT_VALID         = -58,
 
     OVSA_FAIL = -99
 } ovsa_status_t;
@@ -245,11 +259,6 @@ typedef enum {
 typedef char GUID[GUID_SIZE + 1];
 /* TCB Signature list in Customer License
    This is going to contain the TCB Signature JSON blob */
-
-typedef struct ovsa_tcb_sig_list {
-    char* tcb_signature;
-    struct ovsa_tcb_sig_list* next;
-} ovsa_tcb_sig_list_t;
 
 /* To Store list of License Server URL for License Config Struct */
 typedef struct ovsa_license_serv_url_list {
@@ -267,8 +276,21 @@ typedef struct ovsa_tcb_info {
     char sw_quote[TCB_INFO_MAX_QUOTE_SIZE];
     char hw_pub_key[TCB_INFO_MAX_PUBKEY_SIZE];
     char sw_pub_key[TCB_INFO_MAX_PUBKEY_SIZE];
+    char sw_pcr_id_set[TPM2_MAX_PCRS];
+    char hw_pcr_id_set[TPM2_MAX_PCRS];
+#ifdef ENABLE_SGX_GRAMINE
+    char mrenclave[SGX_ENCLAVE_HASH_SIZE];
+    char mrsigner[SGX_ENCLAVE_HASH_SIZE];
+    int isv_svn;
+    int isv_prod_id;
+#endif
     char* isv_certificate;
 } ovsa_tcb_info_t;
+
+typedef struct ovsa_tcb_sig_list {
+    char* tcb_signature;
+    struct ovsa_tcb_sig_list* next;
+} ovsa_tcb_sig_list_t;
 
 /* TCB Signature Struct with Signature */
 typedef struct ovsa_tcb_sig {
@@ -306,7 +328,7 @@ typedef struct ovsa_customer_license_sig {
  *
  * \return Pointer to the key on Success or NULL in Failure
  */
-EVP_PKEY* ovsa_crypto_load_key(char* p_key, const char* key_descrip);
+EVP_PKEY* ovsa_license_service_crypto_load_key(const char* p_Key, const char* key_descrip);
 
 /** \brief This function does signing, verification and hashing operation.
  *
@@ -320,9 +342,11 @@ EVP_PKEY* ovsa_crypto_load_key(char* p_key, const char* key_descrip);
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_crypto_do_sign_verify_hash(unsigned char* buf, BIO* inp, const EVP_PKEY* key,
-                                              const unsigned char* sigin, int siglen,
-                                              const char* file, BIO* out);
+ovsa_status_t ovsa_license_service_crypto_do_sign_verify_hash(unsigned char* buf, BIO* inp,
+                                                              const EVP_PKEY* key,
+                                                              const unsigned char* sigin,
+                                                              int siglen, const char* file,
+                                                              BIO* out);
 
 /** \brief This function reads the certificate
  *
@@ -331,7 +355,7 @@ ovsa_status_t ovsa_crypto_do_sign_verify_hash(unsigned char* buf, BIO* inp, cons
  *
  * \return Pointer to the certificate on Success or NULL in Failure
  */
-X509* ovsa_server_crypto_load_cert(const char* cert, const char* cert_descrip);
+X509* ovsa_license_service_crypto_load_cert(const char* cert, const char* cert_descrip);
 
 /** \brief This function verifies whether the certificate is valid.
  *
@@ -341,7 +365,8 @@ X509* ovsa_server_crypto_load_cert(const char* cert, const char* cert_descrip);
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert, const char* cert_chain);
+ovsa_status_t ovsa_license_service_crypto_verify_certificate(const char* cert,
+                                                             const char* cert_chain);
 
 /** \brief This function extracts public key from the certificate.
  *
@@ -350,7 +375,8 @@ ovsa_status_t ovsa_server_crypto_verify_certificate(const char* cert, const char
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_crypto_extract_pubkey_certificate(const char* cert, char* pubkey);
+ovsa_status_t ovsa_license_service_crypto_extract_pubkey_certificate(const char* cert,
+                                                                     char* pubkey);
 
 /** \brief This function verifies the signature of the input buffer with the
  * specified signature using the public key from the key slot.
@@ -362,8 +388,8 @@ ovsa_status_t ovsa_crypto_extract_pubkey_certificate(const char* cert, char* pub
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_crypto_verify_mem(const char* cert, const char* in_buff, size_t in_buff_len,
-                                     char* signature);
+ovsa_status_t ovsa_license_service_crypto_verify_mem(const char* cert, const char* in_buff,
+                                                     size_t in_buff_len, char* signature);
 /** \brief This function converts binary contents to pem format.
  *
  * \param[in]  in_buff         Input buffer for conversion.
@@ -372,8 +398,8 @@ ovsa_status_t ovsa_crypto_verify_mem(const char* cert, const char* in_buff, size
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_server_crypto_convert_bin_to_pem(const char* in_buff, size_t in_buff_len,
-                                                    char** out_buff);
+ovsa_status_t ovsa_license_service_crypto_convert_bin_to_pem(const char* in_buff,
+                                                             size_t in_buff_len, char** out_buff);
 
 /** \brief This function converts pem formatted data to bin format.
  *
@@ -384,8 +410,9 @@ ovsa_status_t ovsa_server_crypto_convert_bin_to_pem(const char* in_buff, size_t 
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_crypto_convert_base64_to_bin(const char* in_buff, size_t in_buff_len,
-                                                char* out_buff, size_t* out_buff_len);
+ovsa_status_t ovsa_license_service_crypto_convert_base64_to_bin(const char* in_buff,
+                                                                size_t in_buff_len, char* out_buff,
+                                                                size_t* out_buff_len);
 /** \brief This function generates nonce and send json message payload to client.
  *
  * \param[out] out_buff        Output buffer to store nonce buffer.
@@ -393,14 +420,14 @@ ovsa_status_t ovsa_crypto_convert_base64_to_bin(const char* in_buff, size_t in_b
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_generate_nonce_payload(char** nonce_buf, char** json_payload);
+ovsa_status_t ovsa_license_service_generate_nonce_payload(char** nonce_buf, char** json_payload);
 /** \brief This function generates nonce .
  *
  * \param[out] out_buff        Output buffer to store nonce buffer.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_create_nonce(char** nonce_buf);
+ovsa_status_t ovsa_license_service_create_nonce(char** nonce_buf);
 /** \brief This function verifies the signature of the input buffer with the specified signature
  *         using the public key from the key slot.
  *
@@ -411,8 +438,8 @@ ovsa_status_t ovsa_create_nonce(char** nonce_buf);
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buff,
-                                            size_t in_buff_len, char* signature);
+ovsa_status_t ovsa_license_service_crypto_verify_mem(const char* cert, const char* in_buff,
+                                                     size_t in_buff_len, char* signature);
 /** \brief This function extracts public key from the certificate.
  *
  * \param[in]  cert       Pointer to certificate to be used for extracting public key.
@@ -420,7 +447,8 @@ ovsa_status_t ovsa_server_crypto_verify_mem(const char* cert, const char* in_buf
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_server_crypto_extract_pubkey_certificate(const char* cert, char* public_key);
+ovsa_status_t ovsa_license_service_crypto_extract_pubkey_certificate(const char* cert,
+                                                                     char* public_key);
 
 /** \brief This function computes the hash of the memory buffer.
  *
@@ -430,8 +458,8 @@ ovsa_status_t ovsa_server_crypto_extract_pubkey_certificate(const char* cert, ch
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_server_crypto_compute_hash(const char* in_buff, int hash_alg, char* out_buff,
-                                              bool b64_format);
+ovsa_status_t ovsa_license_service_crypto_compute_hash(const char* in_buff, int hash_alg,
+                                                       char* out_buff, bool b64_format);
 
 /** \brief This function converts binary to base64 format of the buffer.
  *
@@ -441,7 +469,17 @@ ovsa_status_t ovsa_server_crypto_compute_hash(const char* in_buff, int hash_alg,
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_server_crypto_convert_bin_to_base64(const char* in_buff, size_t in_buff_len,
-                                                       char** out_buff);
+ovsa_status_t ovsa_license_service_crypto_convert_bin_to_base64(const char* in_buff,
+                                                                size_t in_buff_len,
+                                                                char** out_buff);
+#ifdef ENABLE_SGX_GRAMINE
+int ra_tls_verify_callback(void* data, mbedtls_x509_crt* crt, int depth, uint32_t* flags);
+void ra_tls_set_measurement_callback(int (*f_cb)(const char* mrenclave, const char* mrsigner,
+                                                 const char* isv_prod_id, const char* isv_svn));
+ovsa_status_t ovsa_license_service_sgx_measurements_callback(const char* mrenclave,
+                                                             const char* mrsigner,
+                                                             const char* isv_prod_id,
+                                                             const char* isv_svn);
+#endif
 
 #endif

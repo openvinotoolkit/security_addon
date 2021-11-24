@@ -29,9 +29,13 @@
 #define CUSTOMER_LICENSE_BLOB_TEXT_SIZE        300
 #define TCB_NAME_BLOB_TEXT_SIZE                15
 #define MAX_FILE_NAME_LEN                      20
-#define TPM2_BLOB_TEXT_SIZE                    130
-#define TPM2_QUOTE_SIZE                        3072
-#define TPM2_PUBKEY_SIZE                       512
+
+#define TCB_INFO_BLOB_TEXT_SIZE 435
+#define TPM2_QUOTE_SIZE         3072
+#define TPM2_PUBKEY_SIZE        512
+#define TPM2_MAX_PCRS           32
+#define MAX_PCR_ID_SIZE         8
+#define SGX_ENCLAVE_HASH_SIZE   ((32 << 1) + 1)
 
 /* Struct to handle specified input commands */
 typedef struct ovsa_handle_cmd {
@@ -135,10 +139,19 @@ typedef struct ovsa_customer_license_sig {
 typedef struct ovsa_tcb_info {
     char tcb_name[MAX_NAME_SIZE];
     char tcb_version[MAX_VERSION_SIZE];
+#ifndef ENABLE_SGX_GRAMINE
     char hw_quote[TPM2_QUOTE_SIZE];
     char sw_quote[TPM2_QUOTE_SIZE];
     char hw_pub_key[TPM2_PUBKEY_SIZE];
     char sw_pub_key[TPM2_PUBKEY_SIZE];
+    char sw_pcr_reg_id[TPM2_MAX_PCRS];
+    char hw_pcr_reg_id[TPM2_MAX_PCRS];
+#else
+    char mrenclave[SGX_ENCLAVE_HASH_SIZE];
+    char mrsigner[SGX_ENCLAVE_HASH_SIZE];
+    int isv_svn;
+    int isv_prod_id;
+#endif
     char* isv_certificate;
 } ovsa_tcb_info_t;
 
@@ -149,15 +162,19 @@ typedef struct ovsa_tcb_sig {
 } ovsa_tcb_sig_t;
 
 /*
- * Controlled Access Model Struct
- * First file would be BIN file followed by XML file and other files
- * This structure would contain encrypted data of these files
+ * Controlled Access Model File Structure would contain
+ * encrypted/decrypted information of data files
  */
-typedef struct ovsa_enc_models {
-    char file_name[MAX_NAME_SIZE];
-    char* enc_model;
-    struct ovsa_enc_models* next;
-} ovsa_enc_models_t;
+typedef struct ovsa_model_files {
+    char model_file_name[MAX_NAME_SIZE];
+    char* model_file_data;
+    int model_file_length;
+    struct ovsa_model_files* next;
+} ovsa_model_files_t;
+
+typedef struct ovsa_model_file_list {
+    ovsa_model_files_t* model_list;
+} ovsa_model_file_list_t;
 
 /* Controlled Access Model Struct */
 typedef struct ovsa_controlled_access_model {
@@ -166,7 +183,7 @@ typedef struct ovsa_controlled_access_model {
     char version[MAX_VERSION_SIZE];
     char* isv_certificate;
     GUID model_guid;
-    ovsa_enc_models_t* enc_model;
+    ovsa_model_files_t* enc_model;
 } ovsa_controlled_access_model_t;
 
 /* Controlled Access Model Struct with Signature */

@@ -18,7 +18,7 @@
 REST_PORT=2225
 GRPC_PORT=3335
 
-MTLS_IMAGE=${1:-"ovsa/runtime-tpm-nginx"}
+MTLS_IMAGE=${1:-"openvino/model_server-ovsa-nginx-mtls"}
 
 echo "Starting container. Hit CTRL+C to stop it. Use another terminal to send some requests, e.g. via using test_rest.sh or test_grpc.sh scripts."
 docker run -d --rm -ti \
@@ -28,6 +28,8 @@ docker run -d --rm -ti \
 	-p $REST_PORT:$REST_PORT \
         -p $GRPC_PORT:$GRPC_PORT \
 	-v ${PWD}:/sampleloader \
+	-v /opt/ovsa/kvm/keystore:/opt/ovsa/kvm/keystore \
+	-v /opt/ovsa/kvm/artefacts:/opt/ovsa/kvm/artefacts \
 	-v /var/OVSA:/var/OVSA \
         -v /var/OVSA/Modelserver/server.pem:/certs/server.pem:ro \
         -v /var/OVSA/Modelserver/server.key:/certs/server.key:ro \

@@ -17,27 +17,59 @@
 
 #set -e
 
+echo
 echo "Installing OVSA License Server"
+echo
 
-mkdir -vp /opt/ovsa/bin
-mkdir -vp /opt/ovsa/scripts
-mkdir -vp /opt/ovsa/DB
-mkdir -vp /opt/ovsa/lib
+echo "Copying files to /opt/ovsa/bin directory..."
+mkdir -vp /opt/ovsa/bin 2>&1 | sed 's/^/    /'
+cp -vR bin/* /opt/ovsa/bin/ 2>&1 | sed 's/^/    /'
 
-cp -vR bin/* /opt/ovsa/bin/
-cp -vR scripts/* /opt/ovsa/scripts/
-cp -vR DB/* /opt/ovsa/DB/
-cp -vR lib/* /opt/ovsa/lib/
+echo "Copying files to /opt/ovsa/scripts directory..."
+mkdir -vp /opt/ovsa/scripts 2>&1 | sed 's/^/    /'
+cp -vR scripts/* /opt/ovsa/scripts/ 2>&1 | sed 's/^/    /'
 
-python3 /opt/ovsa/DB/ovsa_create_db.py /opt/ovsa/DB/ovsa.db
+echo "Copying files to /opt/ovsa/lib directory..."
+mkdir -vp /opt/ovsa/lib 2>&1 | sed 's/^/    /'
+cp -vR lib/* /opt/ovsa/lib/ 2>&1 | sed 's/^/    /'
 
-pushd /opt/ovsa/scripts/
-./OVSA_install_license_server_cert.sh gencert
-popd
+echo "Copying files to /opt/ovsa/DB directory..."
+mkdir -vp /opt/ovsa/DB 2>&1 | sed 's/^/    /'
+cp -vR DB/* /opt/ovsa/DB/ 2>&1 | sed 's/^/    /'
+if [ -e /opt/ovsa/DB/ovsa.db ]
+then
+    echo "OVSA DB already exists..."
+else
+    echo "Creating OVSA DB..."
+    python3 /opt/ovsa/DB/ovsa_create_db.py /opt/ovsa/DB/ovsa.db 2>&1 | sed 's/^/    /'
+fi
 
+echo "Provisioning the License Server..."
+if [ -e /opt/ovsa/certs/server.crt -a \
+     -e /opt/ovsa/certs/server.csr -a \
+     -e /opt/ovsa/certs/server.key ]
+then
+    echo "License Server already provisioned..."
+else
+    cd /opt/ovsa/scripts/ && ./OVSA_install_license_server_cert.sh gencert 2>&1 | sed 's/^/    /'
+    cd -
+fi
+
+echo "Changing ownership to OVSA group/user..."
+chown -R ovsa /opt/ovsa 2>&1 | sed 's/^/    /'
+chown -R ovsa /var/OVSA 2>&1 | sed 's/^/    /'
+
+echo
+echo "Installing OVSA License Server completed."
+echo
 echo "Open the .bashrc file in <user_directory>:"
 echo "vi <user_directory>/.bashrc"
 echo "Add this line to the end of the file:"
 echo "source /opt/ovsa/scripts/setupvars.sh"
 echo "Save and close the file: press the Esc key and type :wq."
 echo "To test your change, open a new terminal. You will see [setupvars.sh] OVSA environment initialized."
+echo
+echo "To re-provision OVSA License Server use the below scripts:"
+echo "DB - python3 /opt/ovsa/DB/ovsa_create_db.py /opt/ovsa/DB/ovsa.db"
+echo "Generate certificate for License Server - /opt/ovsa/scripts/OVSA_install_license_server_cert.sh gencert"
+echo

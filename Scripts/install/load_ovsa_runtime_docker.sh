@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Copyright (c) 2020-2021 Intel Corporation
 #
@@ -16,13 +17,19 @@
 
 #set -e
 
-echo "Loading OVSA Runtime Docker"
+echo
+echo "Loading the OpenVINO Model Server docker image..."
+echo
 
-if [ -z "$(docker images -q ovsa/runtime-tpm-nginx:latest)" ]; then
+if [[ "$(docker images -q openvino/model_server-ovsa-nginx-mtls 2> /dev/null)" == "" ]]; then
         echo "Docker does not exist."
 else
-        docker image rm -f ovsa/runtime-tpm-nginx:latest
+	echo "Removing existing docker image..."
+        docker image rm -f openvino/model_server-ovsa-nginx-mtls 2>&1 | sed 's/^/    /'
 fi
 
-docker load -i ovsa-runtime-tpm-nginx.tar.gz
+docker load -i model_server-ovsa-nginx-mtls.tar.gz 2>&1 | sed 's/^/    /'
 
+echo
+echo "Loading the OpenVINO Model Server docker image completed."
+echo

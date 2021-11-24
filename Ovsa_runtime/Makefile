@@ -27,24 +27,47 @@ else
 OVSARUNTIME_DIR ?= $(TOPDIR)/Ovsa_runtime
 endif
 export OVSARUNTIME_DIR
-CLIENT_DISABLE ?=0
+
+ifeq ($(SGX),1)
+export ENABLE_SGX_GRAMINE=1
+# Relative path to Gramine root and key for enclave signing
+SGX_SIGNER_KEY ?= $(GRAMINE_DIR)/Pal/src/host/Linux-SGX/signer/enclave-key.pem
+ARCH_LIBDIR ?= /lib/$(shell $(CC) -dumpmachine)
+endif
 
 SRC_BUILD_DIR  := $(OVSARUNTIME_DIR)
 MV             := mv
-DEBUG ?=
-export DEBUG=1
 
 export MV
 
 ifeq ($(DEBUG),2)
-CFLAGS += -O0 -ggdb3
+	ifeq ($(SGX),1)
+	GRAMINE_DEBUG = all
+	endif
+	CFLAGS += -O0 -ggdb3
+else ifeq ($(DEBUG),1)
+	ifeq ($(SGX),1)
+	GRAMINE_DEBUG = error
+	endif
+	CFLAGS += -O2
 else
-CFLAGS += -O2
+	ifeq ($(SGX),1)
+	GRAMINE_DEBUG = error
+	endif
+	CFLAGS += -O2
 endif
 
 .PHONY : all
+ifeq ($(SGX),1)
+ifndef GRAMINE_DIR
+$(error GRAMINE_DIR not set. Please set before compilation)
+endif
+endif
 all: create_dirs build_mbedtls rapidjson ovsaruntime_build
 
+ifeq ($(SGX),1)
+all: ovsaruntime.manifest.sgx ovsaruntime.sig ovsaruntime.token
+endif
 ############################# MBEDTLS DEPENDENCY ##############################
 
 MBEDTLS_VERSION ?= 2.26.0
@@ -88,7 +111,7 @@ ifeq ($(wildcard  $(SRC_BUILD_DIR)/mbedtls),)
 	$(RM) -r mbedtls/install
 	mkdir mbedtls/install
 	cd mbedtls && ./scripts/config.pl set MBEDTLS_CMAC_C && make SHARED=1 DESTDIR=install install .
-	cp -Prv mbedtls/install/lib/lib*.so* lib
+	cp mbedtls/install/lib/*.a lib
 	$(RM) *.tar.gz
 endif
 
@@ -114,10 +137,34 @@ ovsaruntime_build:
 
 	CC=$(TARGET_CC)
 
+ifeq ($(SGX),1)
+ovsaruntime.manifest: ovsaruntime.manifest.template
+	gramine-manifest \
+		-Dlog_level=$(GRAMINE_DEBUG) \
+		-Dgramine_dir=$(GRAMINE_DIR) \
+		-Darch_libdir=$(ARCH_LIBDIR) \
+		$< > $@
+
+# Generating the SGX-specific manifest, the enclave signature,
+# and the token for enclave initialization.
+ovsaruntime.manifest.sgx: ovsaruntime.manifest
+	gramine-sgx-sign \
+		--key $(SGX_SIGNER_KEY) \
+		--manifest $< \
+		--output $@
+
+ovsaruntime.sig: ovsaruntime.manifest.sgx
+
+ovsaruntime.token: ovsaruntime.sig
+	gramine-sgx-get-token \
+		--output ovsaruntime.token --sig ovsaruntime.sig
+endif
+
 ################################## CLEANUP ####################################
 
 .PHONY: clean
 clean:
+	$(RM) *.token *.sig *.manifest.sgx *.manifest
 	$(MAKE) -C $(SRC_BUILD_DIR)/src/ clean
 	$(RM) $(SRC_BUILD_DIR)/bin/ovsaruntime
 	
@@ -129,4 +176,4 @@ format:
 
 .PHONY: distclean
 distclean: clean
-	$(RM) -rf mbedtls $(SRC_BUILD_DIR)/include/rapidjson  $(SRC_BUILD_DIR)/lib $(SRC_BUILD_DIR)/bin
+	$(RM) -rf mbedtls $(SRC_BUILD_DIR)/include/rapidjson $(SRC_BUILD_DIR)/lib/*.so.* $(SRC_BUILD_DIR)/bin

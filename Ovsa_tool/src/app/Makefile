@@ -24,6 +24,9 @@ endif
 DEBUG ?=
 export DEBUG=1
 
+ifeq ($(ENABLE_SGX_GRAMINE),1)
+CFLAGS += -DENABLE_SGX_GRAMINE
+endif
 CFLAGS +=  -g -Wall -DENABLE_SELF_SIGNED_CERT -DENABLE_OCSP_CHECK -fno-exceptions -fPIC -DDEBUG=$(DEBUG) -fstack-protector-strong -fPIE -fPIC -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -D_GNU_SOURCE
 INC_DIR := -I$(SRC_BUILD_DIR)/include \
 	   -I$(SRC_BUILD_DIR)/src/lib/libovsa \
@@ -55,7 +58,6 @@ all: $(TARGET)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INC_DIR) $(LFLAGS) -c -o $@ $<
-
 
 $(TARGET): $(OBJS)
 	$(CC)  -o $@ $(OBJS) $(LFLAGS)  $(LIBS)
