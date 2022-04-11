@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -455,7 +455,7 @@ end:
 }
 
 ovsa_status_t ovsa_license_service_json_extract_element(const char* inputBuf, const char* keyName,
-                                                        void** keyValue) {
+                                                        char** keyValue) {
     ovsa_status_t ret = OVSA_OK;
     cJSON* parse_json = NULL;
     cJSON* key        = NULL;
@@ -489,9 +489,6 @@ ovsa_status_t ovsa_license_service_json_extract_element(const char* inputBuf, co
             goto end;
         }
         memcpy_s(*keyValue, str_len, key->valuestring, str_len);
-
-    } else if (cJSON_IsNumber(key)) {
-        memcpy_s(*keyValue, sizeof(key->valueint), (int*)&key->valueint, sizeof(key->valueint));
     }
 
 end:

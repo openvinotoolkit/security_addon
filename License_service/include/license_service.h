@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@
 
 #define MAX_NAME_SIZE           256
 #define MAX_LEN                 5
+#define PCR_VAL_MAX_LEN         2
 #define MESSAGE_BLOB_TEXT_SIZE  34
 #define GUID_SIZE               36
 #define PAYLOAD_LENGTH          8 /* BYTE */
@@ -45,7 +46,7 @@
 #define MAX_VERSION_SIZE         32
 #define MAX_KEY_SIZE             512
 #define MAX_EKEY_SIZE            128 /* actual size: 45 */
-#define MAX_URL_SIZE             256
+#define MAX_URL_SIZE             2048
 #define BUFSIZE                  1024 * 8
 #define NULL_TERMINATOR          1
 #define TCB_INFO_MAX_QUOTE_SIZE  3072
@@ -54,7 +55,6 @@
 #define DEFAULT_TLS_PORT         "4452"
 #define MAX_BUF_SIZE             4096
 #define MAX_FILE_LEN             64
-#define TPM2_TPMU_HA_SIZE        64
 #define DEFAULT_PCR_ID_SET       "0xFFFFFF" /*Set all PCR ID's 0:23 */
 #define HASH_ALG_SHA256          1
 #define HASH_ALG_SHA384          2
@@ -116,12 +116,12 @@
             printf(fmt);         \
     } while (0)
 
-#define CREATE_TMP_DIR_PATH(tmp_dir_path, client_fd)            \
-    char fdbuf[5];                                              \
-    snprintf(fdbuf, 5, "%d", client_fd);                        \
-    memset_s(tmp_dir_path, sizeof(tmp_dir_path), 0);            \
-    strcpy_s(tmp_dir_path, sizeof("/tmp/ovsa_"), "/tmp/ovsa_"); \
-    strcat_s(tmp_dir_path, MAX_FILE_LEN, fdbuf);                \
+#define CREATE_TMP_DIR_PATH(tmp_dir_path, client_fd)                                      \
+    char fdbuf[5];                                                                        \
+    snprintf(fdbuf, 5, "%d", client_fd);                                                  \
+    memset_s(tmp_dir_path, sizeof(tmp_dir_path), 0);                                      \
+    strcpy_s(tmp_dir_path, sizeof("/opt/ovsa/tmp_dir/ovsa_"), "/opt/ovsa/tmp_dir/ovsa_"); \
+    strcat_s(tmp_dir_path, MAX_FILE_LEN, fdbuf);                                          \
     strcat_s(tmp_dir_path, MAX_FILE_LEN, "/");
 
 #define CREATE_FILE_PATH(tmp_dir_path, key_file, TPM2_QUOTE_INFO)     \
@@ -236,24 +236,25 @@ typedef enum {
     OVSA_DB_USAGELIMIT_FAIL = -43,
 
     /* TPM2 command */
-    OVSA_SYSCALL_READ_PIPE_FAIL = -44,
-    OVSA_SYSCALL_DUP2_FAIL      = -45,
-    OVSA_TPM2_GENERIC_ERROR     = -46,
-    OVSA_TPM2_CMD_EXEC_FAIL     = -47,
-    OVSA_SYSCALL_WAITPID_FAIL   = -48,
-    OVSA_SYSCALL_EXECVE_FAIL    = -49,
-    OVSA_SYSCALL_FORK_FAIL      = -50,
-    OVSA_RMDIR_FAIL             = -51,
-    OVSA_RMFILE_FAIL            = -52,
-    OVSA_CLOSEDIR_FAIL          = -53,
-
-    OVSA_INTEGER_OVERFLOW      = -54,
-    OVSA_INTEGER_UNDERFLOW     = -55,
-    OVSA_PCR_VALIDATION_FAILED = -56,
-    OVSA_PCR_ID_NOT_VALID      = -57,
-    OVSA_TCB_NOT_VALID         = -58,
-
-    OVSA_FAIL = -99
+    OVSA_SYSCALL_READ_PIPE_FAIL          = -44,
+    OVSA_SYSCALL_DUP2_FAIL               = -45,
+    OVSA_TPM2_GENERIC_ERROR              = -46,
+    OVSA_TPM2_CMD_EXEC_FAIL              = -47,
+    OVSA_SYSCALL_WAITPID_FAIL            = -48,
+    OVSA_SYSCALL_EXECVE_FAIL             = -49,
+    OVSA_SYSCALL_FORK_FAIL               = -50,
+    OVSA_RMDIR_FAIL                      = -51,
+    OVSA_RMFILE_FAIL                     = -52,
+    OVSA_CLOSEDIR_FAIL                   = -53,
+    OVSA_INTEGER_OVERFLOW                = -54,
+    OVSA_INTEGER_UNDERFLOW               = -55,
+    OVSA_PCR_VALIDATION_FAILED           = -56,
+    OVSA_PCR_ID_NOT_VALID                = -57,
+    OVSA_PCR_COUNT_NOT_VALID             = -58,
+    OVSA_PLATFORM_CERT_VALIDATION_FAILED = -59,
+    OVSA_PCR_DIGEST_NOT_VALID            = -60,
+    OVSA_TCB_NOT_VALID                   = -61,
+    OVSA_FAIL                            = -99
 } ovsa_status_t;
 
 typedef char GUID[GUID_SIZE + 1];

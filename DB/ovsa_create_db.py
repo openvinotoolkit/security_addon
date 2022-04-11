@@ -1,6 +1,6 @@
 #!/usr/bin/env python3 
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,7 +62,8 @@ def main():
         license_guid text,
         model_guid text,
         isv_certificate text,
-        customer_certificate text,
+        customer_primary_certificate text,
+        customer_secondary_certificate text,
 	customer_license_blob text,
         license_type integer,
         limit_count integer,

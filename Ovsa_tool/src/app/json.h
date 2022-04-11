@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -142,7 +142,7 @@ ovsa_status_t ovsa_json_extract_customer_license(const char* inputBuf,
  * \param [out] keyValue Updated with json file contents
  * \return ovsa_status_t
  */
-ovsa_status_t ovsa_json_extract_element(const char* inputBuf, const char* keyName, void** keyValue);
+ovsa_status_t ovsa_json_extract_element(const char* inputBuf, const char* keyName, char** keyValue);
 
 #ifdef OVSA_RUNTIME
 #ifndef ENABLE_SGX_GRAMINE

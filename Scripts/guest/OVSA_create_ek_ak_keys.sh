@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ fi
 echo "Generating EK & AK Keys"
 tpm2_createek --ek-context tpm_ek.ctx --key-algorithm rsa --public tpm_ek.pub
 check_status "EK Key generation failed"
+
 tpm2_createak --ek-context tpm_ek.ctx --ak-context tpm_ak.ctx --key-algorithm rsa --hash-algorithm sha256 --signing-algorithm rsassa --public tpm_ak.pub --private tpm_ak.priv --ak-name tpm_ak.name
 check_status "AK Key generation failed"
 
@@ -44,7 +45,6 @@ file_size=`stat -c"%s" tpm_ak.name`
 loaded_key_name=`cat tpm_ak.name | xxd -p -c $file_size`
 
 echo $loaded_key_name > tpm_ak.name.hex
-
 # READ EK Cert
 # Location 1 - TPM2 NV Index 0x1c00002 is the TCG specified location for RSA-EK-certificate.
 RSA_EK_CERT_NV_INDEX=0x01C00002
@@ -67,7 +67,6 @@ tpm2_nvread \
 $RSA_EK_CERT_NV_INDEX
 check_status "Warning: EK Certificate not provisioned"
 fi
-
 echo "Converting EK Certificate from DER to PEM Format"
 openssl x509 -inform der -in tpm_ek_cert.bin -out tpm_ek_cert.pem
 check_status "Converting EK Certificate to PEM format failed"

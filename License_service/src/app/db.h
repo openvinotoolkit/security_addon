@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,17 +24,34 @@
 
 /* API's */
 /*!
- * \brief ovsa_db_get_customer_certificate
+ * \brief ovsa_db_get_customer_primary_certificate
  *
  * \param [in]  db_name buffer pointing to the database name
  * \param [in]  license_guid buffer pointing to the license guid
  * \param [in]  model_guid buffer pointing to the model guid
  * \param [out]  customer_certificate buffer pointing to retrieve the customer
- * certificate \return ovsa_status_t
+ * primary certificate \return ovsa_status_t
  */
 
-ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* license_guid,
-                                               const char* model_guid, char** customer_certificate);
+ovsa_status_t ovsa_db_get_customer_primary_certificate(const char* db_name,
+                                                       const char* license_guid,
+                                                       const char* model_guid,
+                                                       char** customer_certificate);
+
+/*!
+ * \brief ovsa_db_get_customer_secondary_certificate
+ *
+ * \param [in]  db_name buffer pointing to the database name
+ * \param [in]  license_guid buffer pointing to the license guid
+ * \param [in]  model_guid buffer pointing to the model guid
+ * \param [out]  customer_certificate buffer pointing to retrieve the customer
+ * secondary certificate \return ovsa_status_t
+ */
+
+ovsa_status_t ovsa_db_get_customer_secondary_certificate(const char* db_name,
+                                                         const char* license_guid,
+                                                         const char* model_guid,
+                                                         char** customer_certificate);
 
 /*!
  * \brief ovsa_db_get_customer_license_blob

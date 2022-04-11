@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -195,7 +195,6 @@ ovsa_status_t ovsa_json_create_license_config(const ovsa_license_config_sig_t* l
         goto end;
     }
     memcpy_s(outputBuf, outputBuf_size, str_print, str_len);
-    outputBuf[str_len] = '\0';
 
 end:
     cJSON_Delete(license_config);
@@ -346,7 +345,6 @@ ovsa_status_t ovsa_json_create_controlled_access_model(
         goto end;
     }
     memcpy_s(outputBuf, outputBuf_size, str_print, str_len);
-    outputBuf[str_len] = '\0';
 
 end:
     cJSON_Delete(controlled_access_model);
@@ -515,7 +513,6 @@ ovsa_status_t ovsa_json_create_tcb_signature(const ovsa_tcb_sig_t* tsig, size_t 
         goto end;
     }
     memcpy_s(outputBuf, outputBuf_size, str_print, str_len);
-    outputBuf[str_len] = '\0';
 
 end:
     cJSON_Delete(tcb_sig);
@@ -598,7 +595,6 @@ ovsa_status_t ovsa_json_create_master_license(const ovsa_master_license_sig_t* m
         goto end;
     }
     memcpy_s(outputBuf, outputBuf_size, str_print, str_len);
-    outputBuf[str_len] = '\0';
 
 end:
     cJSON_Delete(master_license);
@@ -799,7 +795,6 @@ ovsa_status_t ovsa_json_create_customer_license(const ovsa_customer_license_sig_
         goto end;
     }
     memcpy_s(outputBuf, outputbuf_size, str_print, str_len);
-    outputBuf[str_len] = '\0';
 
 end:
     cJSON_Delete(customer_license);
@@ -1353,7 +1348,7 @@ end:
 }
 
 ovsa_status_t ovsa_json_extract_element(const char* inputBuf, const char* keyName,
-                                        void** keyValue) {
+                                        char** keyValue) {
     ovsa_status_t ret = OVSA_OK;
     cJSON* parse_json = NULL;
     cJSON* key        = NULL;
@@ -1385,9 +1380,6 @@ ovsa_status_t ovsa_json_extract_element(const char* inputBuf, const char* keyNam
             goto end;
         }
         memcpy_s(*keyValue, str_len, key->valuestring, str_len);
-
-    } else if (cJSON_IsNumber(key)) {
-        memcpy_s(*keyValue, sizeof(key->valueint), (int*)&key->valueint, sizeof(key->valueint));
     }
 end:
     cJSON_Delete(parse_json);
@@ -1845,6 +1837,7 @@ end:
     OVSA_DBG(DBG_D, "%s exit\n", __func__);
     return ret;
 }
+#if !defined KVM || defined ENABLE_QUOTE_FROM_NVRAM
 static ovsa_status_t ovsa_create_hw_quote_blob(cJSON** message,
                                                const ovsa_quote_info_t* hw_quote_info) {
     ovsa_status_t ret = OVSA_OK;
@@ -1879,6 +1872,7 @@ end:
     OVSA_DBG(DBG_D, "%s exit\n", __func__);
     return ret;
 }
+#endif
 #ifdef KVM
 static ovsa_status_t ovsa_create_sw_quote_blob(cJSON** message,
                                                const ovsa_quote_info_t* quote_info) {

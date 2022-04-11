@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,9 +26,11 @@ CP = cp
 
 ifeq ($(SGX),1)
 CFLAGS += -DENABLE_SGX_GRAMINE
+else
+CFLAGS += -DKVM -DENABLE_QUOTE_FROM_NVRAM
 endif
 
-CFLAGS +=  -g -Wall -DKVM -DENABLE_QUOTE_FROM_NVRAM -DENABLE_SELF_SIGNED_CERT -D_GNU_SOURCE -DENABLE_OCSP_CHECK -fno-exceptions -fPIC -DDEBUG=$(DEBUG) -DOVMS_LICCHECK_MINS=$(OVMS_LICCHECK_MINS) -D OVSA_RUNTIME -fstack-protector-strong -fPIE -fPIC -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security
+CFLAGS +=  -g -Wall -DENABLE_SELF_SIGNED_CERT -D_GNU_SOURCE -DENABLE_OCSP_CHECK -fno-exceptions -fPIC -DDEBUG=$(DEBUG) -DOVMS_LICCHECK_MINS=$(OVMS_LICCHECK_MINS) -D OVSA_RUNTIME -fstack-protector-strong -fPIE -fPIC -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security
 
 ifndef OVMS_DIR
 $(error OVMS_DIR not set. Please set before compilation)
@@ -51,15 +53,25 @@ OVSATOOL_INC_DIR := -I$(SRC_BUILD_DIR)/include \
            -I$(SRC_BUILD_DIR)/../Ovsa_tool/include \
       	   -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/app \
            -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/lib/safestringlib/include \
-	   -I$(SRC_BUILD_DIR)/mbedtls/install/include -I../../mbedtls/crypto/include \
-	   -I$(SRC_BUILD_DIR)/mbedtls/install/include -I../../mbedtls/crypto/include \
            -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/lib/cJSON \
            -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/lib/openssl/include -I$(OVMS_DIR)
+
+ifeq ($(SGX),1)
+OVSATOOL_INC_DIR += -I$(SRC_BUILD_DIR)/mbedtls_gramine/ 
+else
+OVSATOOL_INC_DIR += -I$(SRC_BUILD_DIR)/mbedtls/install/include \
+		    -I../../mbedtls/crypto/include
+endif
 
 OVSATOOL_SRC_DIR = $(SRC_BUILD_DIR)/../Ovsa_tool/src/app
 OVSATOOL_LIB_DIR := $(SRC_BUILD_DIR)/../Ovsa_tool/lib
 OVSARUN_COM_DIR := $(SRC_BUILD_DIR)/src/common
+ifeq ($(SGX),1)
+OVSARUN_LIB_DIR := $(SRC_BUILD_DIR)/lib_gramine
+else
 OVSARUN_LIB_DIR := $(SRC_BUILD_DIR)/lib
+endif
+
 
 LFLAGS += -Wl,-rpath,$(OVSARUN_LIB_DIR) -L$(OVSARUN_LIB_DIR) -L$(OVSATOOL_LIB_DIR)
 ifeq ($(SGX),1)

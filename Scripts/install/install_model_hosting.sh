@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,6 +39,9 @@ cp -vR example_client/* /opt/ovsa/kvm/example_client/ 2>&1 | sed 's/^/    /'
 
 echo "Setting up the Sealing data..."
 mkdir -vp /var/OVSA/Seal 2>&1 | sed 's/^/    /'
+echo "Changing ownership to OVSA user with RD/WR & execution permission"
+chown ovsa:ovsa /var/OVSA/Seal 2>&1 | sed 's/^/    /'
+chmod 700 /var/OVSA/Seal 2>&1 | sed 's/^/    /'
 cp -vR /opt/ovsa/kvm/scripts/OVSA_Seal_Key_TPM_Policy_Authorize.sh /var/OVSA/Seal 2>&1 | sed 's/^/    /'
 if [ -e /var/OVSA/Seal/Seal_data.bin -a \
      -e /var/OVSA/Seal/session.ctx -a \
@@ -58,11 +61,16 @@ then
     echo "Sealing data already exists..."
 else
     cd /var/OVSA/Seal && ./OVSA_Seal_Key_TPM_Policy_Authorize.sh 2>&1 | sed 's/^/    /'
+    chmod 0600 /var/OVSA/Seal/*
+    chmod 0700 /var/OVSA/Seal/OVSA_Seal_Key_TPM_Policy_Authorize.sh
     cd -
 fi
 
 echo "Setting up the Quote data..."
 mkdir -vp /var/OVSA/Quote 2>&1 | sed 's/^/    /'
+echo "Changing ownership to OVSA user with RD/WR & execution permission"
+chown ovsa:ovsa /var/OVSA/Quote 2>&1 | sed 's/^/    /'
+chmod 700 /var/OVSA/Quote 2>&1 | sed 's/^/    /'
 cp -vR /opt/ovsa/kvm/scripts/OVSA_create_ek_ak_keys.sh /var/OVSA/Quote 2>&1 | sed 's/^/    /'
 if [ -e /var/OVSA/Quote/tpm_ak.ctx -a \
      -e /var/OVSA/Quote/tpm_ak.name -a \
@@ -79,6 +87,8 @@ then
     echo "Quote data already exists..."
 else
     cd /var/OVSA/Quote && ./OVSA_create_ek_ak_keys.sh 2>&1 | sed 's/^/    /'
+    chmod 0600 /var/OVSA/Quote/*
+    chmod 0700 /var/OVSA/Quote/OVSA_create_ek_ak_keys.sh
     cd -
 fi
 
@@ -113,6 +123,15 @@ mkdir -vp /opt/ovsa/certs 2>&1 | sed 's/^/    /'
 echo "Changing ownership to OVSA group/user..."
 chown -R ovsa /opt/ovsa 2>&1 | sed 's/^/    /'
 chown -R ovsa /var/OVSA 2>&1 | sed 's/^/    /'
+
+echo "Creating /opt/ovsa/tmp_dir directory..."
+mkdir -vp /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
+echo "Remove stale files inside /opt/ovsa/tmp_dir directory..."
+rm -rf /opt/ovsa/tmp_dir/*
+
+echo "Changing ownership to OVSA user with RD/WR & execution permission"
+chown ovsa:ovsa /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
+chmod 700 /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
 
 echo "Loading the docker image..."
 if [[ "$(docker images -q openvino/model_server-ovsa-nginx-mtls 2> /dev/null)" == "" ]]; then

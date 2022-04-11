@@ -46,29 +46,28 @@ modules to aid Intel® Applications in performing attestation
 
 3. Install Docker
     ```sh	
-    sudo apt-get remove docker docker-engine docker.io containerd runc
-    sudo apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-
+    sudo -E apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
     sudo add-apt-repository \
            "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-              $(lsb_release -cs) \
-                 stable"
-
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+           $(lsb_release -cs) \
+           stable"
+    sudo -E apt-get update
+    sudo -E apt-get remove docker docker-engine docker.io containerd runc
+    sudo -E apt-get install -y docker-ce docker-ce-cli containerd.io             
     ```	
 4. Build and Install Gramine-SGX
 
-	Clone Gramine-SGX **release v1.0**
+	Clone Gramine-SGX **release v1.1**
 	```sh
 	git clone https://github.com/gramineproject/gramine.git
 	cd gramine
-	git checkout v1.0
+	git checkout 3f1601fc9cc86c66ad1810dba2f10f064bb0e1b8
 	export GRAMINE_DIR=$PWD
 	```
 	Prepare a signing key:
 	```sh
+	mkdir -p Pal/src/host/Linux-SGX/signer/
 	openssl genrsa -3 -out Pal/src/host/Linux-SGX/signer/enclave-key.pem 3072
 	```
 	Build Gramine with SGX and RA-TLS DCAP attestation support:
@@ -92,7 +91,7 @@ modules to aid Intel® Applications in performing attestation
 	cd $GRAMINE_DIR
 	git clone https://github.com/gramineproject/gsc.git
 	cd gsc
-	git checkout 9fb6b65480387742a90b13b835d37ceacd197dee	
+	git checkout 83069e96924059a156e56231fec99ede4f43d494
 	```
 	[Refer to GSC documentation](https://gramine.readthedocs.io/en/latest/gsc.html#gsc-gramine-shielded-containers)
 6. Create `ovsa` user
@@ -100,6 +99,7 @@ modules to aid Intel® Applications in performing attestation
     sudo useradd -s /bin/bash  -m -d /home/ovsa ovsa
     sudo passwd ovsa
     sudo usermod -aG docker ovsa
+    sudo usermod -aG aesmd ovsa
     ``` 
 
 You're now ready to build and install the OpenVINO™ Security Add-on on the Host Machine. 
@@ -117,7 +117,7 @@ Building OpenVINO™ Security Add-on depends on OpenVINO™ Model Server docker 
 	```sh
 	git clone https://github.com/openvinotoolkit/model_server.git
     cd model_server
-    git checkout v2021.4.2
+    git checkout v2022.1
 	make docker_build
 	```
 ### Step 2: Build the software required for all roles
@@ -239,7 +239,9 @@ Log on to the Host Machine in a new terminal.
 	- `secondary_isv_keystore.csr`- A Certificate Signing Request (CSR)  
 	- `secondary_isv_keystore.csr.crt` - A self-signed certificate
 
-	In a production environment, send `primary_isv_keystore.csr` to a CA to request a CA-signed certificate.
+	In a production environment, obtain CA-signed certificates using the `primary_isv_keystore.csr` and `secondary_isv_keystore.csr`.
+	
+	The above certificates must be inserted to the Trust Store using instructions specified in the [Inserting Trusted Certificate into the Trust Store](trusted_certificates.md)  document.
 
 3. Add the certificate to the key store
 	```sh
@@ -293,7 +295,9 @@ Continue to generate the model User artefacts in the same terminal used to gener
 	* `secondary_custkeystore.csr` - A Certificate Signing Request (CSR)
 	* `secondary_custkeystore.csr.crt` - A self-signed certificate	
 
-3. Send `primary_custkeystore.csr` and `secondary_custkeystore.csr` to the CA to request a CA-signed certificate.
+3. Obtain CA-signed certificates using the `primary_isv_keystore.csr` and `secondary_isv_keystore.csr`.
+
+   The above certificates must be inserted to the Trust Store using instructions specified in the [Inserting Trusted Certificate into the Trust Store](trusted_certificates.md)  document
 
 4. Add the certificate to the key store:
 	```sh
@@ -304,7 +308,7 @@ Continue to generate the model User artefacts in the same terminal used to gener
 #### Step 2: Request an access controlled Model from the Model Developer
 
 1. Communicate your need for a model to the Model Developer. The Developer will ask you to provide the certificate from your key store and other information. This example uses the length of time the model needs to be available. 
-2. The model User's secondary certificate needs to be provided to the Developer.
+2. The model User's primary and secondary certificates needs to be provided to the Developer.
 
 Since in this example uses the same host machine enviroment, the data would be available between Model Developer and the model User.
 
@@ -315,6 +319,8 @@ Since in this example uses the same host machine enviroment, the data would be a
 	* Customer primary certificate from the customer's key store to be used for generating the customer license.
 	* Customer secondary certificate from the customer's key store for validating the customer by the License Server.
 	* Other information that apply to your licensing practices, such as the length of time the user needs access to the model
+
+   The above customer certificates must be inserted to the Trust Store using instructions specified in the [Inserting Trusted Certificate into the Trust Store](trusted_certificates.md)  document
 
 #### Step 2: Create Customer License Configuration
  Create a customer license configuration
@@ -331,7 +337,7 @@ gramine-sgx ovsatool sale -m /opt/ovsa/gramine/artefacts/fd/1/face_detection_mod
 
 #### Step 4: Update the license server database with the license.
 ```sh
-python3 /opt/ovsa/DB/ovsa_store_customer_lic_cert_db.py /opt/ovsa/DB/ovsa.db /opt/ovsa/gramine/artefacts/fd/1/face_detection_model.lic /opt/ovsa/gramine/artefacts/fd/1/secondary_custkeystore.csr.crt
+python3 /opt/ovsa/DB/ovsa_store_customer_lic_cert_db.py /opt/ovsa/DB/ovsa.db /opt/ovsa/gramine/artefacts/fd/1/face_detection_model.lic /opt/ovsa/gramine/artefacts/fd/1/primary_custkeystore.csr.crt /opt/ovsa/gramine/artefacts/fd/1/secondary_custkeystore.csr.crt
 ```
 
 #### Step 5: Share the AccessControlled Model with Model User
@@ -421,8 +427,6 @@ You have completed these tasks:
 
 
 ## Known Limitations:
-
-- Reloading of the models due to configuration file change in OVMS depends on checking the file timestamp of the configuration file. In Gramine-SGX checking of file timestamp is not supported. Due to this, the model reload feature would not work. One needs to load all the required models during start-up or need to re-start the OVMS after the configuration file changes.
 
 - Due to static memory allocation for the processes in Gramine-SGX, the number of simultaneous processes/threads can be run is dependent on total SGX memory available. In this example, we have limited NGINX worker threads to 4 in the /etc/nginx/nginx.conf file, GRPC worker threads to 1 and REST worker threads to 3 by passing appropriate command line arguements. This limitation need to be considered if these value needs to be changed.
 

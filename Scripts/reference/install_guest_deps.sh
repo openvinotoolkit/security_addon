@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,16 +19,16 @@ mkdir -p dep_packages
 pushd dep_packages
 
 echo "Updating the system...."
-sudo apt-get update
-sudo apt-get upgrade -y
+apt-get update
+apt-get upgrade -y
 
 #Build tools
 echo "Installing Build tools...."
-sudo apt install -y build-essential automake libtool libssl-dev python3 python3-pip
+apt install -y build-essential automake libtool libssl-dev python3 python3-pip
 
 #TSS
 echo "Installing TPM Pacakages"
-sudo apt-get install -y libjson-c-dev libcurl4-openssl-dev doxygen pkg-config uuid-dev
+apt-get install -y libjson-c-dev libcurl4-openssl-dev doxygen pkg-config uuid-dev
 wget https://github.com/tpm2-software/tpm2-tss/releases/download/3.0.3/tpm2-tss-3.0.3.tar.gz
 tar -xvzf tpm2-tss-3.0.3.tar.gz
 pushd tpm2-tss-3.0.3
@@ -43,16 +43,16 @@ if [ $? != 0 ];then
  echo "ERROR: Failed TSS build/install. Exiting."
  exit 1
 fi
-sudo make install
-sudo ldconfig
-sudo udevadm control --reload-rules && sudo udevadm trigger
-sudo mkdir -p /var/lib/tpm
-sudo groupadd tss && sudo useradd -M -d /var/lib/tpm -s /bin/false -g tss tss
-sudo pkill -HUP dbus-daemon
+make install
+ldconfig
+udevadm control --reload-rules && udevadm trigger
+mkdir -p /var/lib/tpm
+groupadd tss && useradd -M -d /var/lib/tpm -s /bin/false -g tss tss
+pkill -HUP dbus-daemon
 popd
 
 #ABRMD
-sudo apt-get install -y libglib2.0-dev
+apt-get install -y libglib2.0-dev
 wget https://github.com/tpm2-software/tpm2-abrmd/releases/download/2.4.0/tpm2-abrmd-2.4.0.tar.gz
 tar -xvzf tpm2-abrmd-2.4.0.tar.gz
 pushd tpm2-abrmd-2.4.0
@@ -67,12 +67,12 @@ if [ $? != 0 ];then
  echo "ERROR: Failed ABRMD build. Exiting."
  exit 1
 fi
-sudo make install
-sudo ldconfig
+make install
+ldconfig
 popd
 
 #TOOLS
-sudo apt-get install -y pandoc
+apt-get install -y pandoc
 wget https://github.com/tpm2-software/tpm2-tools/releases/download/5.0/tpm2-tools-5.0.tar.gz
 tar -xvzf tpm2-tools-5.0.tar.gz
 pushd tpm2-tools-5.0
@@ -87,22 +87,23 @@ if [ $? != 0 ];then
  echo "ERROR: Failed tpm2-tools build/install. Exiting."
  exit 1
 fi
-sudo make install
-sudo ldconfig
+make install
+sed -i '2 i /usr/lib/' /etc/ld.so.conf.d/x86_64-linux-gnu.conf
+ldconfig
 popd
 
 echo "Installing Docker Pacakges...."
-sudo apt-get remove docker docker-engine docker.io containerd runc
-sudo apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+apt-get remove docker docker-engine docker.io containerd runc
+apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
 
-sudo add-apt-repository \
-	   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-	      $(lsb_release -cs) \
-	         stable"
+add-apt-repository \
+           "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+              $(lsb_release -cs) \
+                 stable"
 
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io
 
 echo "Removing all the downloaded sources..."
 popd

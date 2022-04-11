@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -205,8 +205,13 @@ static ovsa_status_t ovsa_verify_artefacts(int asymm_keyslot, const char* input_
         OVSA_DBG(DBG_E, "OVSA: Error opening file %s failed with code %d\n", input_file, ret);
         goto out;
     }
-    size = ovsa_crypto_get_file_size(fptr);
-    ret  = ovsa_safe_malloc(size, &sig_buf);
+    ret = ovsa_crypto_get_file_size(fptr, &size);
+    if (ret < OVSA_OK || size == 0) {
+        OVSA_DBG(DBG_E, "OVSA: Error get file size failed for %s with code %d\n", input_file, ret);
+        fclose(fptr);
+        goto out;
+    }
+    ret = ovsa_safe_malloc(size, &sig_buf);
     if (ret < OVSA_OK || sig_buf == NULL) {
         OVSA_DBG(DBG_E, "OVSA: Error buffer allocation failed with code %d\n", ret);
         fclose(fptr);
@@ -224,10 +229,10 @@ static ovsa_status_t ovsa_verify_artefacts(int asymm_keyslot, const char* input_
     }
 
     if (hash_type == SIGN_VERIFY) {
-        ret = ovsa_crypto_verify_json_blob(asymm_keyslot, sig_buf, size, file_buf);
+        ret = ovsa_crypto_verify_json_blob(asymm_keyslot, sig_buf, size, file_buf, size);
     } else {
         /* Extract encryption_key from master license */
-        ret = ovsa_json_extract_element(sig_buf, "encryption_key", (void**)&encryption_key);
+        ret = ovsa_json_extract_element(sig_buf, "encryption_key", &encryption_key);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error extract json element failed with error code %d\n", ret);
             goto out;
@@ -250,7 +255,7 @@ static ovsa_status_t ovsa_verify_artefacts(int asymm_keyslot, const char* input_
         }
 
         /* Verifies the HMAC for master license */
-        ret = ovsa_crypto_verify_hmac_json_blob(keyiv_hmac_slot, sig_buf, size, file_buf);
+        ret = ovsa_crypto_verify_hmac_json_blob(keyiv_hmac_slot, sig_buf, size, file_buf, size);
     }
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error verify json failed with error code %d\n", ret);
@@ -476,8 +481,14 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
     }
 
     /* Get length of certificate file */
-    size = ovsa_crypto_get_file_size(fptr);
-    ret  = ovsa_safe_malloc(size, &cert_buff);
+    ret = ovsa_crypto_get_file_size(fptr, &size);
+    if (ret < OVSA_OK || size == 0) {
+        OVSA_DBG(DBG_E, "OVSA: Error get file size failed for %s with code %d\n",
+                 customer_cert_file, ret);
+        fclose(fptr);
+        goto out;
+    }
+    ret = ovsa_safe_malloc(size, &cert_buff);
     if (ret < OVSA_OK || cert_buff == NULL) {
         OVSA_DBG(DBG_E, "OVSA: Error certificate file buffer allocation failed with code %d\n",
                  ret);
@@ -724,7 +735,7 @@ ovsa_status_t ovsa_sale_main(int argc, char* argv[]) {
 
     /* Computes HMAC for customer license */
     ret = ovsa_crypto_hmac_json_blob(keyiv_hmac_slot, customer_lic_string, cust_lic_size,
-                                     customer_lic_sig_string);
+                                     customer_lic_sig_string, size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error customer license signing failed with error code %d\n", ret);
         goto out;

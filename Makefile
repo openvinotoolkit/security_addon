@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -114,6 +114,26 @@ ifeq ($(SGX), 1)
                $(SRC_BUILD_DIR)/Ovsa_runtime/src/gramine/Pal/src/host/Linux-SGX
 	cp $(GRAMINE_DIR)/build/Pal/src/host/Linux-SGX/tools/ra-tls/libra_tls_attest.so \
                $(SRC_BUILD_DIR)/Ovsa_runtime/lib
+	rm -rf $(SRC_BUILD_DIR)/Ovsa_runtime/mbedtls_gramine
+	mkdir -p $(SRC_BUILD_DIR)/Ovsa_runtime/mbedtls_gramine
+	cp -r \
+	   $(GRAMINE_DIR)/subprojects/mbedtls-mbedtls-2.26.0-1/mbedtls-mbedtls-2.26.0/include/mbedtls \
+	   $(SRC_BUILD_DIR)/Ovsa_runtime/mbedtls_gramine/
+	cp -r \
+	   $(GRAMINE_DIR)/subprojects/mbedtls-mbedtls-2.26.0-1/mbedtls-mbedtls-2.26.0/include/psa \
+	   $(SRC_BUILD_DIR)/Ovsa_runtime/mbedtls_gramine/
+	mkdir -p $(SRC_BUILD_DIR)/Ovsa_runtime/lib_gramine
+	cp \
+	   $(GRAMINE_DIR)/build/subprojects/mbedtls-mbedtls-2.26.0-1/libmbedcrypto_gramine.a \
+	   $(SRC_BUILD_DIR)/Ovsa_runtime/lib_gramine/libmbedcrypto.a
+	cp \
+	   $(GRAMINE_DIR)/build/subprojects/mbedtls-mbedtls-2.26.0-1/libmbedtls_gramine.a \
+	   $(SRC_BUILD_DIR)/Ovsa_runtime/lib_gramine/libmbedtls.a
+	cp \
+	   $(GRAMINE_DIR)/build/subprojects/mbedtls-mbedtls-2.26.0-1/libmbedx509_gramine.a \
+	   $(SRC_BUILD_DIR)/Ovsa_runtime/lib_gramine/libmbedx509.a
+	cp $(SRC_BUILD_DIR)/Ovsa_runtime/lib/libra_tls_attest.so \
+	   $(SRC_BUILD_DIR)/Ovsa_runtime/lib_gramine/
 endif
 	docker build -f Dockerfile-build-ovsa . \
                 --build-arg http_proxy=$(HTTP_PROXY)  \
@@ -130,7 +150,7 @@ endif
 	cd $(DIST_DIR) && tar -xzvf ovsa-runtime.tar.gz && rm ovsa-runtime.tar.gz
 
 ifeq ($(SGX), 1)
-	docker build -f Dockerfile-pkg-ovsa-nginx-sgx . \
+	docker build --no-cache -f Dockerfile-pkg-ovsa-nginx-sgx . \
                 --build-arg http_proxy=$(HTTP_PROXY) \
                 --build-arg https_proxy=$(HTTPS_PROXY) \
                 --build-arg no_proxy=$(NO_PROXY) \
@@ -138,7 +158,7 @@ ifeq ($(SGX), 1)
                 -t openvino/model_server-ovsa-nginx-mtls:latest
 
 	cd $(GRAMINE_DIR)/gsc && \
-                ./gsc build --insecure-args \
+                ./gsc build --no-cache --insecure-args \
                 --build-arg http_proxy=$(HTTP_PROXY) \
                 --build-arg https_proxy=$(HTTPS_PROXY) \
                 --build-arg no_proxy=$(NO_PROXY) \
@@ -155,7 +175,7 @@ ifeq ($(SGX), 1)
 	docker save -o $(DIST_DIR)/model_server-ovsa-nginx-mtls.tar.gz \
 		gsc-openvino/model_server-ovsa-nginx-mtls:latest
 else
-	docker build -f Dockerfile-pkg-ovsa-nginx . \
+	docker build --no-cache -f Dockerfile-pkg-ovsa-nginx . \
                 --build-arg http_proxy=$(HTTP_PROXY) \
                 --build-arg https_proxy=$(HTTPS_PROXY) \
                 --build-arg no_proxy=$(NO_PROXY) \

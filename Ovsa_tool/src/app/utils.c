@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,8 +53,8 @@ ovsa_status_t ovsa_read_file_content(const char* filename, char** filecontent, s
         goto out;
     }
 
-    file_size = ovsa_crypto_get_file_size(fptr);
-    if (file_size == 0) {
+    ret = ovsa_crypto_get_file_size(fptr, &file_size);
+    if (ret < OVSA_OK || file_size == 0) {
         OVSA_DBG(DBG_E, "OVSA: Error getting file size for %s failed\n", filename);
         ret = OVSA_FILEIO_FAIL;
         fclose(fptr);
@@ -339,8 +339,9 @@ ovsa_status_t ovsa_generate_cert_hash(char* filename, char* cert_hash) {
     }
 
     /* Get size of file data */
-    int size = ovsa_crypto_get_file_size(fcur_file);
-    if (size <= 0) {
+    size_t size = 0;
+    ret         = ovsa_crypto_get_file_size(fcur_file, &size);
+    if (ret < OVSA_OK || size < 0) {
         OVSA_DBG(DBG_E, "OVSA: Error reading file size %s\n", filename);
         fclose(fcur_file);
         return OVSA_FILEIO_FAIL;

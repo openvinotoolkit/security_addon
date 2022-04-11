@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -99,35 +99,32 @@ static ovsa_status_t ovsa_extract_hw_quote(char* hw_quote_payload,
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
     /* Read HW_quote_pcr from json file */
-    ret = ovsa_json_extract_element(hw_quote_payload, "HW_Quote_PCR",
-                                    (void*)&hw_quote_info->quote_pcr);
+    ret = ovsa_json_extract_element(hw_quote_payload, "HW_Quote_PCR", &hw_quote_info->quote_pcr);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read HW_Quote_PCR from json failed %d\n", ret);
         goto out;
     }
     /* Read HW_pub_key from json file */
-    ret = ovsa_json_extract_element(hw_quote_payload, "HW_AK_Pub_Key",
-                                    (void*)&hw_quote_info->ak_pub_key);
+    ret = ovsa_json_extract_element(hw_quote_payload, "HW_AK_Pub_Key", &hw_quote_info->ak_pub_key);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read HW_AK_Pub_Key from json failed %d\n", ret);
         goto out;
     }
     /* Read HW_quote_msg from json file */
-    ret = ovsa_json_extract_element(hw_quote_payload, "HW_Quote_MSG",
-                                    (void*)&hw_quote_info->quote_message);
+    ret =
+        ovsa_json_extract_element(hw_quote_payload, "HW_Quote_MSG", &hw_quote_info->quote_message);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read HW_Quote_MSG from json failed %d\n", ret);
         goto out;
     }
     /* Read HW_quote_sig from json file */
-    ret = ovsa_json_extract_element(hw_quote_payload, "HW_Quote_SIG",
-                                    (void*)&hw_quote_info->quote_sig);
+    ret = ovsa_json_extract_element(hw_quote_payload, "HW_Quote_SIG", &hw_quote_info->quote_sig);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read HW_Quote_SIG from json failed %d\n", ret);
         goto out;
     }
     /* Read HW_ek_cert from json file */
-    ret = ovsa_json_extract_element(hw_quote_payload, "HW_EK_Cert", (void*)&hw_quote_info->ek_cert);
+    ret = ovsa_json_extract_element(hw_quote_payload, "HW_EK_Cert", &hw_quote_info->ek_cert);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read HW_EK_Cert from json failed %d\n", ret);
         goto out;
@@ -295,7 +292,7 @@ static ovsa_status_t ovsa_extract_server_quote_nonce(char* payload, char** quote
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
     /* Read server nonce from json file */
-    ret = ovsa_json_extract_element(payload, "quote_nonce", (void*)quote_nonce);
+    ret = ovsa_json_extract_element(payload, "quote_nonce", quote_nonce);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read server nonce payload from json failed %d\n", ret);
         goto out;
@@ -476,7 +473,7 @@ static ovsa_status_t ovsa_do_tpm2_activatecredential_quote_nonce(char* payload,
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
     /* Read credout from json file */
-    ret = ovsa_json_extract_element(payload, "cred_blob", (void*)&cred_outbuf);
+    ret = ovsa_json_extract_element(payload, "cred_blob", &cred_outbuf);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read credout payload from json failed %d\n", ret);
         goto out;
@@ -551,7 +548,7 @@ ovsa_status_t ovsa_do_get_quote_nounce(const int asym_keyslot, char* quote_credo
     memset_s(&hw_quote_info, sizeof(ovsa_quote_info_t), 0);
 
     /* Read quote_credout_blob payload from json file*/
-    ret = ovsa_json_extract_element((char*)quote_credout_blob, "payload", (void*)&payload);
+    ret = ovsa_json_extract_element((char*)quote_credout_blob, "payload", &payload);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read quote_credout_blob payload from json failed %d\n", ret);
         goto out;
@@ -911,7 +908,7 @@ void ovsa_remove_quote_files(void) {
     remove(TPM2_ACTCRED_OUT);
     remove(TPM2_NVM_HWQUOTE_LEN_FILE);
 
-    OVSA_DBG(DBG_D, "OVSA:Removed the Quote files from /tmp directory\n");
+    OVSA_DBG(DBG_D, "OVSA:Removed the Quote files from /opt/ovsa/tmp_dir directory\n");
 }
 
 ovsa_status_t ovsa_get_pcr_exclusion_set(char* optarg, int* pcr_id_set) {
@@ -1025,6 +1022,9 @@ ovsa_status_t ovsa_generate_reference_tcb(ovsa_tcb_info_t* tcb_info, int sw_pcr_
         OVSA_DBG(DBG_E, "OVSA: Error could not get length of sw_pub_key string %d\n", ret);
         goto out;
     }
+#if !defined KVM || defined ENABLE_QUOTE_FROM_NVRAM
+    static char hw_pcr_id[TPM2_MAX_PCRS];
+#endif
 #ifdef KVM
     static char sw_pcr_id[TPM2_MAX_PCRS];
     memcpy_s(tcb_info->sw_quote, TPM2_QUOTE_SIZE, quote_info.quote_pcr, quote_pcr_file_size);
@@ -1032,8 +1032,9 @@ ovsa_status_t ovsa_generate_reference_tcb(ovsa_tcb_info_t* tcb_info, int sw_pcr_
     memset_s(sw_pcr_id, sizeof(sw_pcr_id), 0);
     snprintf(sw_pcr_id, TPM2_MAX_PCRS, "0x%02X", sw_pcr_reg_id);
     memcpy_s(tcb_info->sw_pcr_reg_id, TPM2_MAX_PCRS, sw_pcr_id, TPM2_MAX_PCRS);
-#else
-    static char hw_pcr_id[TPM2_MAX_PCRS];
+#endif
+
+#if !defined KVM && !defined ENABLE_QUOTE_FROM_NVRAM
     memcpy_s(tcb_info->hw_quote, TPM2_QUOTE_SIZE, quote_info.quote_pcr, quote_pcr_file_size);
     memcpy_s(tcb_info->hw_pub_key, TPM2_PUBKEY_SIZE, quote_info.ak_pub_key, pub_key_file_size);
     memset_s(hw_pcr_id, sizeof(hw_pcr_id), 0);
@@ -1043,7 +1044,6 @@ ovsa_status_t ovsa_generate_reference_tcb(ovsa_tcb_info_t* tcb_info, int sw_pcr_
 
 #ifdef ENABLE_QUOTE_FROM_NVRAM
     size_t file_size = 0;
-    static char hw_pcr_id[TPM2_MAX_PCRS];
     /* Read hw quote from NV memory  */
     ret = ovsa_get_tpm2_base_host_quote(&hw_quote_info);
     if (ret < OVSA_OK) {

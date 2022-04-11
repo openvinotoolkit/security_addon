@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,12 +30,14 @@ docker run -d --rm -ti \
 	-v ${PWD}:/sampleloader \
 	-v /opt/ovsa/kvm/keystore:/opt/ovsa/kvm/keystore \
 	-v /opt/ovsa/kvm/artefacts:/opt/ovsa/kvm/artefacts \
+	-v /opt/ovsa/tmp_dir:/opt/ovsa/tmp_dir \
 	-v /var/OVSA:/var/OVSA \
         -v /var/OVSA/Modelserver/server.pem:/certs/server.pem:ro \
         -v /var/OVSA/Modelserver/server.key:/certs/server.key:ro \
         -v /var/OVSA/Modelserver/client_cert_ca.pem:/certs/client_cert_ca.pem:ro \
         -v /var/OVSA/Modelserver/dhparam.pem:/certs/dhparam.pem:ro \
         -v /var/OVSA/Modelserver/client_cert_ca.crl:/certs/client_cert_ca.crl:ro \
+	-v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro \
         $MTLS_IMAGE \
         --config_path /sampleloader/sample.json \
 	--grpc_bind_address 8.8.8.8 --port $GRPC_PORT --rest_bind_address 1.1.1.1 --rest_port $REST_PORT

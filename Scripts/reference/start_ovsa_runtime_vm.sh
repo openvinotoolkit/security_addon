@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,26 +15,32 @@
 # limitations under the License.
 #
 
-sudo swtpm socket --tpm2 --server port=8380 \
+mkdir -p /var/OVSA/vtpm/vtpm_runtime
+if [[ ! -f /var/OVSA/vtpm/vtpm_runtime/tpm2-00.permall ]]; then
+    echo "Provisioning the SWTPM...."
+    export XDG_CONFIG_HOME=~/.config
+    /usr/share/swtpm/swtpm-create-user-config-files
+    swtpm_setup --tpmstate /var/OVSA/vtpm/vtpm_runtime --create-ek-cert --create-platform-cert --overwrite --tpm2 --pcr-banks -
+fi
+
+swtpm socket --tpm2 --server port=8380 \
                   --ctrl type=tcp,port=8381 \
                   --flags not-need-init --tpmstate dir=/var/OVSA/vtpm/vtpm_runtime &
 
-sudo -u tss tpm2-abrmd --tcti=swtpm:port=8380
+tpm2_startup --clear -T swtpm:port=8380
+tpm2_startup -T swtpm:port=8380
+python3 /var/OVSA/scripts/OVSA_write_hwquote_swtpm_nvram.py 8380
+pkill -f vtpm_runtime
 
-sudo tpm2_startup --clear -T swtpm:port=8380
-sudo tpm2_startup -T swtpm:port=8380
-python3 OVSA_write_hwquote_swtpm_nvram.py 8380
-sudo pkill -f vtpm_runtime
-
-sudo swtpm socket --tpmstate dir=/var/OVSA/vtpm/vtpm_runtime \
+swtpm socket --tpmstate dir=/var/OVSA/vtpm/vtpm_runtime \
      --tpm2 \
      --ctrl type=unixio,path=/var/OVSA/vtpm/vtpm_runtime/swtpm-sock &
 
-sudo qemu-system-x86_64 -m 8192 -enable-kvm \
+qemu-system-x86_64 -m 4096 -enable-kvm \
     -cpu host \
-    -drive if=virtio,file=/root/ovsa/vm_images/ovsa_vm_disk_runtime.qcow2,cache=none \
+    -drive if=virtio,file=/var/OVSA/vm_images/ovsa_runtime_vm_disk.qcow2,cache=none \
     -device e1000,netdev=hostnet1,mac=52:54:00:d1:67:5f \
-    -netdev tap,id=hostnet1,script=/root/ovsa/scripts/virbr0-qemu-ifup,downscript=/root/ovsa/scripts/virbr0-qemu-ifdown \
+    -netdev tap,id=hostnet1,script=/var/OVSA/scripts/virbr0-qemu-ifup,downscript=/var/OVSA/scripts/virbr0-qemu-ifdown \
     -chardev socket,id=chrtpm,path=/var/OVSA/vtpm/vtpm_runtime/swtpm-sock \
     -tpmdev emulator,id=tpm0,chardev=chrtpm \
     -device tpm-tis,tpmdev=tpm0 \

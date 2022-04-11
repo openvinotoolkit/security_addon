@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,8 +89,14 @@ static ovsa_status_t ovsa_do_cmd_verify(const char* file_to_verify, const char* 
         }
 
         /* Get length of Signature file */
-        sig_file_size = ovsa_crypto_get_file_size(fptr);
-        ret           = ovsa_safe_malloc(sig_file_size, &sig_buf);
+        ret = ovsa_crypto_get_file_size(fptr, &sig_file_size);
+        if (ret < OVSA_OK || sig_file_size == 0) {
+            OVSA_DBG(DBG_E, "OVSA: Error get file size failed for %s with error code %d\n",
+                     signature, ret);
+            goto exit;
+        }
+
+        ret = ovsa_safe_malloc(sig_file_size, &sig_buf);
         if (ret < OVSA_OK || sig_buf == NULL) {
             OVSA_DBG(DBG_E, "OVSA: Error signature buffer allocation failed %d\n", ret);
             goto exit;
@@ -223,8 +229,13 @@ static ovsa_status_t ovsa_do_cmd_storecert(const char* keystore, const char* cer
         }
 
         /* Get length of certificate file */
-        cert_file_size = ovsa_crypto_get_file_size(fptr);
-        ret            = ovsa_safe_malloc(cert_file_size, &cert_buff);
+        ret = ovsa_crypto_get_file_size(fptr, &cert_file_size);
+        if (ret < OVSA_OK || cert_file_size == 0) {
+            OVSA_DBG(DBG_E, "OVSA: Error file size failed for %s with code %d\n", cert_file, ret);
+            fclose(fptr);
+            goto exit;
+        }
+        ret = ovsa_safe_malloc(cert_file_size, &cert_buff);
         if (ret < OVSA_OK || cert_buff == NULL) {
             OVSA_DBG(DBG_E, "OVSA: Error certificate buffer allocation failed %d\n", ret);
             fclose(fptr);

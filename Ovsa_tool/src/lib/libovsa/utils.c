@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -569,7 +569,7 @@ static int ovsa_crypto_build_subject(X509_REQ* req, const char* subject, unsigne
     return 1;
 }
 
-void* ovsa_crypto_app_malloc(int size, const char* what) {
+void* ovsa_crypto_app_malloc(size_t size, const char* what) {
     void* buff = OPENSSL_malloc(size);
     if (buff == NULL) {
         BIO_printf(g_bio_err, "LibOVSA: Error in allocating memory for %s\n", what);
@@ -1502,9 +1502,10 @@ ovsa_status_t ovsa_crypto_generate_guid(char* guid) {
     return ret;
 }
 
-int ovsa_crypto_get_file_size(FILE* fp) {
-    size_t file_size = 0;
-    int ret          = 0;
+ovsa_status_t ovsa_crypto_get_file_size(FILE* fp, size_t* file_size) {
+    size_t fsize      = 0;
+    ovsa_status_t ret = OVSA_FILEIO_FAIL;
+    *file_size        = 0;
 
     if (fp == NULL) {
         BIO_printf(g_bio_err, "LibOVSA: Error getting file size failed with invalid parameter\n");
@@ -1518,9 +1519,9 @@ int ovsa_crypto_get_file_size(FILE* fp) {
         goto end;
     }
 
-    file_size = ftell(fp);
-    if (file_size == 0) {
-        BIO_printf(g_bio_err, "LibOVSA: Error getting file size failed\n");
+    fsize = ftell(fp);
+    if (fsize == 0) {
+        BIO_printf(g_bio_err, "LibOVSA: Error file size is zero\n");
         goto end;
     }
 
@@ -1531,7 +1532,9 @@ int ovsa_crypto_get_file_size(FILE* fp) {
         goto end;
     }
 
-    ret = file_size + NULL_TERMINATOR;
+    *file_size = fsize + NULL_TERMINATOR;
+    ret        = OVSA_OK;
+
 end:
     if (!ret) {
         ERR_print_errors(g_bio_err);
@@ -1683,7 +1686,8 @@ ovsa_status_t ovsa_compare_strings(const char* src_buff, const char* dest_buff, 
     return ret;
 }
 
-ovsa_status_t ovsa_json_create_isv_keystore(const ovsa_isv_keystore_t keystore[], char* outputBuf) {
+ovsa_status_t ovsa_json_create_isv_keystore(const ovsa_isv_keystore_t keystore[], char* outputBuf,
+                                            size_t outputLen) {
     ovsa_status_t ret   = OVSA_OK;
     cJSON* isv_keystore = NULL;
     char* str_print     = NULL;
@@ -1691,7 +1695,7 @@ ovsa_status_t ovsa_json_create_isv_keystore(const ovsa_isv_keystore_t keystore[]
 
     OVSA_DBG(DBG_D, "\ncreate_ISV_keystore_json_blob : entry\n");
 
-    if (outputBuf == NULL) {
+    if (outputBuf == NULL || outputLen == 0) {
         ret = OVSA_JSON_INVALID_INPUT;
         OVSA_DBG(DBG_E, "LibOVSA: Error input is null %d\n", ret);
         goto end;
@@ -1783,8 +1787,7 @@ ovsa_status_t ovsa_json_create_isv_keystore(const ovsa_isv_keystore_t keystore[]
         OVSA_DBG(DBG_E, "LibOVSA: Error could not get length of json string %d\n", ret);
         goto end;
     }
-    memcpy_s(outputBuf, str_len, str_print, str_len);
-    OVSA_DBG(DBG_D, "keystore json: %s\n", str_print);
+    memcpy_s(outputBuf, outputLen, str_print, str_len);
 
 end:
     cJSON_Delete(isv_keystore);
@@ -1813,7 +1816,6 @@ ovsa_status_t ovsa_json_extract_keystore_info(const char* inputBuf,
         goto end;
     }
 
-    OVSA_DBG(DBG_D, "inputBuf:  %s\n", inputBuf);
     parse_json = cJSON_Parse(inputBuf);
     if (parse_json == NULL) {
         ret = OVSA_JSON_PARSE_FAIL;
@@ -1832,14 +1834,12 @@ ovsa_status_t ovsa_json_extract_keystore_info(const char* inputBuf,
     if (cJSON_IsString(key_guid) && (key_guid->valuestring != NULL)) {
         memcpy_s(keystore[0].key_guid, GUID_SIZE, key_guid->valuestring,
                  strnlen_s(key_guid->valuestring, GUID_SIZE));
-        OVSA_DBG(DBG_D, "key_guid %s\n", keystore[0].key_guid);
     }
 
     public_key = cJSON_GetObjectItemCaseSensitive(parse_json, "public_key");
     if (cJSON_IsString(public_key) && (public_key->valuestring != NULL)) {
         memcpy_s(keystore[0].public_key, MAX_KEY_SIZE, public_key->valuestring,
                  strnlen_s(public_key->valuestring, MAX_KEY_SIZE));
-        OVSA_DBG(DBG_D, "public_key %s\n", keystore[0].public_key);
     }
 
     private_key = cJSON_GetObjectItemCaseSensitive(parse_json, "private_key");
@@ -1864,7 +1864,6 @@ ovsa_status_t ovsa_json_extract_keystore_info(const char* inputBuf,
     if (cJSON_IsString(public_key_2) && (public_key_2->valuestring != NULL)) {
         memcpy_s(keystore[1].public_key, MAX_KEY_SIZE, public_key_2->valuestring,
                  strnlen_s(public_key_2->valuestring, MAX_KEY_SIZE));
-        OVSA_DBG(DBG_D, "public_key_2 %s\n", keystore[1].public_key);
     }
 
     cJSON* private_key_2 = cJSON_GetObjectItemCaseSensitive(parse_json, "private_key_2");
@@ -1891,7 +1890,8 @@ end:
     return ret;
 }
 
-ovsa_status_t ovsa_json_create_encrypted_keystore(const char* keystoreBuf, char* outputBuf) {
+ovsa_status_t ovsa_json_create_encrypted_keystore(const char* keystoreBuf, char* outputBuf,
+                                                  size_t outLen) {
     ovsa_status_t ret  = OVSA_OK;
     cJSON* en_keystore = NULL;
     char* str_print    = NULL;
@@ -1899,7 +1899,7 @@ ovsa_status_t ovsa_json_create_encrypted_keystore(const char* keystoreBuf, char*
 
     OVSA_DBG(DBG_D, "\novsa_json_create_encrypted_keystore : entry\n");
 
-    if (keystoreBuf == NULL || outputBuf == NULL) {
+    if (keystoreBuf == NULL || outputBuf == NULL || outLen == 0) {
         ret = OVSA_JSON_INVALID_INPUT;
         OVSA_DBG(DBG_E, "LibOVSA: Error input is null %d\n", ret);
         goto end;
@@ -1932,7 +1932,7 @@ ovsa_status_t ovsa_json_create_encrypted_keystore(const char* keystoreBuf, char*
         OVSA_DBG(DBG_E, "LibOVSA: Error could not get length of json string %d\n", ret);
         goto end;
     }
-    memcpy_s(outputBuf, str_len, str_print, str_len);
+    memcpy_s(outputBuf, outLen, str_print, str_len);
 
 end:
     cJSON_Delete(en_keystore);
@@ -1944,7 +1944,8 @@ end:
 }
 
 ovsa_status_t ovsa_json_extract_encrypted_keystore(const char* inputBuf,
-                                                   ovsa_enc_keystore_t* en_keystore) {
+                                                   ovsa_enc_keystore_t* en_keystore,
+                                                   size_t enkeyLen) {
     ovsa_status_t ret   = OVSA_OK;
     cJSON* parse_json   = NULL;
     cJSON* enc_keystore = NULL;
@@ -1952,7 +1953,7 @@ ovsa_status_t ovsa_json_extract_encrypted_keystore(const char* inputBuf,
 
     OVSA_DBG(DBG_D, "\novsa_json_extract_encrypted_keystore entry\n");
 
-    if (inputBuf == NULL) {
+    if (inputBuf == NULL || enkeyLen == 0) {
         ret = OVSA_JSON_INVALID_INPUT;
         OVSA_DBG(DBG_E, "LibOVSA: Error input is null %d\n", ret);
         goto end;
@@ -1973,7 +1974,6 @@ ovsa_status_t ovsa_json_extract_encrypted_keystore(const char* inputBuf,
             goto end;
         }
         memcpy_s(en_keystore->keystore, str_len, enc_keystore->valuestring, str_len);
-        OVSA_DBG(DBG_D, "enc_keystore %s\n", en_keystore->keystore);
     }
 
 end:
@@ -1982,7 +1982,8 @@ end:
     return ret;
 }
 
-ovsa_status_t ovsa_json_apend_signature(const char* inputBuf, const char* sigBuf, char* outBuf) {
+ovsa_status_t ovsa_json_apend_signature(const char* inputBuf, const char* sigBuf, char* outBuf,
+                                        size_t buff_len) {
     ovsa_status_t ret = OVSA_OK;
     cJSON* input_json = NULL;
     char* str_print   = NULL;
@@ -1990,7 +1991,7 @@ ovsa_status_t ovsa_json_apend_signature(const char* inputBuf, const char* sigBuf
 
     OVSA_DBG(DBG_D, "\novsa_apend_signature entry\n");
 
-    if (inputBuf == NULL || sigBuf == NULL || outBuf == NULL) {
+    if (inputBuf == NULL || sigBuf == NULL || buff_len == 0 || outBuf == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
         OVSA_DBG(DBG_E, "LibOVSA: Error input is null %d\n", ret);
         goto end;
@@ -2022,7 +2023,7 @@ ovsa_status_t ovsa_json_apend_signature(const char* inputBuf, const char* sigBuf
         OVSA_DBG(DBG_E, "LibOVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
-    memcpy_s(outBuf, str_len, str_print, str_len);
+    memcpy_s(outBuf, buff_len, str_print, str_len);
 
 end:
     cJSON_Delete(input_json);
@@ -2034,7 +2035,7 @@ end:
 }
 
 ovsa_status_t ovsa_json_extract_and_strip_signature(const char* inputBuf, char* sigBuf,
-                                                    char* outBuf) {
+                                                    size_t sigLen, char* outBuf, size_t outLen) {
     ovsa_status_t ret = OVSA_OK;
     cJSON* input_json = NULL;
     cJSON* sig_json   = NULL;
@@ -2044,7 +2045,7 @@ ovsa_status_t ovsa_json_extract_and_strip_signature(const char* inputBuf, char* 
 
     OVSA_DBG(DBG_D, "\novsa_extract_and_strip_signature entry\n");
 
-    if (inputBuf == NULL || sigBuf == NULL || outBuf == NULL) {
+    if (inputBuf == NULL || sigBuf == NULL || outLen == 0 || outBuf == NULL) {
         ret = OVSA_JSON_INVALID_INPUT;
         OVSA_DBG(DBG_E, "LibOVSA: Error input is null %d\n", ret);
 
@@ -2060,8 +2061,7 @@ ovsa_status_t ovsa_json_extract_and_strip_signature(const char* inputBuf, char* 
 
     sig_json = cJSON_GetObjectItemCaseSensitive(input_json, "signature");
     if (cJSON_IsString(sig_json) && (sig_json->valuestring != NULL)) {
-        memcpy_s(sigBuf, strlen(sig_json->valuestring), sig_json->valuestring,
-                 strlen(sig_json->valuestring));
+        memcpy_s(sigBuf, sigLen, sig_json->valuestring, strnlen_s(sig_json->valuestring, sigLen));
         OVSA_DBG(DBG_D, "signature: %s\n", sigBuf);
     } else {
         ret = OVSA_JSON_PARSE_FAIL;
@@ -2088,7 +2088,7 @@ ovsa_status_t ovsa_json_extract_and_strip_signature(const char* inputBuf, char* 
         OVSA_DBG(DBG_E, "LibOVSA: Error could not get length of string %d\n", ret);
         goto end;
     }
-    memcpy_s(outBuf, str_len, input, str_len);
+    memcpy_s(outBuf, outLen, input, str_len);
 
 end:
     cJSON_Delete(input_json);

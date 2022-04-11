@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,10 +70,10 @@ all: ovsaruntime.manifest.sgx ovsaruntime.sig ovsaruntime.token
 endif
 ############################# MBEDTLS DEPENDENCY ##############################
 
-MBEDTLS_VERSION ?= 2.26.0
+MBEDTLS_VERSION ?= 3.1.0
 MBEDTLS_SRC ?= mbedtls-$(MBEDTLS_VERSION).tar.gz
 MBEDTLS_URI ?= https://github.com/ARMmbed/mbedtls/archive/
-MBEDTLS_CHECKSUM ?= 35d8d87509cd0d002bddbd5508b9d2b931c5e83747d087234cc7ad551d53fe05
+MBEDTLS_CHECKSUM ?= 64d01a3b22b91cf3a25630257f268f11bc7bfa37981ae6d397802dd4ccec4690
 
 # mbedTLS uses a submodule mbedcrypto, need to download it and move under mbedtls/crypto
 MBEDCRYPTO_VERSION ?= 3.1.0

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -198,6 +199,11 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
+    /*set file mode creation mask*/
+    mode_t nmask;
+    nmask = S_IRGRP | S_IWGRP | /* group read write */
+            S_IROTH | S_IWOTH;  /* other read write */
+    umask(nmask);               /*0666 & ~066 = 0600 i.e., (-rw-------)*/
     ret = ovsa_generate_reference_tcb(&tcb_sig_info.tcbinfo,
 #ifndef ENABLE_SGX_GRAMINE
                                       sw_pcr_reg_id, hw_pcr_reg_id
@@ -261,7 +267,7 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
         goto out;
     }
     OVSA_DBG(DBG_I, "OVSA: Sign TCB JSON Blob\n");
-    ret = ovsa_crypto_sign_json_blob(asymm_keyslot, tcb_buf, tcb_buf_size, tcb_sig_buf);
+    ret = ovsa_crypto_sign_json_blob(asymm_keyslot, tcb_buf, tcb_buf_size, tcb_sig_buf, size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error TCB signing failed with error code %d\n", ret);
         goto out;

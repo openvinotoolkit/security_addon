@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1454,7 +1454,7 @@ ovsa_status_t ovsa_crypto_encrypt_keystore(int sym_key_slot, const char* enc_key
         ret = OVSA_MEMORY_ALLOC_FAIL;
         goto end;
     }
-    ret = ovsa_json_create_encrypted_keystore(encrypt_buff, enc_keystore_buff);
+    ret = ovsa_json_create_encrypted_keystore(encrypt_buff, enc_keystore_buff, enc_keystore_size);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error encrypting keystore failed in creating the encrypted keystore "
@@ -1474,7 +1474,7 @@ ovsa_status_t ovsa_crypto_encrypt_keystore(int sym_key_slot, const char* enc_key
     }
 
     ret = ovsa_crypto_hmac_json_blob(keyiv_hmac_slot, enc_keystore_buff, enc_keystore_size,
-                                     enc_keystore_hmac_buff);
+                                     enc_keystore_hmac_buff, enc_keystore_hmac_size);
     if (ret < OVSA_OK) {
         BIO_printf(
             g_bio_err,
@@ -1601,8 +1601,8 @@ ovsa_status_t ovsa_crypto_decrypt_keystore(int sym_key_slot, const char* in_buff
         goto end;
     }
 
-    ret =
-        ovsa_crypto_verify_hmac_json_blob(keyiv_hmac_slot, in_buff, in_buff_len, enc_keystore_buff);
+    ret = ovsa_crypto_verify_hmac_json_blob(keyiv_hmac_slot, in_buff, in_buff_len,
+                                            enc_keystore_buff, in_buff_len);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error decrypting keystore failed in verifying the hmac json blob\n");
@@ -1632,7 +1632,8 @@ ovsa_status_t ovsa_crypto_decrypt_keystore(int sym_key_slot, const char* in_buff
         }
     }
 
-    ret = ovsa_json_extract_encrypted_keystore(enc_keystore_buff, &enc_keystore);
+    ret = ovsa_json_extract_encrypted_keystore(enc_keystore_buff, &enc_keystore,
+                                               (encrypted_buff_len + NULL_TERMINATOR));
     if (ret < OVSA_OK) {
         BIO_printf(
             g_bio_err,

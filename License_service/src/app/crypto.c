@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -659,7 +659,8 @@ ovsa_status_t ovsa_license_service_create_nonce(char** nonce_buf) {
         goto out;
     }
 
-    ret = ovsa_license_service_safe_malloc((sizeof(char) * NONCE_SIZE * 2), nonce_buf);
+    size_t nouce_len = sizeof(char) * NONCE_SIZE * 2;
+    ret              = ovsa_license_service_safe_malloc(nouce_len, nonce_buf);
     if (ret < OVSA_OK) {
         ret = OVSA_MEMORY_ALLOC_FAIL;
         OVSA_DBG(DBG_E, "OVSA: Error memory init failed\n");
@@ -673,8 +674,8 @@ ovsa_status_t ovsa_license_service_create_nonce(char** nonce_buf) {
         goto out;
     }
 
-    if (memcpy_s(*nonce_buf, strlen(nonce_b64_buff), nonce_b64_buff, strlen(nonce_b64_buff)) !=
-        EOK) {
+    size_t len = strnlen_s(nonce_b64_buff, RSIZE_MAX_STR);
+    if (memcpy_s(*nonce_buf, nouce_len, nonce_b64_buff, len) != EOK) {
         OVSA_DBG(DBG_E, "OVSA: Error generating nonce\n");
         ret = -1;
         goto out;

@@ -1,5 +1,5 @@
 //*****************************************************************************
-// Copyright 2020-2021 Intel Corporation
+// Copyright 2020-2022 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ class OvsaModelInstance {
     std::string model_ksFile;
     std::string model_licFile;
     std::string model_datFile;
+    int model_version;
     bool model_is_blacklisted;
     std::mutex& mutex_lock;
 
@@ -51,7 +52,7 @@ class OvsaModelInstance {
     OvsaModelInstance(std::mutex& mutex);
     OvsaModelInstance(const std::string modelName, const std::string& ksFile,
                       const std::string& licFile, const std::string& datFile, bool licState,
-                      std::mutex& mutex);
+                      int model_version, std::mutex& mutex);
     OvsaModelInstance(const OvsaModelInstance& s);
     OvsaModelInstance& operator=(const OvsaModelInstance& s);
     ~OvsaModelInstance();

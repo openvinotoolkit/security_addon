@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1467,31 +1467,94 @@ end:
 }
 #endif
 
+static ovsa_status_t ovsa_crypto_check_cert_trust_store(const X509* xcert,
+                                                        bool* check_cert_trust_store) {
+    STACK_OF(X509_INFO)* certstack = NULL;
+    const char ca_filestr[]        = ROOT_CA_CERTIFICATES;
+    BIO* stackbio                  = NULL;
+    ovsa_status_t ret              = OVSA_OK;
+    int i;
+
+    if (xcert == NULL) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error Certificate check in Linux Trust Store failed with invalid "
+                   "parameter\n");
+        return OVSA_INVALID_PARAMETER;
+    }
+
+    stackbio = BIO_new(BIO_s_file());
+    if (stackbio == NULL) {
+        BIO_printf(
+            g_bio_err,
+            "OVSA: Error Certificate check in Linux Trust Store failed in getting new BIO \n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    if (BIO_read_filename(stackbio, ca_filestr) <= 0) {
+        BIO_printf(g_bio_err, "LibOVSA: Error while loading cert bundle into memory\n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    certstack = PEM_X509_INFO_read_bio(stackbio, NULL, NULL, NULL);
+    if (certstack == NULL) {
+        BIO_printf(g_bio_err, "LibOVSA: Error in reading X509 certificate stack\n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    /* ---------------------------------------------------------- *
+     * Cycle through the stack for Certificate            *
+     * ---------------------------------------------------------- */
+    for (i = 0; i < sk_X509_INFO_num(certstack); i++) {
+        X509_INFO* itmp;
+
+        itmp = sk_X509_INFO_value(certstack, i);
+
+        if (X509_cmp(xcert, itmp->x509) == 0) {
+            BIO_printf(g_bio_err,
+                       "LibOVSA: Certificate is available in Linux Trust Store and trusted...\n");
+            *check_cert_trust_store = true;
+            break;
+        }
+    }
+    /* ---------------------------------------------------------- *
+     * Free up the resources                                      *
+     * ---------------------------------------------------------- */
+end:
+    sk_X509_INFO_pop_free(certstack, X509_INFO_free);
+    BIO_free_all(stackbio);
+
+    return ret;
+}
+
 static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
                                                           const char* chain_file) {
-    ovsa_status_t ret        = OVSA_OK;
-    BIO* ca_issuers_bio      = NULL;
-    BIO* issuer_cert_bio     = NULL;
-    BIO* issuer_cert_mem     = NULL;
-    BUF_MEM* ca_issuers_ptr  = NULL;
-    BUF_MEM* issuer_cert_ptr = NULL;
-    X509* xcert              = NULL;
-    X509* d2i_xcert          = NULL;
-    char* cert_dup           = NULL;
-    char* d2i_cert           = NULL;
-    char* ca_issuers         = NULL;
-    char* ca_cert            = NULL;
-    char* issuer_cert        = NULL;
-    char* issuer_dup         = NULL;
-    const char* exts         = "authorityInfoAccess";
-    bool check_ca_cert       = false;
-    FILE* chain_fp           = NULL;
-    FILE* issuer_fp          = NULL;
-    static int cert_flag     = 0;
-    int safe_exit            = 0;
+    ovsa_status_t ret           = OVSA_OK;
+    BIO* ca_issuers_bio         = NULL;
+    BIO* issuer_cert_bio        = NULL;
+    BIO* issuer_cert_mem        = NULL;
+    BUF_MEM* ca_issuers_ptr     = NULL;
+    BUF_MEM* issuer_cert_ptr    = NULL;
+    X509* xcert                 = NULL;
+    X509* d2i_xcert             = NULL;
+    char* cert_dup              = NULL;
+    char* d2i_cert              = NULL;
+    char* ca_issuers            = NULL;
+    char* ca_cert               = NULL;
+    char* issuer_cert           = NULL;
+    char* issuer_dup            = NULL;
+    const char* exts            = "authorityInfoAccess";
+    bool check_ca_cert          = false;
+    bool check_cert_trust_store = false;
+    FILE* chain_fp              = NULL;
+    FILE* issuer_fp             = NULL;
+    static int cert_flag        = 0;
+    int safe_exit               = 0;
     size_t ca_cert_len = 0, cert_len = 0;
     size_t issuer_cert_len = 0, cert_file_size = 0;
-    char* issuer_file_name      = "/tmp/issuer_cert.der";
+    char* issuer_file_name      = "/opt/ovsa/tmp_dir/issuer_cert.der";
     size_t ca_issuers_field_len = 0;
     int ca_issuers_uri_len = 0, count = 0;
     char ca_issuers_uri[MAX_URL_SIZE];
@@ -1584,7 +1647,16 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
             ret = OVSA_CRYPTO_X509_ERROR;
             goto end;
         }
-
+        if (check_cert_trust_store != true) {
+            BIO_printf(g_bio_err, "OVSA: Checking certificate in Linux Trust Store...\n");
+            ret = ovsa_crypto_check_cert_trust_store(xcert, &check_cert_trust_store);
+            if (ret < OVSA_OK) {
+                BIO_printf(g_bio_err,
+                           "OVSA: ovsa crypto check cert trust store failed with error code:%d\n",
+                           ret);
+                goto end;
+            }
+        }
         /* Check whether certificate's issuer and subject is matching */
         ret = ovsa_crypto_check_issuer_subject_match(xcert, xcert, &check_ca_cert);
         if (ret < OVSA_OK) {
@@ -1595,6 +1667,13 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
         }
 
         if (check_ca_cert == true) {
+            if (check_cert_trust_store == false) {
+                BIO_printf(
+                    g_bio_err,
+                    "OVSA: RootCA cert can't be trusted as its not available in Trust Store...\n");
+                ret = OVSA_CRYPTO_BIO_ERROR;
+                goto end;
+            }
             break;
         }
 
@@ -1665,7 +1744,7 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
         memset_s(ca_issuers_field, MAX_URL_SIZE, 0);
 
         /* Get the CAIssuers field alone */
-        while (true) {
+        while (count < MAX_URL_SIZE) {
             if (ca_issuers[count] == '\n') {
                 count = 0;
                 break;
@@ -1721,9 +1800,9 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
             goto end;
         }
 
-        safe_exit      = 0;
-        cert_file_size = ovsa_crypto_get_file_size(issuer_fp);
-        if (cert_file_size == 0) {
+        safe_exit = 0;
+        ret       = ovsa_crypto_get_file_size(issuer_fp, &cert_file_size);
+        if (ret < OVSA_OK || cert_file_size == 0) {
             BIO_printf(g_bio_err,
                        "LibOVSA: Error forming chain failed in reading the issuer certificate file "
                        "size\n");
@@ -1875,6 +1954,7 @@ end:
     return ret;
 }
 
+#ifdef ENABLE_SELF_SIGNED_CERT
 static ovsa_status_t ovsa_crypto_check_cert_is_self_signed(const X509* xcert,
                                                            bool* check_self_signed_cert) {
     ovsa_status_t ret = OVSA_OK;
@@ -1889,11 +1969,12 @@ static ovsa_status_t ovsa_crypto_check_cert_is_self_signed(const X509* xcert,
 
     return ret;
 }
+#endif
 
 ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, const char* cert,
                                              bool lifetime_validity_check) {
     X509_STORE* store           = NULL;
-    char* chain_file            = "/tmp/chain.pem";
+    char* chain_file            = "/opt/ovsa/tmp_dir/chain.pem";
     EVP_PKEY* cert_pkey         = NULL;
     bool check_self_signed_cert = false;
     ovsa_status_t ret           = OVSA_OK;
@@ -1953,6 +2034,7 @@ ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, 
         goto end;
     }
 
+#ifdef ENABLE_SELF_SIGNED_CERT
     ret = ovsa_crypto_check_cert_is_self_signed(xcert, &check_self_signed_cert);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
@@ -1976,7 +2058,10 @@ ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, 
         } else {
             BIO_printf(g_bio_err, "LibOVSA: Certificate signature verified OK\n");
         }
-    } else {
+    } else
+#endif
+    {
+
         ret = ovsa_crypto_form_chain_do_ocsp_check(cert, chain_file);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,

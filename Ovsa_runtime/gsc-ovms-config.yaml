@@ -5,7 +5,7 @@ Distro: "ubuntu:20.04"
 # below; typically, you want to keep the default values though
 Gramine:
     Repository: "https://github.com/gramineproject/gramine.git"
-    Branch:     "v1.0"
+    Branch:     "3f1601fc9cc86c66ad1810dba2f10f064bb0e1b8"
 
 # Specify the Intel SGX driver installed on your machine (more specifically, on the machine where
 # the graminized Docker container will run); there are several variants of the SGX driver:

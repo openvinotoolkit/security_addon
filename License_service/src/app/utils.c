@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@
 #include <string.h>
 
 #include "license_service.h"
-#include "mbedtls/certs.h"
 #include "mbedtls/config.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
@@ -223,8 +222,8 @@ ovsa_status_t ovsa_license_service_read_file_content(const char* filename, char*
         goto out;
     }
 
-    file_size = ovsa_license_service_crypto_get_file_size(fptr);
-    if (file_size == 0) {
+    ret = ovsa_license_service_crypto_get_file_size(fptr, &file_size);
+    if (ret < OVSA_OK || file_size == 0) {
         OVSA_DBG(DBG_E, "OVSA: Error getting file size for %s failed\n", filename);
         ret = OVSA_FILEIO_FAIL;
         fclose(fptr);
@@ -250,9 +249,11 @@ out:
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }
-int ovsa_license_service_crypto_get_file_size(FILE* fp) {
-    size_t file_size = 0;
-    int ret          = 0;
+
+ovsa_status_t ovsa_license_service_crypto_get_file_size(FILE* fp, size_t* filesize) {
+    size_t fsize      = 0;
+    ovsa_status_t ret = OVSA_FILEIO_FAIL;
+    *filesize         = 0;
 
     if (fp == NULL) {
         BIO_printf(g_bio_err, "OVSA: Error getting file size failed with invalid parameter\n");
@@ -266,11 +267,9 @@ int ovsa_license_service_crypto_get_file_size(FILE* fp) {
         goto end;
     }
 
-    file_size = ftell(fp);
-    if (file_size == 0) {
-        BIO_printf(g_bio_err,
-                   "OVSA: Error getting file size failed in giving the current "
-                   "position of the fp\n");
+    fsize = ftell(fp);
+    if (fsize == 0) {
+        BIO_printf(g_bio_err, "OVSA: Error file size is zero\n");
         goto end;
     }
 
@@ -281,7 +280,8 @@ int ovsa_license_service_crypto_get_file_size(FILE* fp) {
         goto end;
     }
 
-    ret = file_size + NULL_TERMINATOR;
+    *filesize = fsize + NULL_TERMINATOR;
+    ret       = OVSA_OK;
 end:
     if (!ret) {
         ERR_print_errors(g_bio_err);

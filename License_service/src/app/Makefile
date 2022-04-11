@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ all: license_server
 
 INC_LIBS := $(SRC_BUILD_DIR)/lib
 
-CFLAGS += -DDEBUG=$(DEBUG) #-DPTT_EK_ONDIE_CA #-DENABLE_OCSP_CHECK
+CFLAGS += -DDEBUG=$(DEBUG) -DENABLE_SELF_SIGNED_CERT #-DPTT_EK_ONDIE_CA #-DENABLE_OCSP_CHECK
 
 INC_DIR := -I$(SRC_BUILD_DIR)/src/lib/mbedtls/install/include \
            -I$(SRC_BUILD_DIR)/src/lib/mbedtls/crypto/include \

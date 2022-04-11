@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,13 +18,15 @@ SRC_BUILD_DIR  := $(OVSARUNTIME_DIR)
 DEBUG ?=
 export DEBUG=1
 
-ifeq ($(ENABLE_SGX_GRAMINE),1)
+ifeq ($(SGX),1)
 CFLAGS += -DENABLE_SGX_GRAMINE
+else
+CFLAGS += -DKVM -DENABLE_QUOTE_FROM_NVRAM
 endif
 
 CP = cp
 
-CFLAGS +=  -g -Wall -DKVM -DENABLE_QUOTE_FROM_NVRAM -DENABLE_SELF_SIGNED_CERT -D_GNU_SOURCE -DENABLE_OCSP_CHECK -fno-exceptions -fPIC -DDEBUG=$(DEBUG) -D OVSA_RUNTIME -fstack-protector-strong -fPIE -fPIC -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security
+CFLAGS +=  -g -Wall -DENABLE_SELF_SIGNED_CERT -D_GNU_SOURCE -DENABLE_OCSP_CHECK -fno-exceptions -fPIC -DDEBUG=$(DEBUG) -D OVSA_RUNTIME -fstack-protector-strong -fPIE -fPIC -O2 -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security
 
 ifeq ($(SGX),1)
 GRAMINE_INC_DIR := -I$(GRAMINE_DIR)/Pal/src/host/Linux-SGX/tools/ra-tls \

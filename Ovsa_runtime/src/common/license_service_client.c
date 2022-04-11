@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mbedtls/certs.h"
-#include "mbedtls/config.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/debug.h"
 #include "mbedtls/entropy.h"
@@ -136,7 +134,7 @@ static ovsa_status_t ovsa_validate_peer_cert_hash(ovsa_customer_license_sig_t cu
     cur_cert_hash = customer_lic_sig.customer_lic.license_url_list->cur_cert_hash;
     fut_cert_hash = customer_lic_sig.customer_lic.license_url_list->fut_cert_hash;
 
-    /*validate peer_cert_hash*/
+    /* Validate peer_cert_hash */
     strcmp_s(peer_cert_hash, HASH_SIZE, cur_cert_hash, &cur_cert_hash_indicator);
     strcmp_s(peer_cert_hash, HASH_SIZE, fut_cert_hash, &fut_cert_hash_indicator);
 
@@ -513,15 +511,23 @@ out:
 }
 
 ovsa_status_t ovsa_validate_controlled_access_model(
-    const int peer_keyslot, const char* controlled_access_model,
+    const int peer_keyslot, const char* cust_lic_sig_buf, const char* controlled_access_model,
     ovsa_controlled_access_model_sig_t* controlled_access_model_sig) {
     ovsa_status_t ret                     = OVSA_OK;
     size_t control_access_model_file_size = 0;
     char* control_access_model_sig_buf    = NULL;
     char* control_access_model_buf        = NULL;
     char* peer_certificate                = NULL;
+    char* model_buff                      = NULL;
+    char* cust_model_hash                 = NULL;
+    char sig_buff[MAX_SIGNATURE_SIZE];
+    char model_hash[HASH_SIZE];
+    int model_hash_indicator = -1;
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+
+    memset_s(sig_buff, MAX_SIGNATURE_SIZE, 0);
+    memset_s(model_hash, HASH_SIZE, 0);
 
     if (controlled_access_model != NULL) {
         /* Load controlled access model Artifact */
@@ -532,7 +538,13 @@ ovsa_status_t ovsa_validate_controlled_access_model(
                      "OVSA: Error opening controlled access model file failed with code %d\n", ret);
             goto out;
         }
-        control_access_model_file_size = ovsa_crypto_get_file_size(fcontrol_access_model);
+        ret = ovsa_crypto_get_file_size(fcontrol_access_model, &control_access_model_file_size);
+        if (ret < OVSA_OK || control_access_model_file_size == 0) {
+            OVSA_DBG(DBG_E, "OVSA: Error get file size failed for %s with code %d\n",
+                     controlled_access_model, ret);
+            fclose(fcontrol_access_model);
+            goto out;
+        }
         ret = ovsa_safe_malloc(control_access_model_file_size * sizeof(char),
                                &control_access_model_sig_buf);
         if (ret < OVSA_OK) {
@@ -570,13 +582,51 @@ ovsa_status_t ovsa_validate_controlled_access_model(
             goto out;
         }
         OVSA_DBG(DBG_I, "OVSA: Verify controlled access model signature\n");
-        ret =
-            ovsa_crypto_verify_json_blob(peer_keyslot, control_access_model_sig_buf,
-                                         control_access_model_file_size, control_access_model_buf);
+        ret = ovsa_crypto_verify_json_blob(peer_keyslot, control_access_model_sig_buf,
+                                           control_access_model_file_size, control_access_model_buf,
+                                           control_access_model_file_size);
         if (ret != OVSA_OK || control_access_model_buf == NULL) {
             OVSA_DBG(DBG_E,
                      "OVSA: Error verify controlled access model json blob failed with code  %d\n",
                      ret);
+            goto out;
+        }
+        ret = ovsa_safe_malloc(control_access_model_file_size, &model_buff);
+        if (ret < OVSA_OK || model_buff == NULL) {
+            OVSA_DBG(DBG_E, "OVSA: Error buffer allocation failed with code %d\n", ret);
+            goto out;
+        }
+        ret = ovsa_json_extract_and_strip_signature((const char*)control_access_model_sig_buf,
+                                                    sig_buff, MAX_SIGNATURE_SIZE, model_buff,
+                                                    control_access_model_file_size);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E,
+                     "OVSA: Error verifying the JSON blob failed in stripping the signature\n");
+            goto out;
+        }
+        /* Generate HASH of controlled access model */
+        OVSA_DBG(DBG_I, "OVSA: Generate HASH For Controlled Access Model\n");
+        ret = ovsa_crypto_compute_hash((const char*)model_buff, HASH_ALG_SHA512,
+                                       (unsigned char*)model_hash, true /*FORMAT_BASE64*/);
+        if (ret != OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error model HASH generation failed with code %d\n", ret);
+            goto out;
+        }
+        /* Extract HASH from customer license */
+        ret = ovsa_json_extract_element(cust_lic_sig_buf, "model_hash", &cust_model_hash);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error extract json element failed with error code %d\n", ret);
+            goto out;
+        }
+
+        /*validate controlled_access model_hash*/
+        strcmp_s(cust_model_hash, HASH_SIZE, model_hash, &model_hash_indicator);
+
+        if (model_hash_indicator == 0) {
+            OVSA_DBG(DBG_I, "\nOVSA: Controlled_access model_hash HASH verified OK.\n");
+        } else {
+            ret = OVSA_CONTROLED_ACCESS_MODEL_HASH_VALIDATION_FAILED;
+            OVSA_DBG(DBG_E, "OVSA: Error controlled_access model_hash failed %d\n", ret);
         }
     } else {
         OVSA_DBG(DBG_E, "OVSA: Error invalid controlled access model artifact \n");
@@ -586,22 +636,24 @@ out:
     ovsa_safe_free(&control_access_model_sig_buf);
     ovsa_safe_free(&control_access_model_buf);
     ovsa_safe_free(&peer_certificate);
+    ovsa_safe_free(&cust_model_hash);
+    ovsa_safe_free(&model_buff);
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }
 
 ovsa_status_t ovsa_validate_customer_license(const char* customer_license, const int asym_keyslot,
-                                             ovsa_customer_license_sig_t* customer_lic_sig) {
+                                             char** cust_lic_buff) {
     ovsa_status_t ret         = OVSA_OK;
     size_t cust_lic_file_size = 0;
     size_t peer_certlen       = 0;
     int peer_keyslot          = -1;
     int shared_key_slot       = -1;
     int keyiv_hmac_slot       = -1;
-    char* cust_lic_sig_buf    = NULL;
     char* cust_lic_buf        = NULL;
     char* peer_cert           = NULL;
     char* encryption_key      = NULL;
+    char* cust_lic_sig_buf    = NULL;
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
     if (customer_license != NULL) {
@@ -612,8 +664,14 @@ ovsa_status_t ovsa_validate_customer_license(const char* customer_license, const
             OVSA_DBG(DBG_E, "OVSA: Error opening customer license file failed with code %d\n", ret);
             goto out;
         }
-        cust_lic_file_size = ovsa_crypto_get_file_size(fcust_lic);
-        ret                = ovsa_safe_malloc(cust_lic_file_size * sizeof(char), &cust_lic_sig_buf);
+        ret = ovsa_crypto_get_file_size(fcust_lic, &cust_lic_file_size);
+        if (ret < OVSA_OK || cust_lic_file_size == 0) {
+            OVSA_DBG(DBG_E, "OVSA: Error get file size failed for %s with code %d\n",
+                     customer_license, ret);
+            fclose(fcust_lic);
+            goto out;
+        }
+        ret = ovsa_safe_malloc(cust_lic_file_size * sizeof(char), &cust_lic_sig_buf);
         if (ret < OVSA_OK) {
             ret = OVSA_MEMORY_ALLOC_FAIL;
             OVSA_DBG(DBG_E, "OVSA: Error init memory failed with code %d\n", ret);
@@ -623,19 +681,20 @@ ovsa_status_t ovsa_validate_customer_license(const char* customer_license, const
         if (!fread(cust_lic_sig_buf, 1, cust_lic_file_size, fcust_lic)) {
             ret = OVSA_FILEIO_FAIL;
             OVSA_DBG(DBG_E, "OVSA: Error read customer license file failed with code %d\n", ret);
+            ovsa_safe_free(&cust_lic_sig_buf);
             fclose(fcust_lic);
             goto out;
         }
         cust_lic_sig_buf[cust_lic_file_size - 1] = '\0';
+        *cust_lic_buff                           = cust_lic_sig_buf;
         fclose(fcust_lic);
-        /* Extract customer licensce json blob */
-        ret = ovsa_json_extract_customer_license(cust_lic_sig_buf, customer_lic_sig);
-        if (ret != OVSA_OK) {
-            OVSA_DBG(DBG_E, "OVSA: Error extract customer license json blob failed with code %d\n",
-                     ret);
+
+        /* Extract encryption_key from customer license */
+        ret = ovsa_json_extract_element(cust_lic_sig_buf, "isv_certificate", &peer_cert);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error extract json element failed with error code %d\n", ret);
             goto out;
         }
-        peer_cert = customer_lic_sig->customer_lic.isv_certificate;
 
         OVSA_DBG(DBG_I, "OVSA: Verify PEER certificate\n");
         /* Verifying customer license ISV Certificate */
@@ -664,8 +723,7 @@ ovsa_status_t ovsa_validate_customer_license(const char* customer_license, const
         }
         OVSA_DBG(DBG_I, "OVSA: Verify customer license signature\n");
         /* Extract encryption_key from customer license */
-        ret =
-            ovsa_json_extract_element(cust_lic_sig_buf, "encryption_key", (void**)&encryption_key);
+        ret = ovsa_json_extract_element(cust_lic_sig_buf, "encryption_key", &encryption_key);
         if (ret < OVSA_OK) {
             OVSA_DBG(DBG_E, "OVSA: Error extract json element failed with error code %d\n", ret);
             goto out;
@@ -688,8 +746,9 @@ ovsa_status_t ovsa_validate_customer_license(const char* customer_license, const
         }
 
         /* Verifies the HMAC for customer license */
-        ret = ovsa_crypto_verify_hmac_json_blob(keyiv_hmac_slot, cust_lic_sig_buf,
-                                                cust_lic_file_size, cust_lic_buf);
+        ret =
+            ovsa_crypto_verify_hmac_json_blob(keyiv_hmac_slot, cust_lic_sig_buf, cust_lic_file_size,
+                                              cust_lic_buf, cust_lic_file_size);
         if (ret != OVSA_OK || cust_lic_buf == NULL) {
             OVSA_DBG(DBG_E, "OVSA: Error verify customer license json blob failed with code %d\n",
                      ret);
@@ -702,16 +761,16 @@ ovsa_status_t ovsa_validate_customer_license(const char* customer_license, const
     }
 
 out:
+    /* To implement a clean solution to clear peer_key slot in error cases */
+    if ((ret < OVSA_OK) && (peer_keyslot > -1)) {
+        ovsa_crypto_clear_asymmetric_key_slot(peer_keyslot);
+    }
     /* clear key/IV/HMAC from the key slot */
     ovsa_crypto_clear_symmetric_key_slot(keyiv_hmac_slot);
     /* clear shared key from the key slot */
     ovsa_crypto_clear_symmetric_key_slot(shared_key_slot);
     ovsa_safe_free(&encryption_key);
-    ovsa_safe_free(&cust_lic_sig_buf);
-    ovsa_safe_free(&customer_lic_sig->customer_lic.isv_certificate);
-    peer_cert = NULL;
-    ovsa_safe_free_url_list(&customer_lic_sig->customer_lic.license_url_list);
-    ovsa_safe_free_tcb_list(&customer_lic_sig->customer_lic.tcb_signatures);
+    ovsa_safe_free(&peer_cert);
     ovsa_safe_free(&cust_lic_buf);
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
@@ -728,8 +787,8 @@ static ovsa_status_t ovsa_do_update_cust_license(char* update_cust_lic_buf,
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
-    ret = ovsa_json_extract_element((char*)update_cust_lic_buf, "payload",
-                                    (void*)&update_cust_lic_payload);
+    ret =
+        ovsa_json_extract_element((char*)update_cust_lic_buf, "payload", &update_cust_lic_payload);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read updated customer license payload from json failed %d\n",
                  ret);
@@ -775,8 +834,8 @@ static ovsa_status_t ovsa_do_get_license_check(const int asym_keyslot,
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
-    ret = ovsa_json_extract_element((char*)cust_lic_check_status_buf, "payload",
-                                    (void*)&lic_check_payload);
+    ret =
+        ovsa_json_extract_element((char*)cust_lic_check_status_buf, "payload", &lic_check_payload);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read license check status payload from json failed %d\n", ret);
         goto out;
@@ -879,7 +938,7 @@ static ovsa_status_t ovsa_do_sign_send_nounce(const int asym_keyslot, char* nonc
     memset_s(nonce_signed, sizeof(nonce_signed), 0);
 
     /* Read payload from json file */
-    ret = ovsa_json_extract_element((char*)nonce_buf, "payload", (void*)&payload);
+    ret = ovsa_json_extract_element((char*)nonce_buf, "payload", &payload);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read payload from json failed %d\n", ret);
         goto out;
@@ -986,17 +1045,18 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
     void* ssl_session = NULL;
     unsigned char payload_len_str[PAYLOAD_LENGTH + 1];
     size_t payload_size         = 0;
+    int peer_keyslot            = -1;
     unsigned char* read_buf     = NULL;
     unsigned char* command      = NULL;
     bool license_check_complete = false;
     ovsa_command_type_t cmd     = OVSA_INVALID_CMD;
     char* cust_lic_sig_buf      = NULL;
-    size_t cust_lic_file_size   = 0;
     ovsa_customer_license_sig_t customer_lic_sig;
     /* Set all pointers to NULL for KW fix */
     customer_lic_sig.customer_lic.isv_certificate  = NULL;
     customer_lic_sig.customer_lic.tcb_signatures   = NULL;
     customer_lic_sig.customer_lic.license_url_list = NULL;
+
     ovsa_license_serv_url_list_t* license_url_list = NULL;
     char license_serv_url[MAX_URL_SIZE + 1];
     bool connected_to_license_server = false;
@@ -1006,34 +1066,21 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
     if ((asym_keyslot >= MIN_KEY_SLOT) && (customer_license != NULL)) {
         memset_s(license_serv_url, sizeof(license_serv_url), 0);
         memset_s(payload_len_str, sizeof(payload_len_str), 0);
-
-        /* Load customer license file */
-        FILE* fcust_lic = fopen(customer_license, "r");
-        if (fcust_lic == NULL) {
-            ret = OVSA_FILEOPEN_FAIL;
-            OVSA_DBG(DBG_E, "OVSA: Error opening customer license file failed with code %d\n", ret);
-            goto out;
-        }
-        cust_lic_file_size = ovsa_crypto_get_file_size(fcust_lic);
-        ret                = ovsa_safe_malloc(cust_lic_file_size * sizeof(char), &cust_lic_sig_buf);
-        if (ret < OVSA_OK) {
-            ret = OVSA_MEMORY_ALLOC_FAIL;
-            OVSA_DBG(DBG_E, "OVSA: Error init memory failed with code %d\n", ret);
-            fclose(fcust_lic);
-            goto out;
-        }
-        if (!fread(cust_lic_sig_buf, 1, cust_lic_file_size, fcust_lic)) {
-            ret = OVSA_FILEIO_FAIL;
-            OVSA_DBG(DBG_E, "OVSA: Error read customer license file failed with code %d\n", ret);
-            fclose(fcust_lic);
-            goto out;
-        }
-        fclose(fcust_lic);
         /*
-         * Stage #1: Perform Platform Validation
-         * Platform Validation using TLS library
+         * Stage #1: Validation of Customer license
          */
-        OVSA_DBG(DBG_I, "OVSA: Perform Platform Validation using TLS \n");
+        /* Validate Customer license artefact */
+        peer_keyslot =
+            ovsa_validate_customer_license(customer_license, asym_keyslot, &cust_lic_sig_buf);
+        if ((peer_keyslot < MIN_KEY_SLOT) || (peer_keyslot >= MAX_KEY_SLOT)) {
+            ret = peer_keyslot;
+            OVSA_DBG(DBG_E,
+                     "OVSA: Error customer license artifact validation failed with code %d\n", ret);
+            goto out;
+        }
+        /* clear peer keys from the key slots */
+        ovsa_crypto_clear_asymmetric_key_slot(peer_keyslot);
+
         /* Extract customer license json blob */
         memset_s(&customer_lic_sig, sizeof(ovsa_customer_license_sig_t), 0);
         ret = ovsa_json_extract_customer_license(cust_lic_sig_buf, &customer_lic_sig);
@@ -1042,6 +1089,12 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
                      ret);
             goto out;
         }
+
+        /*
+         * Stage #2: Perform Platform Validation
+         * Platform Validation using TLS library
+         */
+        OVSA_DBG(DBG_I, "OVSA: Perform Platform Validation using TLS \n");
         /* Extract license server URL from customer license */
         license_url_list = customer_lic_sig.customer_lic.license_url_list;
 
@@ -1099,7 +1152,7 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
 
         do {
             /*
-             * Stage #2: Customer License Check Sequence
+             * Stage #3: Customer License Check Sequence
              * Sign the received Nonce and send back
              */
 
@@ -1136,7 +1189,7 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
             OVSA_DBG(DBG_I, "OVSA: Received payload from server \n'%s'\n", read_buf);
 
             /* Read command from Payload */
-            ret = ovsa_json_extract_element((char*)read_buf, "command", (void*)&command);
+            ret = ovsa_json_extract_element((char*)read_buf, "command", (char**)&command);
             if (ret < OVSA_OK) {
                 OVSA_DBG(DBG_E, "OVSA: Error read command from json failed %d\n", ret);
                 goto out;
