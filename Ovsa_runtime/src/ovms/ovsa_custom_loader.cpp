@@ -1,5 +1,5 @@
 //*****************************************************************************
-// Copyright 2020-2021 Intel Corporation
+// Copyright 2020-2022 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -165,7 +165,7 @@ CustomLoaderStatus OvsaCustomLoader::ovsa_json_extract_input_params(
 
     if (doc.HasMember("keystore")) {
         std::string ks = doc["keystore"].GetString();
-	ksFile         = ks;
+        ksFile         = ks;
         std::cout << "keystore:" << ksFile << std::endl;
     }
 
@@ -188,7 +188,7 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
     std::string licFile;
     std::string datFile;
     ovsa_model_files_t* decrypted_files = NULL;
-    CustomLoaderStatus retStatus = CustomLoaderStatus::MODEL_LOAD_ERROR;
+    CustomLoaderStatus retStatus        = CustomLoaderStatus::MODEL_LOAD_ERROR;
 
     if (modelName.empty() || basePath.empty() || loaderOptions.empty()) {
         std::cout << "OvsaCustomLoader: Error invalid input parameters to loadModel" << std::endl;
@@ -224,6 +224,7 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
 
     std::vector<std::pair<std::string, uint8_t>> modelFileVec;
     ovsa_model_files_t* head = decrypted_files;
+    bool file_type_ir        = false;
 
     while (head != NULL) {
         // model_file_t file_data =  std::make_pair(head->model_file_name,head->model_file_data);
@@ -237,7 +238,11 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
             std::vector<uint8_t> mdl(&head->model_file_data[0],
                                      &head->model_file_data[head->model_file_length]);
             modelBuffer.insert(modelBuffer.end(), mdl.begin(), mdl.end());
-            retStatus = CustomLoaderStatus::MODEL_TYPE_IR;
+            if (file_type_ir) {
+                retStatus = CustomLoaderStatus::MODEL_TYPE_IR;
+            } else {
+                file_type_ir = true;
+            }
         }
 
         found = filename.find(".bin");
@@ -246,16 +251,20 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
             std::vector<uint8_t> wts(&head->model_file_data[0],
                                      &head->model_file_data[head->model_file_length]);
             weights.insert(weights.end(), wts.begin(), wts.end());
-	    retStatus = CustomLoaderStatus::MODEL_TYPE_IR;
+            if (file_type_ir) {
+                retStatus = CustomLoaderStatus::MODEL_TYPE_IR;
+            } else {
+                file_type_ir = true;
+            }
         }
 
-	found = filename.find(".blob");
+        found = filename.find(".blob");
         if (found != std::string::npos) {
             std::cout << "OvsaCustomLoader: " << head->model_file_name << std::endl;
             std::vector<uint8_t> mdl(&head->model_file_data[0],
                                      &head->model_file_data[head->model_file_length]);
             modelBuffer.insert(modelBuffer.end(), mdl.begin(), mdl.end());
-	    retStatus = CustomLoaderStatus::MODEL_TYPE_BLOB;
+            retStatus = CustomLoaderStatus::MODEL_TYPE_BLOB;
         }
 
         found = filename.find(".onnx");
@@ -269,15 +278,16 @@ CustomLoaderStatus OvsaCustomLoader::loadModel(const std::string& modelName,
 
         head = head->next;
     }
-
-    std::lock_guard<std::mutex> guard(models_watched_mutex);
-    map_key_t key  = std::make_pair(modelName, version);
-    model_map[key] = std::make_shared<OvsaModelInstance>(modelName, ksFile, licFile, datFile, false,
-                                                         ref(critical_ops));
-    auto itr       = model_map.find(key);
-    if (itr != model_map.end()) {
-        itr->second->startWatcher(VALIDITY_CHECK_INTERVAL);
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+    if (retStatus != CustomLoaderStatus::MODEL_LOAD_ERROR) {
+        std::lock_guard<std::mutex> guard(models_watched_mutex);
+        map_key_t key  = std::make_pair(modelName, version);
+        model_map[key] = std::make_shared<OvsaModelInstance>(modelName, ksFile, licFile, datFile,
+                                                             false, version, ref(critical_ops));
+        auto itr       = model_map.find(key);
+        if (itr != model_map.end()) {
+            itr->second->startWatcher(VALIDITY_CHECK_INTERVAL);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
     }
     ovsa_safe_free_model_file_list(&decrypted_files);
     return retStatus;
@@ -325,12 +335,13 @@ CustomLoaderStatus OvsaCustomLoader::loaderDeInit() {
 
 CustomLoaderStatus OvsaCustomLoader::getModelBlacklistStatus(const std::string& modelName,
                                                              const int version) {
-    std::cout << "OvsaCustomLoader: Custom getModelBlacklistStatus" << std::endl;
+    OVSA_DBG(DBG_D, "OvsaCustomLoader: Custom getModelBlacklistStatus\n");
 
     map_key_t toFind = std::make_pair(modelName, version);
     auto it          = model_map.find(toFind);
     if (it == model_map.end()) {
-        OVSA_DBG(DBG_E, "OvsaCustomLoader: Error model not loaded\n");
+        OVSA_DBG(DBG_D, "OvsaCustomLoader: Model:%s Version:%d not loaded\n",
+			(char*)modelName.c_str(), version);
         return CustomLoaderStatus::OK;
     }
 

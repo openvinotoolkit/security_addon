@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ docker run --rm -ti \
         -p $GRPC_PORT:$GRPC_PORT \
         -v /var/run/aesmd/aesm.socket:/var/run/aesmd/aesm.socket \
         -v ${PWD}:/sampleloader \
+	-v /opt/ovsa/tmp_dir:/opt/ovsa/tmp_dir \
         -v /opt/ovsa/gramine/keystore:/opt/ovsa/gramine/keystore \
         -v /opt/ovsa/gramine/artefacts:/opt/ovsa/gramine/artefacts \
         -v /var/OVSA/Modelserver/server.pem:/certs/server.pem:ro \
@@ -40,6 +41,7 @@ docker run --rm -ti \
         -v /var/OVSA/Modelserver/client_cert_ca.pem:/certs/client_cert_ca.pem:ro \
         -v /var/OVSA/Modelserver/dhparam.pem:/certs/dhparam.pem:ro \
         -v /var/OVSA/Modelserver/client_cert_ca.crl:/certs/client_cert_ca.crl:ro \
+	-v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro \
         $MTLS_IMAGE \
         /ovms_wrapper --config_path /sampleloader/sample.json \
         --grpc_bind_address 8.8.8.8 --port $GRPC_PORT \

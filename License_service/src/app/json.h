@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ ovsa_status_t ovsa_license_service_json_extract_customer_license(
  * \return ovsa_status_t
  */
 ovsa_status_t ovsa_license_service_json_extract_element(const char* inputBuf, const char* keyName,
-                                                        void** keyValue);
+                                                        char** keyValue);
 /*!
  * \brief ovsa_license_service_json_create_message_blob
  *

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "libovsa.h"
 #include "ovsa_tool.h"
@@ -50,8 +51,8 @@ static void ovsa_help(const char* argv) {
         argv);
     printf("%s keygen -storecert -c <Certificate> -k <Key Store File>\n", argv);
     printf("%s keygen -getcert -k <Key Store File> -c <Certificate>\n", argv);
-    printf("%s keygen -sign -p <file to be signed> -o <signed file> -k <key_store file>\n", argv);
-    printf("%s keygen -verify -p <file to be verified> -s <signature> -k <key_store file>\n", argv);
+    printf("%s keygen -sign -i <file to be signed> -o <signed file> -k <key_store file>\n", argv);
+    printf("%s keygen -verify -i <file to be verified> -s <signature> -k <key_store file>\n", argv);
     printf(
         "%s licgen -t <License Type> [-l <Usage Count Limit> or <Time Limit>] -n \"License "
         "name\" -v \"License Version\" -u <License URL> [<Future server certificate file>] [-u "
@@ -103,6 +104,11 @@ int main(int argc, char* argv[]) {
         ovsa_help(argv[0]);
         goto out;
     }
+    /*set file mode creation mask*/
+    mode_t nmask;
+    nmask = S_IRGRP | S_IWGRP | /* group read write */
+            S_IROTH | S_IWOTH;  /* other read write */
+    umask(nmask);               /*0666 & ~066 = 0600 i.e., (-rw-------)*/
 
     for (i = 0; i < MAX_OVSA_CMDS; i++) {
         if (!strcmp(g_ovsa_cmd_handler[i].command, argv[1])) {

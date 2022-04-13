@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ then
   exit 1
 fi
 }
-
 echo "Generating Password, Salt using Openssl and SEAL to TPM"
 #40 byte random number generated. First 8bytes would be Salt and next 32bytes would be Password
 openssl rand -base64 40 > Seal_data.bin
@@ -31,6 +30,7 @@ check_status "Password and Salt generation failed"
 echo "Create Primary context under hierarchy: Owner"
 tpm2_createprimary -Q --hierarchy=o --key-context=tpm_prim.ctx
 check_status "Primary key creation failed"
+
 
 # Get the new set of PCR and sign the pcr policy with signer private key
 echo "Get the new set of PCR and sign the pcr policy with signer private key"
@@ -45,6 +45,7 @@ check_status "Flusing context failed"
 
 openssl genrsa -out signing_key_private.pem 2048
 check_status "Generation of key for Signing with Openssl failed"
+
 openssl rsa -in signing_key_private.pem -out signing_key_public.pem -pubout
 check_status "Generation of key for Signing with Openssl failed"
 

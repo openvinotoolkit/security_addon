@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 loader.env.LD_PRELOAD = "ovsa-runtime/lib/libra_tls_attest.so"
 
 # Request remote attestation functionality from Gramine
-sgx.remote_attestation = 1
+sgx.remote_attestation = true
 
 sys.enable_sigterm_injection = true
 
@@ -44,7 +44,9 @@ sgx.allowed_files = [
                         "file:/etc/nginx/conf.d/",
                         "file:/etc/group",
                         "file:/etc/passwd",
+                        "file:/etc/ssl/certs/ca-certificates.crt",
                         "file:/var/log/nginx/error.log",
+                        "file:/opt/ovsa/tmp_dir",
                         "file:/tmp",
                         "file:/run/nginx.pid",
                         "file:/var/log/nginx/access.log",

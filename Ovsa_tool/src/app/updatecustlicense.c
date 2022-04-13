@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -268,8 +268,14 @@ ovsa_status_t ovsa_update_custlicense_main(int argc, char* argv[]) {
     }
 
     /* Get length of certificate file */
-    size = ovsa_crypto_get_file_size(fptr);
-    ret  = ovsa_safe_malloc(size, &peer_cert);
+    ret = ovsa_crypto_get_file_size(fptr, &size);
+    if (ret < OVSA_OK || size == 0) {
+        OVSA_DBG(DBG_E, "OVSA: Error get file size failed for %s with code %d\n",
+                 customer_cert_file, ret);
+        fclose(fptr);
+        goto out;
+    }
+    ret = ovsa_safe_malloc(size, &peer_cert);
     if (ret < OVSA_OK || peer_cert == NULL) {
         OVSA_DBG(DBG_E, "OVSA: Error certificate file buffer allocation failed with code %d\n",
                  ret);
@@ -326,8 +332,14 @@ ovsa_status_t ovsa_update_custlicense_main(int argc, char* argv[]) {
         OVSA_DBG(DBG_E, "OVSA: Error opening customer license file failed with code %d\n", ret);
         goto out;
     }
-    cust_lic_size = ovsa_crypto_get_file_size(fcust_lic);
-    ret           = ovsa_safe_malloc(cust_lic_size * sizeof(char), &cust_lic_sig_buf);
+    ret = ovsa_crypto_get_file_size(fcust_lic, &cust_lic_size);
+    if (ret < OVSA_OK || cust_lic_size == 0) {
+        OVSA_DBG(DBG_E, "OVSA: Error get file size failed for %s with code %d\n", customer_lic_file,
+                 ret);
+        fclose(fcust_lic);
+        goto out;
+    }
+    ret = ovsa_safe_malloc(cust_lic_size * sizeof(char), &cust_lic_sig_buf);
     if (ret < OVSA_OK) {
         ret = OVSA_MEMORY_ALLOC_FAIL;
         OVSA_DBG(DBG_E, "OVSA: Error init memory failed with code %d\n", ret);
@@ -376,7 +388,7 @@ ovsa_status_t ovsa_update_custlicense_main(int argc, char* argv[]) {
     }
     OVSA_DBG(DBG_I, "OVSA: Verify customer license signature\n");
     ret = ovsa_crypto_verify_hmac_json_blob(keyiv_hmac_slot, cust_lic_sig_buf, cust_lic_size,
-                                            cust_lic_buf);
+                                            cust_lic_buf, cust_lic_size);
     if (ret != OVSA_OK || cust_lic_buf == NULL) {
         OVSA_DBG(DBG_E, "OVSA: Error verify customer license json blob failed with code %d\n", ret);
         goto out;
@@ -443,7 +455,7 @@ ovsa_status_t ovsa_update_custlicense_main(int argc, char* argv[]) {
 
     /* Computes HMAC for customer license */
     ret = ovsa_crypto_hmac_json_blob(keyiv_hmac_slot, customer_lic_string, cust_lic_size,
-                                     customer_lic_sig_string);
+                                     customer_lic_sig_string, cust_lic_size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error customer license signing failed with error code %d\n", ret);
         goto out;

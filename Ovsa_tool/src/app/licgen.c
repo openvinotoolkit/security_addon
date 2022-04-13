@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -414,8 +414,8 @@ ovsa_status_t ovsa_licgen_main(int argc, char* argv[]) {
         goto out;
     }
     OVSA_DBG(DBG_I, "OVSA: Sign License Config JSON Blob\n");
-    ret =
-        ovsa_crypto_sign_json_blob(asymm_keyslot, lic_buf_string, lic_buf_size, lic_buf_sig_string);
+    ret = ovsa_crypto_sign_json_blob(asymm_keyslot, lic_buf_string, lic_buf_size,
+                                     lic_buf_sig_string, lic_sig_buf_size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error license config signing failed with error code %d\n", ret);
         goto out;

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@
 #define MAX_MAC_SIZE                                     128 /* Actual size: 90 */
 #define MAX_KEY_SIZE                                     512 /* Actual size: 359 */
 #define MAX_EKEY_SIZE                                    256 /* Actual size: 45 */
-#define MAX_URL_SIZE                                     256
+#define MAX_URL_SIZE                                     2048
 #define MAX_TCB_SIZE                                     256
 #define MAX_BUF_SIZE                                     4096
 #define KEYSTORE_BLOB_TEXT_SIZE                          155
@@ -207,11 +207,12 @@ ovsa_status_t ovsa_crypto_verify_file(int asym_key_slot, const char* file_to_ver
  * \param[in]  in_buff         Input buffer for signing.
  * \param[in]  in_buff_len     Length of input buffer for signing.
  * \param[out] out_buff        Output buffer to store signature.
+ * \param[in]  out_buff_len    Length of output buffer allocated.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
 ovsa_status_t ovsa_crypto_sign_json_blob(int asym_key_slot, const char* in_buff, size_t in_buff_len,
-                                         char* out_buff);
+                                         char* out_buff, size_t out_buff_len);
 
 /** \brief This function extracts and strips the signature element from the input JSON blob of
  *         specified length and verifies the JSON blob with the extracted signature using the
@@ -221,11 +222,12 @@ ovsa_status_t ovsa_crypto_sign_json_blob(int asym_key_slot, const char* in_buff,
  * \param[in]  in_buff         Input buffer for verification.
  * \param[in]  in_buff_len     Length of input buffer for verification.
  * \param[out] out_buff        Output buffer to strip the signature.
+ * \param[in]  out_buff_len    Length of output buffer allocated.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
 ovsa_status_t ovsa_crypto_verify_json_blob(int asym_key_slot, const char* in_buff,
-                                           size_t in_buff_len, char* out_buff);
+                                           size_t in_buff_len, char* out_buff, size_t out_buff_len);
 
 /** \brief This function hmac's the input JSON blob of specified length using the hmac key
  *         from the key slot and creates the hmac element and appends to the JSON blob and
@@ -235,11 +237,12 @@ ovsa_status_t ovsa_crypto_verify_json_blob(int asym_key_slot, const char* in_buf
  * \param[in]  in_buff         Input buffer for signing.
  * \param[in]  in_buff_len     Length of input buffer for signing.
  * \param[out] out_buff        Output buffer to store hmac.
+ * \param[in]  out_buff_len    Length of output buffer allocated.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
 ovsa_status_t ovsa_crypto_hmac_json_blob(int keyiv_hmac_slot, const char* in_buff,
-                                         size_t in_buff_len, char* out_buff);
+                                         size_t in_buff_len, char* out_buff, size_t out_buff_len);
 
 /** \brief This function extracts and strips the hmac element from the input JSON blob of
  *         specified length and verifies the JSON blob with the extracted signature using the
@@ -249,18 +252,20 @@ ovsa_status_t ovsa_crypto_hmac_json_blob(int keyiv_hmac_slot, const char* in_buf
  * \param[in]  in_buff         Input buffer for verification.
  * \param[in]  in_buff_len     Length of input buffer for verification.
  * \param[out] out_buff        Output buffer to strip the hmac.
+ * \param[in]  out_buff_len    Length of output buffer allocated.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
 ovsa_status_t ovsa_crypto_verify_hmac_json_blob(int keyiv_hmac_slot, const char* in_buff,
-                                                size_t in_buff_len, char* out_buff);
+                                                size_t in_buff_len, char* out_buff,
+                                                size_t out_buff_len);
 
 /** \brief This function encrypts the symmetric key using the Private key.
  *
  * \param[in]  asym_key_slot   Asymmetric key slot index.
  * \param[in]  sym_key_slot    Symmetric key slot index.
  * \param[out] out_buff        Output buffer to store encrypted data.
- * \param[out] out_buff_len    Length of the output buffer.
+ * \param[in] out_buff_len    Length of the output buffer.
  * \param[out] keyiv_hmac_slot key/IV/HMAC slot index.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
@@ -394,7 +399,7 @@ ovsa_status_t ovsa_crypto_derive_keyiv_hmac(int sym_key_slot, const char* in_buf
  * \param[in]  in_buff_len     Length of input buffer for encryption.
  * \param[in]  magic_salt_buff Salt prefixed with magic buffer.
  * \param[out] out_buff        Output buffer to store encrypted data.
- * \param[out] out_buff_len    Length of the output buffer.
+ * \param[in] out_buff_len    Length of the output buffer.
  * \param[out] keyiv_hmac_slot key/IV/HMAC slot index.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
@@ -466,11 +471,12 @@ ovsa_status_t ovsa_crypto_extract_cert_date(const char* cert, char* issue_date, 
 
 /** \brief This function gets the file size and points the file pointer to the begining of the file.
  *
- * \param[in]  fp  File pointer.
+ * \param[in]   fp         File pointer.
+ * \param[out]  file_len   File Size.
  *
- * \return File size or OVSA_ERROR
+ * \return  ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-int ovsa_crypto_get_file_size(FILE* fp);
+ovsa_status_t ovsa_crypto_get_file_size(FILE* fp, size_t* file_len);
 
 /** \brief This function gives the current time.
  *
@@ -480,5 +486,19 @@ int ovsa_crypto_get_file_size(FILE* fp);
  * \return File size or OVSA_ERROR
  */
 ovsa_status_t ovsa_get_current_time(time_t* ovsa_current_time, struct tm** ovsa_current_time_tm);
+
+/*!
+ * \brief This function strips the signature from the input buffer.
+ *
+ * \param [in]  inputBuf    Buffer with json file contents.
+ * \param [out] sigBuf      Buffer containing signature.
+ * \param [in]  outLen      Length of the signature buffer allocated by caller.
+ * \param [out] outBuf      Buffer updated with json file contents.
+ * \param [in]  outLen      Length of the output buffer allocated by caller.
+ *
+ * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
+ */
+ovsa_status_t ovsa_json_extract_and_strip_signature(const char* inputBuf, char* sigBuf,
+                                                    size_t sigLen, char* outBuf, size_t outLen);
 
 #endif /* __OVSA_LIBOVSA_H_ */

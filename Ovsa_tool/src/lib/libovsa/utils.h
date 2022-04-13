@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ ovsa_status_t ovsa_crypto_do_sign_verify_hash(unsigned char* buf, BIO* inp, cons
  *
  * \return allocated buffer pointer on Success or NULL in Failure
  */
-void* ovsa_crypto_app_malloc(int size, const char* what);
+void* ovsa_crypto_app_malloc(size_t size, const char* what);
 
 /** \brief This function is used to free the allocated memory
  *
@@ -148,10 +148,12 @@ ovsa_status_t ovsa_compare_strings(const char* src_buff, const char* dest_buff, 
  *
  * \param [in]  keystore     Structure containing keystore information
  * \param [out] outputBuf    Buffer updated with json file contents
+ * \param [in]  outLen       Length of output buffer allocated.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_json_create_isv_keystore(const ovsa_isv_keystore_t keystore[], char* outputBuf);
+ovsa_status_t ovsa_json_create_isv_keystore(const ovsa_isv_keystore_t keystore[], char* outputBuf,
+                                            size_t outLen);
 
 /*!
  * \brief This function extracts keystore contents.
@@ -168,21 +170,22 @@ ovsa_status_t ovsa_json_extract_keystore_info(const char* inputBuf, ovsa_isv_key
  *
  * \param [in]  keystore     Buffer containing encrypted keystore information.
  * \param [out] outputBuf    Buffer updated with json file contents.
- *
+ * \param [in]  outLen         Length of output buffer allocated.
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_json_create_encrypted_keystore(const char* keystoreBuf, char* outputBuf);
+ovsa_status_t ovsa_json_create_encrypted_keystore(const char* keystoreBuf, char* outputBuf,
+                                                  size_t outLen);
 
 /*!
  * \brief This function extract encrypted keystore contents.
  *
  * \param [in]  inputBuf       Buffer having json file contents.
  * \param [out] en_keystore    Buffer containing encrypted keystore information.
- *
+ * \param [in]  outLen         Length of output buffer allocated.
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
 ovsa_status_t ovsa_json_extract_encrypted_keystore(const char* inputBuf,
-                                                   ovsa_enc_keystore_t* en_keystore);
+                                                   ovsa_enc_keystore_t* en_keystore, size_t outLen);
 
 /*!
  * \brief This function gets the size of the specified keyname.
@@ -201,22 +204,12 @@ ovsa_status_t ovsa_json_getitem_size(const char* keyName, const char* inBuf, siz
  * \param [in]  inputBuf    Buffer with json file contents.
  * \param [in]  sigBuf      Buffer containing signature.
  * \param [out] outBuf      Buffer updated with json file contents.
+ * \param [in]  buff_len    Length of output buffer allocated.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_json_apend_signature(const char* inputBuf, const char* sigBuf, char* outBuf);
-
-/*!
- * \brief This function strips the signature from the input buffer.
- *
- * \param [in]  inputBuf    Buffer with json file contents.
- * \param [in]  sigBuf      Buffer containing signature.
- * \param [out] outBuf      Buffer updated with json file contents.
- *
- * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
- */
-ovsa_status_t ovsa_json_extract_and_strip_signature(const char* inputBuf, char* sigBuf,
-                                                    char* outBuf);
+ovsa_status_t ovsa_json_apend_signature(const char* inputBuf, const char* sigBuf, char* outBuf,
+                                        size_t buff_len);
 
 /*!
  * \brief ovsa_safe_add

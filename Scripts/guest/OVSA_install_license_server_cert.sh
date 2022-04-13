@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,8 +85,8 @@ install_certificate() {
 }
 
 provision_certificate() {
-        if [[ ! -f "$INSTALL_DIR/server_future.cert" && ! -f "$INSTALL_DIR/server_future.key" ]]; then
-                echo "Future certificate files does not exist"
+        if [[ ! -f "$INSTALL_DIR/server_future.crt" || ! -f "$INSTALL_DIR/server_future.key" ]]; then
+                echo "Future certificate file or key file does not exist"
 		return
         fi
         echo "Provisioning future certificate as current certificate in $INSTALL_DIR"

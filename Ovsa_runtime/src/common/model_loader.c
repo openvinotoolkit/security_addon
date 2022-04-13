@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,9 @@
 
 #include "runtime.h"
 #include "utils.h"
+
+/* json.h to be included at end due to dependencies */
+#include "json.h"
 
 static ovsa_status_t ovsa_do_decrypt_model_files(
     const int asym_key_slot, const int peer_slot, ovsa_customer_license_sig_t* customer_lic_sig,
@@ -154,13 +157,26 @@ out:
 }
 
 ovsa_status_t ovsa_start_model_loader(
-    const int asym_key_slot, const int peer_slot, ovsa_customer_license_sig_t* customer_lic_sig,
+    const int asym_key_slot, const int peer_slot, char* customer_lic_sig_buf,
     ovsa_controlled_access_model_sig_t* controlled_access_model_sig,
     ovsa_model_files_t** decrypted_files) {
     ovsa_status_t ret = OVSA_OK;
+    ovsa_customer_license_sig_t customer_lic_sig;
+    /* Set all pointers to NULL for KW fix */
+    customer_lic_sig.customer_lic.isv_certificate  = NULL;
+    customer_lic_sig.customer_lic.tcb_signatures   = NULL;
+    customer_lic_sig.customer_lic.license_url_list = NULL;
 
+    /* Extract customer license json blob */
+    memset_s(&customer_lic_sig, sizeof(ovsa_customer_license_sig_t), 0);
+    ret = ovsa_json_extract_customer_license(customer_lic_sig_buf, &customer_lic_sig);
+    if (ret != OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error extract customer license json blob failed with code %d\n",
+                 ret);
+        goto out;
+    }
     /* Decrypt the model files */
-    ret = ovsa_do_decrypt_model_files(asym_key_slot, peer_slot, customer_lic_sig,
+    ret = ovsa_do_decrypt_model_files(asym_key_slot, peer_slot, &customer_lic_sig,
                                       controlled_access_model_sig, decrypted_files);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Could not decrypt model files\n");
@@ -169,6 +185,9 @@ ovsa_status_t ovsa_start_model_loader(
     OVSA_DBG(DBG_D, "\nDecryption model files completed \n---END---\n");
 
 out:
+    ovsa_safe_free(&customer_lic_sig.customer_lic.isv_certificate);
+    ovsa_safe_free_url_list(&customer_lic_sig.customer_lic.license_url_list);
+    ovsa_safe_free_tcb_list(&customer_lic_sig.customer_lic.tcb_signatures);
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }
@@ -176,13 +195,13 @@ out:
 ovsa_status_t ovsa_license_check_module(const char* keystore, const char* controlled_access_model,
                                         const char* customer_license,
                                         ovsa_model_files_t** decrypted_files) {
-    ovsa_status_t ret = OVSA_OK;
-    int asym_keyslot  = -1;
-    size_t certlen    = 0;
-    char* certificate = NULL;
-    int peer_keyslot  = -1;
+    ovsa_status_t ret      = OVSA_OK;
+    int asym_keyslot       = -1;
+    size_t certlen         = 0;
+    char* certificate      = NULL;
+    char* cust_lic_sig_buf = NULL;
+    int peer_keyslot       = -1;
     ovsa_controlled_access_model_sig_t control_access_model_sig;
-
     ovsa_customer_license_sig_t cust_lic_sig;
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
@@ -226,17 +245,19 @@ ovsa_status_t ovsa_license_check_module(const char* keystore, const char* contro
             goto out;
         }
         /* Validate Customer license artefact */
+        OVSA_DBG(DBG_I, "OVSA: Validate customer license\n");
         peer_keyslot =
-            ovsa_validate_customer_license(customer_license, asym_keyslot, &cust_lic_sig);
+            ovsa_validate_customer_license(customer_license, asym_keyslot, &cust_lic_sig_buf);
         if ((peer_keyslot < MIN_KEY_SLOT) || (peer_keyslot >= MAX_KEY_SLOT)) {
             ret = peer_keyslot;
             OVSA_DBG(DBG_E,
                      "OVSA: Error customer license artifact validation failed with code %d\n", ret);
             goto out;
         }
+        OVSA_DBG(DBG_I, "OVSA: Validate controlled access model\n");
         /* Validate controlled access model artifact*/
-        ret = ovsa_validate_controlled_access_model(peer_keyslot, controlled_access_model,
-                                                    &control_access_model_sig);
+        ret = ovsa_validate_controlled_access_model(
+            peer_keyslot, cust_lic_sig_buf, controlled_access_model, &control_access_model_sig);
         if (ret != OVSA_OK) {
             OVSA_DBG(
                 DBG_E,
@@ -247,6 +268,7 @@ ovsa_status_t ovsa_license_check_module(const char* keystore, const char* contro
     } else {
         OVSA_DBG(DBG_E, "OVSA: Error invalid artifacts \n");
         ret = OVSA_INVALID_PARAMETER;
+        goto out;
     }
     /* Perform License Check Sequence */
     bool status = false;
@@ -258,7 +280,7 @@ ovsa_status_t ovsa_license_check_module(const char* keystore, const char* contro
     OVSA_DBG(DBG_I, "OVSA: Platform and License Validation completed successfully\n");
     OVSA_DBG(DBG_I, "OVSA: Invoking model loader\n");
     /* Invoke Model Loader */
-    ret = ovsa_start_model_loader(asym_keyslot, peer_keyslot, &cust_lic_sig,
+    ret = ovsa_start_model_loader(asym_keyslot, peer_keyslot, cust_lic_sig_buf,
                                   &control_access_model_sig, decrypted_files);
     if (ret != OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error model Loader Init failed with code %d\n", ret);
@@ -271,6 +293,7 @@ out:
     ovsa_crypto_clear_asymmetric_key_slot(peer_keyslot);
     ovsa_safe_free_model_file_list(&control_access_model_sig.controlled_access_model.enc_model);
     ovsa_safe_free(&certificate);
+    ovsa_safe_free(&cust_lic_sig_buf);
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }

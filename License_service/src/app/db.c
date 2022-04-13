@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,10 @@
 /* db.h to be included at end due to dependencies */
 #include "db.h"
 
-ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* license_guid,
-                                               const char* model_guid,
-                                               char** customer_certificate) {
+ovsa_status_t ovsa_db_get_customer_primary_certificate(const char* db_name,
+                                                       const char* license_guid,
+                                                       const char* model_guid,
+                                                       char** customer_certificate) {
     int ret       = 0;
     int db_status = 0;
     size_t sqllen = 0, licguid_len = 0, modelguid_len = 0;
@@ -50,7 +51,7 @@ ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* 
     }
 
     sprintf(sql,
-            "select customer_license_id, customer_certificate from "
+            "select customer_license_id, customer_primary_certificate from "
             "customer_license_info where "
             "license_guid = @license_guid and model_guid = @model_guid;");
     OVSA_DBG(DBG_D, "OVSA: SQL: %s\n", sql);
@@ -111,8 +112,111 @@ ovsa_status_t ovsa_db_get_customer_certificate(const char* db_name, const char* 
         ret = sqlite3_column_int(stmt, 0);
 
         OVSA_DBG(DBG_D, "OVSA: ROWID %s: \n", sqlite3_column_text(stmt, 0));
-        OVSA_DBG(DBG_D, "OVSA: CERT %s\n", sqlite3_column_text(stmt, 1));
-        OVSA_DBG(DBG_I, "OVSA: Customer certificate extracted from DB successfully\n");
+        OVSA_DBG(DBG_D, "OVSA: PRIMARY CERT %s\n", sqlite3_column_text(stmt, 1));
+        OVSA_DBG(DBG_I, "OVSA: Customer primary certificate extracted from DB successfully\n");
+    } else {
+        OVSA_DBG(DBG_E, "OVSA: Error failed to execute statement: %s\n", sqlite3_errmsg(db));
+        ret = OVSA_DB_UPDATE_FAIL;
+        goto end;
+    }
+    sqlite3_finalize(stmt);
+
+end:
+    if (db)
+        sqlite3_close(db);
+
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
+
+ovsa_status_t ovsa_db_get_customer_secondary_certificate(const char* db_name,
+                                                         const char* license_guid,
+                                                         const char* model_guid,
+                                                         char** customer_certificate) {
+    ovsa_status_t ret = OVSA_OK;
+    int db_status     = 0;
+    size_t sqllen = 0, licguid_len = 0, modelguid_len = 0;
+    char sql[SQL_BUFFER_LENGTH];
+
+    sqlite3* db        = NULL;
+    sqlite3_stmt* stmt = NULL;
+
+    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+    memset_s(sql, sizeof(sql), 0);
+    /* open the database */
+    db_status = sqlite3_open(db_name, &db);
+    if (db_status) {
+        OVSA_DBG(DBG_E, "OVSA: Error OVSA DB open failed%s \n", sqlite3_errmsg(db));
+        ret = OVSA_DB_INIT_FAIL;
+        goto end;
+    } else {
+        OVSA_DBG(DBG_I, "OVSA: OVSA DB open successful\n");
+    }
+
+    sprintf(sql,
+            "select customer_license_id, customer_secondary_certificate from "
+            "customer_license_info where "
+            "license_guid = @license_guid and model_guid = @model_guid;");
+    OVSA_DBG(DBG_D, "OVSA: SQL: %s\n", sql);
+
+    ret = ovsa_license_service_get_string_length(sql, &sqllen);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of sql %d\n", ret);
+        goto end;
+    }
+
+    db_status = sqlite3_prepare_v2(db, sql, sqllen, &stmt, 0);
+    if (db_status == SQLITE_OK) {
+        int idx = sqlite3_bind_parameter_index(stmt, "@license_guid");
+        ret     = ovsa_license_service_get_string_length(license_guid, &licguid_len);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of license_guid %d\n", ret);
+            goto end;
+        }
+        sqlite3_bind_text(stmt, idx, license_guid, licguid_len, SQLITE_STATIC);
+
+        idx = sqlite3_bind_parameter_index(stmt, "@model_guid");
+        ret = ovsa_license_service_get_string_length(model_guid, &modelguid_len);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of modelguid_len %d\n", ret);
+            goto end;
+        }
+        sqlite3_bind_text(stmt, idx, model_guid, modelguid_len, SQLITE_STATIC);
+    } else {
+        OVSA_DBG(DBG_E, "OVSA: Error failed to execute statement: %s\n", sqlite3_errmsg(db));
+        ret = OVSA_DB_QUERY_FAIL;
+        goto end;
+    }
+
+    db_status = sqlite3_step(stmt);
+    if (db_status == SQLITE_ROW) {
+        /* success */
+        size_t certlen = 0;
+        ret = ovsa_license_service_get_string_length(sqlite3_column_text(stmt, 1), &certlen);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error could not get length of certificate %d\n", ret);
+            goto end;
+        }
+        if ((!certlen) || (certlen > MAX_CERT_SIZE)) {
+            OVSA_DBG(DBG_E, "OVSA: Error certificate length is invalid \n");
+            ret = OVSA_INVALID_PARAMETER;
+            goto end;
+        }
+        ret = ovsa_license_service_safe_malloc(sizeof(char) * (certlen + 1), customer_certificate);
+        if (ret < OVSA_OK) {
+            sqlite3_finalize(stmt);
+            OVSA_DBG(DBG_E,
+                     "OVSA: Error allocating memory for certificate buffer failed with code %d\n",
+                     ret);
+            ret = OVSA_MEMORY_ALLOC_FAIL;
+            goto end;
+        }
+        sprintf(*customer_certificate, "%s", sqlite3_column_text(stmt, 1));
+        ret = sqlite3_column_int(stmt, 0);
+
+        OVSA_DBG(DBG_D, "OVSA: ROWID %s: \n", sqlite3_column_text(stmt, 0));
+        OVSA_DBG(DBG_D, "OVSA: SECONDARY CERT %s\n", sqlite3_column_text(stmt, 1));
+        OVSA_DBG(DBG_I, "OVSA: Customer secondary certificate extracted from DB successfully\n");
     } else {
         OVSA_DBG(DBG_E, "OVSA: Error failed to execute statement: %s\n", sqlite3_errmsg(db));
         ret = OVSA_DB_UPDATE_FAIL;

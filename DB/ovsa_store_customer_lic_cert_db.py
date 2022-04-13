@@ -1,6 +1,6 @@
 #!/usr/bin/env python3 
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,9 +50,9 @@ def create_customer_license_info(conn, customer_license_info):
     data=cur.fetchall()
     if len(data)==0:
         print('Record not found. Inserting new record....')
-        sql = ''' INSERT INTO customer_license_info (license_guid, model_guid, isv_certificate, customer_certificate,
+        sql = ''' INSERT INTO customer_license_info (license_guid, model_guid, isv_certificate, customer_primary_certificate, customer_secondary_certificate,
               customer_license_blob, license_type, limit_count, usage_count, time_limit, created_date, updated_date)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '''
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) '''
 
         #cur = conn.cursor()
         cur.execute(sql, customer_license_info)
@@ -60,10 +60,11 @@ def create_customer_license_info(conn, customer_license_info):
         row_id = cur.lastrowid
     else:
         print('Record exists. Updating license information....')
-        sql = ''' UPDATE customer_license_info SET isv_certificate = ?, customer_certificate = ?,
+        sql = ''' UPDATE customer_license_info SET isv_certificate = ?,
+              customer_primary_certificate = ?, customer_secondary_certificate = ?,
               customer_license_blob = ?, updated_date = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW') WHERE
               license_guid = ? AND model_guid = ? '''
-        cur.execute(sql, (customer_license_info[2], customer_license_info[3], customer_license_info[4], customer_license_info[0], customer_license_info[1]))
+        cur.execute(sql, (customer_license_info[2], customer_license_info[3], customer_license_info[4], customer_license_info[5], customer_license_info[0], customer_license_info[1]))
         conn.commit()
 
     cur.execute("SELECT * FROM customer_license_info WHERE license_guid = ? AND model_guid = ?", (customer_license_info[0], customer_license_info[1]))
@@ -73,24 +74,27 @@ def create_customer_license_info(conn, customer_license_info):
         print(row[0])
         print("isv-certificate:")
         print(row[3])
-        print("customer_certificate")
+        print("customer_primary_certificate")
         print(row[4])
-        print("json blob")
+        print("customer_secondary_certificate")
         print(row[5])
+        print("json blob")
+        print(row[6])
 
     return row_id
 
 
 def main():
     # validate command line arguments
-    if len(sys.argv) != 4:
-        print('Invalid arguments. UpdateCl.py <db file> <customer license file> <customer certificate file>')
+    if len(sys.argv) != 5:
+        print('Invalid arguments. ovsa_store_customer_lic_cert_db.py <db file> <customer license file> <customer primary certificate file> <customer secondary certificate file>')
         return
 
     try:
         database = sys.argv[1]
         customer_license_file_path = sys.argv[2]
-        customer_cert_file_path = sys.argv[3]
+        customer_primary_cert_file_path = sys.argv[3]
+        customer_secondary_cert_file_path = sys.argv[4]
         customer_license_blob = None
 
         # read customer license file
@@ -123,15 +127,21 @@ def main():
             usage_count = 0
             time_limit = datetime.datetime.now() + timedelta(days=limit_count)
 
-        # read customer certificate file
-        print('Opening Customer Certificate File - ' + customer_cert_file_path)
-        with open(customer_cert_file_path, "r") as customer_certificate_file:
-            customer_certificate = customer_certificate_file.read()
+        # read customer primary certificate file
+        print('Opening Customer Primary Certificate File - ' + customer_primary_cert_file_path)
+        with open(customer_primary_cert_file_path, "r") as customer_primary_certificate_file:
+            customer_primary_certificate = customer_primary_certificate_file.read()
+
+        # read customer secondary certificate file
+        print('Opening Customer Secondary Certificate File - ' + customer_secondary_cert_file_path)
+        with open(customer_secondary_cert_file_path, "r") as customer_secondary_certificate_file:
+            customer_secondary_certificate = customer_secondary_certificate_file.read()
 
         # create a database connection
         print('Opening DB - ' + database)
         conn = create_connection(database)
-        customer_license_info = (license_guid, model_guid, isv_certificate, customer_certificate,
+        customer_license_info = (license_guid, model_guid, isv_certificate,
+                                 customer_primary_certificate, customer_secondary_certificate,
                                  customer_license_blob, license_type_no, limit_count, usage_count, time_limit,
                                  datetime.datetime.now(), datetime.datetime.now())
         create_customer_license_info(conn, customer_license_info)

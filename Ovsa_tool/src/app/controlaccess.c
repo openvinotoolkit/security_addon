@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,7 +94,13 @@ static ovsa_status_t ovsa_encrypt_model_files(int keyslot, const ovsa_input_file
         }
 
         /* Get size of file data */
-        size = ovsa_crypto_get_file_size(fcur_file);
+        ret = ovsa_crypto_get_file_size(fcur_file, &size);
+        if (ret < OVSA_OK || size == 0) {
+            OVSA_DBG(DBG_E, "OVSA: Error get file size failed for %s with code %d\n",
+                     cur_file->name, ret);
+            fclose(fcur_file);
+            goto out;
+        }
         size -= 1; /* Encryption to be calculated without null terminator */
 
         /* Read the content of the file */
@@ -295,8 +301,8 @@ static ovsa_status_t ovsa_do_create_controlled_access_model_file(
                  ret);
         goto out;
     }
-    ret = ovsa_crypto_sign_json_blob(asymm_keyslot, controlaccess_buf_string, size,
-                                     controlaccess_buf_sig_string);
+    ret = ovsa_crypto_sign_json_blob(asymm_keyslot, controlaccess_buf_string, controlaccess_buf_len,
+                                     controlaccess_buf_sig_string, size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error controlled access model signing failed with error code %d\n",
                  ret);
@@ -431,7 +437,7 @@ ovsa_status_t ovsa_do_create_master_license_file(int asymm_keyslot, int sym_keys
 
     /* Computes HMAC for master license */
     ret = ovsa_crypto_hmac_json_blob(keyiv_hmac_slot, master_lic_string, master_lic_buf_len,
-                                     master_lic_sig_string);
+                                     master_lic_sig_string, size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error master license signing failed with error code %d\n", ret);
         goto out;

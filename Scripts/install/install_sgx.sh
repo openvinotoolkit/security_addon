@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2020-2022 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -76,6 +76,15 @@ cp -v ovsaruntime.* /opt/ovsa/gramine 2>&1 | sed 's/^/    /'
 echo "Changing ownership to OVSA group/user..."
 chown -R ovsa /opt/ovsa 2>&1 | sed 's/^/    /'
 chown -R ovsa /var/OVSA 2>&1 | sed 's/^/    /'
+
+echo "Creating /opt/ovsa/tmp_dir directory..."
+mkdir -vp /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
+echo "Remove stale files inside /opt/ovsa/tmp_dir directory..."
+rm -rf /opt/ovsa/tmp_dir/*
+
+echo "Changing ownership to OVSA user with RD/WR & execution permission"
+chown ovsa:ovsa /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
+chmod 700 /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
 
 echo "Loading the docker image..."
 if [[ "$(docker images -q gsc-openvino/model_server-ovsa-nginx-mtls 2> /dev/null)" == "" ]]; then

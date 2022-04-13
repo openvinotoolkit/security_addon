@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@
 /* Specify the timeout for OCSP request in seconds */
 #define OCSP_REQ_TIMEOUT 10
 
+extern pthread_mutex_t g_cert_verify_lock;
 static int ovsa_license_service_crypto_cert_check(X509_STORE* ctx, const char* cert);
 
 static X509_STORE* ovsa_license_service_crypto_setup_chain(const char* cafile);
@@ -100,7 +101,7 @@ static int ovsa_license_service_crypto_cert_check(X509_STORE* ctx, const char* c
     ovsa_status_t ret   = OVSA_OK;
     X509* xcert         = NULL;
     X509_STORE_CTX* csc = NULL;
-    static int vflags   = 0;
+    int vflags          = 0;
     int verify_cert     = 0;
 
     xcert = ovsa_license_service_crypto_load_cert(cert, "certificate");
@@ -205,9 +206,9 @@ static void ovsa_license_service_crypto_policies_print(X509_STORE_CTX* ctx) {
 }
 
 static int ovsa_license_service_crypto_verify_cb(int ok, X509_STORE_CTX* ctx) {
-    int cert_error       = X509_STORE_CTX_get_error(ctx);
-    X509* current_cert   = X509_STORE_CTX_get_current_cert(ctx);
-    static int v_verbose = 0;
+    int cert_error     = X509_STORE_CTX_get_error(ctx);
+    X509* current_cert = X509_STORE_CTX_get_current_cert(ctx);
+    int v_verbose      = 0;
 
     if (!ok) {
         if (current_cert != NULL) {
@@ -888,7 +889,7 @@ static ovsa_status_t ovsa_license_service_crypto_extract_ca_cert(X509* xcert, ch
     BIO* cert_bio         = NULL;
     BUF_MEM* cert_ptr     = NULL;
     bool check_ca_cert    = false;
-    static int vflags     = 0;
+    int vflags            = 0;
     int verify_cert = 0, chain_count = 0;
 #ifdef ENABLE_OCSP_CHECK
     char* ocsp_uri = NULL;
@@ -1345,32 +1346,94 @@ end:
 }
 #endif
 
+static ovsa_status_t ovsa_license_service_check_cert_trust_store(const X509* xcert,
+                                                                 bool* check_cert_trust_store) {
+    STACK_OF(X509_INFO)* certstack = NULL;
+    const char ca_filestr[]        = ROOT_CA_CERTIFICATES;
+    BIO* stackbio                  = NULL;
+    ovsa_status_t ret              = OVSA_OK;
+    int i;
+
+    if (xcert == NULL) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error Certificate check in Linux Trust Store failed with invalid "
+                   "parameter\n");
+        return OVSA_INVALID_PARAMETER;
+    }
+    stackbio = BIO_new(BIO_s_file());
+    if (stackbio == NULL) {
+        BIO_printf(
+            g_bio_err,
+            "OVSA: Error Certificate check in Linux Trust Store failed in getting new BIO \n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    if (BIO_read_filename(stackbio, ca_filestr) <= 0) {
+        BIO_printf(g_bio_err, "LibOVSA: Error while loading cert bundle into memory\n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    certstack = PEM_X509_INFO_read_bio(stackbio, NULL, NULL, NULL);
+    if (certstack == NULL) {
+        BIO_printf(g_bio_err, "LibOVSA: Error in reading X509 certificate stack\n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto end;
+    }
+
+    /* ---------------------------------------------------------- *
+     * Cycle through the stack for Certificate            *
+     * ---------------------------------------------------------- */
+    for (i = 0; i < sk_X509_INFO_num(certstack); i++) {
+        X509_INFO* itmp;
+
+        itmp = sk_X509_INFO_value(certstack, i);
+
+        if (X509_cmp(xcert, itmp->x509) == 0) {
+            BIO_printf(g_bio_err,
+                       "LibOVSA: Certificate is available in Linux Trust Store and trusted...\n");
+            *check_cert_trust_store = true;
+            break;
+        }
+    }
+    /* ---------------------------------------------------------- *
+     * Free up the resources                                      *
+     * ---------------------------------------------------------- */
+end:
+    sk_X509_INFO_pop_free(certstack, X509_INFO_free);
+    BIO_free_all(stackbio);
+
+    return ret;
+}
+
 static ovsa_status_t ovsa_license_service_crypto_form_chain_do_ocsp_check(const char* cert,
                                                                           const char* chain_file,
                                                                           const char* chain_cert) {
-    ovsa_status_t ret        = OVSA_OK;
-    BIO* ca_issuers_bio      = NULL;
-    BIO* issuer_cert_bio     = NULL;
-    BIO* issuer_cert_mem     = NULL;
-    BUF_MEM* ca_issuers_ptr  = NULL;
-    BUF_MEM* issuer_cert_ptr = NULL;
-    X509* xcert              = NULL;
-    X509* d2i_xcert          = NULL;
-    char* cert_dup           = NULL;
-    char* d2i_cert           = NULL;
-    char* ca_issuers         = NULL;
-    char* ca_cert            = NULL;
-    char* issuer_cert        = NULL;
-    char* issuer_dup         = NULL;
-    const char* exts         = "authorityInfoAccess";
-    bool check_ca_cert       = false;
-    FILE* chain_fp           = NULL;
-    FILE* issuer_fp          = NULL;
-    static int cert_flag     = 0;
-    int safe_exit            = 0;
+    ovsa_status_t ret           = OVSA_OK;
+    BIO* ca_issuers_bio         = NULL;
+    BIO* issuer_cert_bio        = NULL;
+    BIO* issuer_cert_mem        = NULL;
+    BUF_MEM* ca_issuers_ptr     = NULL;
+    BUF_MEM* issuer_cert_ptr    = NULL;
+    X509* xcert                 = NULL;
+    X509* d2i_xcert             = NULL;
+    char* cert_dup              = NULL;
+    char* d2i_cert              = NULL;
+    char* ca_issuers            = NULL;
+    char* ca_cert               = NULL;
+    char* issuer_cert           = NULL;
+    char* issuer_dup            = NULL;
+    const char* exts            = "authorityInfoAccess";
+    bool check_ca_cert          = false;
+    bool check_cert_trust_store = false;
+    FILE* chain_fp              = NULL;
+    FILE* issuer_fp             = NULL;
+    int cert_flag               = 0;
+    int safe_exit               = 0;
     size_t ca_cert_len = 0, cert_len = 0;
     size_t issuer_cert_len = 0, cert_file_size = 0;
-    char* issuer_file_name      = "/tmp/issuer_cert.der";
+    char* issuer_file_name      = "/opt/ovsa/tmp_dir/issuer_cert.der";
     size_t ca_issuers_field_len = 0;
     int ca_issuers_uri_len = 0, count = 0;
     char ca_issuers_uri[MAX_URL_SIZE];
@@ -1483,6 +1546,18 @@ static ovsa_status_t ovsa_license_service_crypto_form_chain_do_ocsp_check(const 
             goto end;
         }
 
+        if (check_cert_trust_store != true) {
+            BIO_printf(g_bio_err, "OVSA: Checking certificate in Linux Trust Store...\n");
+            ret = ovsa_license_service_check_cert_trust_store(xcert, &check_cert_trust_store);
+            if (ret < OVSA_OK) {
+                BIO_printf(g_bio_err,
+                           "OVSA: ovsa licenser service check cert trust store failed with error "
+                           "code:%d\n",
+                           ret);
+                goto end;
+            }
+        }
+
         /* Check whether certificate's issuer and subject is matching */
         ret = ovsa_license_service_crypto_check_issuer_subject_match(xcert, xcert, &check_ca_cert);
         if (ret < OVSA_OK) {
@@ -1493,6 +1568,13 @@ static ovsa_status_t ovsa_license_service_crypto_form_chain_do_ocsp_check(const 
         }
 
         if (check_ca_cert == true) {
+            if (check_cert_trust_store == false) {
+                BIO_printf(
+                    g_bio_err,
+                    "OVSA: RootCA cert can't be trusted as its not available in Trust Store... \n");
+                ret = OVSA_CRYPTO_BIO_ERROR;
+                goto end;
+            }
             break;
         }
 
@@ -1561,7 +1643,7 @@ static ovsa_status_t ovsa_license_service_crypto_form_chain_do_ocsp_check(const 
         memset_s(ca_issuers_field, MAX_URL_SIZE, 0);
 
         /* Get the CAIssuers field alone */
-        while (true) {
+        while (count < MAX_URL_SIZE) {
             if (ca_issuers[count] == '\n') {
                 count = 0;
                 break;
@@ -1615,12 +1697,10 @@ static ovsa_status_t ovsa_license_service_crypto_form_chain_do_ocsp_check(const 
             goto end;
         }
 
-        safe_exit      = 0;
-        cert_file_size = ovsa_license_service_crypto_get_file_size(issuer_fp);
-        if (cert_file_size == 0) {
-            BIO_printf(g_bio_err,
-                       "OVSA: Error forming chain failed in reading the issuer certificate file "
-                       "size\n");
+        safe_exit = 0;
+        ret       = ovsa_license_service_crypto_get_file_size(issuer_fp, &cert_file_size);
+        if (ret < OVSA_OK || cert_file_size == 0) {
+            BIO_printf(g_bio_err, "OVSA: Error getting file size of %s\n", issuer_file_name);
             ret = OVSA_FILEIO_FAIL;
             goto exit;
         }
@@ -1788,24 +1868,31 @@ static ovsa_status_t ovsa_license_service_crypto_check_cert_is_self_signed(
 
 ovsa_status_t ovsa_license_service_crypto_verify_certificate(const char* cert,
                                                              const char* chain_cert) {
-    ovsa_status_t ret           = OVSA_OK;
-    X509_STORE* store           = NULL;
-    X509* xcert                 = NULL;
-    char* chain_file            = "/tmp/chain.pem";
-    bool check_self_signed_cert = false;
-    int cert_verify             = 0;
-    EVP_PKEY* pkey              = NULL;
+    ovsa_status_t ret              = OVSA_OK;
+    ovsa_status_t mutex_unlock_ret = OVSA_OK;
+    X509_STORE* store              = NULL;
+    X509* xcert                    = NULL;
+    char* chain_file               = "/opt/ovsa/tmp_dir/chain.pem";
+    bool check_self_signed_cert    = false;
+    int cert_verify                = 0;
+    EVP_PKEY* pkey                 = NULL;
 
     g_bio_err = BIO_new_fp(stdout, BIO_NOCLOSE);
     if (g_bio_err == NULL) {
-        OVSA_DBG(DBG_E, "OVSA: Error verifying certificate failed in creating a file BIO\n");
-        return OVSA_CRYPTO_BIO_ERROR;
+        BIO_printf(g_bio_err, "OVSA: Error verifying certificate failed in creating a file BIO\n");
+        ret = OVSA_CRYPTO_BIO_ERROR;
+        goto exit;
     }
 
     if (cert == NULL) {
         BIO_printf(g_bio_err, "OVSA: Error verifying certificate failed with invalid parameter\n");
         ret = OVSA_INVALID_PARAMETER;
-        goto end;
+        goto exit;
+    }
+    ret = pthread_mutex_lock(&g_cert_verify_lock);
+    if (ret != OVSA_OK) {
+        BIO_printf(g_bio_err, "OVSA: Error mutex lock failed %d\n", ret);
+        goto exit;
     }
 
     xcert = ovsa_license_service_crypto_load_cert(cert, "certificate");
@@ -1832,6 +1919,7 @@ ovsa_status_t ovsa_license_service_crypto_verify_certificate(const char* cert,
         goto end;
     }
 
+#ifdef ENABLE_SELF_SIGNED_CERT
     if (check_self_signed_cert == true) {
         cert_verify = X509_verify(xcert, pkey);
         if (cert_verify < 0) {
@@ -1847,7 +1935,9 @@ ovsa_status_t ovsa_license_service_crypto_verify_certificate(const char* cert,
         } else {
             BIO_printf(g_bio_err, "OVSA: Certificate signature verified OK\n");
         }
-    } else {
+    } else
+#endif
+    {
         ret = ovsa_license_service_crypto_form_chain_do_ocsp_check(cert, chain_file, chain_cert);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
@@ -1874,10 +1964,18 @@ ovsa_status_t ovsa_license_service_crypto_verify_certificate(const char* cert,
         }
     }
 end:
+    mutex_unlock_ret = pthread_mutex_unlock(&g_cert_verify_lock);
+    if (mutex_unlock_ret != OVSA_OK) {
+        ret = mutex_unlock_ret;
+        BIO_printf(g_bio_err, "OVSA: Error mutex unlock failed %d\n", ret);
+    }
+exit:
     X509_free(xcert);
     X509_STORE_free(store);
-    if (remove(chain_file) != 0) {
-        BIO_printf(g_bio_err, "OVSA: Warning could not delete %s file\n", chain_file);
+    if (check_self_signed_cert == false) {
+        if (remove(chain_file) != 0) {
+            BIO_printf(g_bio_err, "OVSA: Warning could not delete %s file\n", chain_file);
+        }
     }
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);

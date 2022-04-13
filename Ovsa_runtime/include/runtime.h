@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,8 @@
 
 #define DISABLE_RA_TLS
 #define DEFAULT_PCR_ID_SET         "0xFFFFFF" /*Set all PCR ID's 0:23 */
-#define TPM2_NVM_HWQUOTE_LEN_FILE  "/tmp/read_hwquote_len"
-#define TPM2_NVM_HWQUOTE_BLOB_FILE "/tmp/read_hw_quote_"
+#define TPM2_NVM_HWQUOTE_LEN_FILE  "/opt/ovsa/tmp_dir/read_hwquote_len"
+#define TPM2_NVM_HWQUOTE_BLOB_FILE "/opt/ovsa/tmp_dir/read_hw_quote_"
 #endif
 
 #define MESSAGE_BLOB_TEXT_SIZE  34
@@ -156,22 +156,22 @@ ovsa_status_t ovsa_license_check_module(const char* keystore, const char* contro
  *
  * \param[in]  customer_license         customer_license json
  * \param[in]  asym_keyslot             asymmetric keyslot index
- * \param[out] customer_lic_sig         structure containing customer license info
+ * \param[out] cust_lic_buff            structure containing customer license buffer
  * \return ovsa_status_t
  */
 ovsa_status_t ovsa_validate_customer_license(const char* customer_license, const int asym_keyslot,
-                                             ovsa_customer_license_sig_t* customer_lic_sig);
-
+                                             char** cust_lic_buff);
 /*!
  * \brief Validation for controlled access model json and load info to structure
  *
  * \param[in]  peer_keyslot                peer keyslot index
+ * \param[in]  cust_lic_sig_buff           structure containing customer license info
  * \param[in]  controlled_access_model     controlled access model json
  * \param[out] controlled_access_model_sig structure containing controlled access info
  * \return ovsa_status_t
  */
 ovsa_status_t ovsa_validate_controlled_access_model(
-    const int peer_keyslot, const char* controlled_access_model,
+    const int peer_keyslot, const char* cust_lic_sig_buff, const char* controlled_access_model,
     ovsa_controlled_access_model_sig_t* controlled_access_model_sig);
 
 /*!
@@ -298,13 +298,6 @@ ovsa_status_t ovsa_generate_reference_tcb(ovsa_tcb_info_t* tcb_info, char* sig_f
  * tcb generation help
  */
 void ovsa_tcb_gen_help(char* argv);
-ovsa_status_t ovsa_validate_customer_license(const char* customer_license, const int asym_keyslot,
-                                             ovsa_customer_license_sig_t* customer_lic_sig);
-ovsa_status_t ovsa_validate_controlled_access_model(
-    const int peer_keyslot, const char* controlled_access_model,
-    ovsa_controlled_access_model_sig_t* controlled_access_model_sig);
-ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char* customer_license,
-                                             bool* status);
 
 /*!
  * extern functions list

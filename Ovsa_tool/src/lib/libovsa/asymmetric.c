@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright 2020-2021 Intel Corporation
+ * Copyright 2020-2022 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -390,8 +390,8 @@ ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, 
 
     keystore[0].isv_certificate = "";
     keystore[1].isv_certificate = "";
-    keystore_buff               = (char*)ovsa_crypto_app_malloc(
-        (sizeof(ovsa_isv_keystore_t) * MAX_KEYPAIR) + KEYSTORE_BLOB_TEXT_SIZE, "keystore buffer");
+    size_t keystore_size = ((sizeof(ovsa_isv_keystore_t) * MAX_KEYPAIR) + KEYSTORE_BLOB_TEXT_SIZE);
+    keystore_buff        = (char*)ovsa_crypto_app_malloc(keystore_size, "keystore buffer");
     if (keystore_buff == NULL) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error generating asymmetric key pair failed in allocating memory for "
@@ -400,7 +400,7 @@ ovsa_status_t ovsa_crypto_generate_asymmetric_key_pair(ovsa_key_alg_t alg_type, 
         goto end;
     }
 
-    ret = ovsa_json_create_isv_keystore(keystore, keystore_buff);
+    ret = ovsa_json_create_isv_keystore(keystore, keystore_buff, keystore_size);
     if (ret < OVSA_OK) {
         BIO_printf(
             g_bio_err,
@@ -534,8 +534,8 @@ static ovsa_status_t ovsa_crypto_extract_keystore(const char* keystore_name,
         return OVSA_FILEOPEN_FAIL;
     }
 
-    keystore_file_size = ovsa_crypto_get_file_size(keystore_fp);
-    if (keystore_file_size == 0) {
+    ret = ovsa_crypto_get_file_size(keystore_fp, &keystore_file_size);
+    if (ret < OVSA_OK || keystore_file_size == 0) {
         BIO_printf(
             g_bio_err,
             "LibOVSA: Error loading asymmetric key failed in reading the keystore file size\n");
@@ -938,7 +938,8 @@ ovsa_status_t ovsa_crypto_store_certificate_keystore(int asym_key_slot, bool pee
         goto end;
     }
 
-    ret = ovsa_json_create_isv_keystore(&g_key_store[asym_key_slot], keystore_buff);
+    ret = ovsa_json_create_isv_keystore(&g_key_store[asym_key_slot], keystore_buff,
+                                        (keystore_size * MAX_KEYPAIR));
     if (ret < OVSA_OK) {
         BIO_printf(
             g_bio_err,
@@ -1192,8 +1193,8 @@ ovsa_status_t ovsa_crypto_sign_file(int asym_key_slot, const char* file_to_sign,
         goto end;
     }
 
-    sign_file_size = ovsa_crypto_get_file_size(file_to_sign_fp);
-    if (sign_file_size == 0) {
+    ret = ovsa_crypto_get_file_size(file_to_sign_fp, &sign_file_size);
+    if (ret < OVSA_OK || sign_file_size == 0) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error signing the file failed in reading the input file size\n");
         ret = OVSA_FILEIO_FAIL;
@@ -2217,12 +2218,12 @@ end:
 }
 
 ovsa_status_t ovsa_crypto_sign_json_blob(int asym_key_slot, const char* in_buff, size_t in_buff_len,
-                                         char* out_buff) {
+                                         char* out_buff, size_t out_buff_len) {
     ovsa_status_t ret = OVSA_OK;
     char sig_buff[MAX_SIGNATURE_SIZE];
 
     if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT) || (in_buff == NULL) ||
-        (in_buff_len == 0) || (out_buff == NULL)) {
+        (in_buff_len == 0) || (out_buff_len == 0) || (out_buff == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error signing the JSON blob failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -2237,7 +2238,7 @@ ovsa_status_t ovsa_crypto_sign_json_blob(int asym_key_slot, const char* in_buff,
         goto end;
     }
 
-    ret = ovsa_json_apend_signature(in_buff, sig_buff, out_buff);
+    ret = ovsa_json_apend_signature(in_buff, sig_buff, out_buff, out_buff_len);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error signing the JSON blob failed in appending the signature\n");
@@ -2252,12 +2253,13 @@ end:
 }
 
 ovsa_status_t ovsa_crypto_verify_json_blob(int asym_key_slot, const char* in_buff,
-                                           size_t in_buff_len, char* out_buff) {
+                                           size_t in_buff_len, char* out_buff,
+                                           size_t out_buff_len) {
     ovsa_status_t ret = OVSA_OK;
     char sig_buff[MAX_SIGNATURE_SIZE];
 
     if ((asym_key_slot < MIN_KEY_SLOT) || (asym_key_slot >= MAX_KEY_SLOT) || (in_buff == NULL) ||
-        (in_buff_len == 0) || (out_buff == NULL)) {
+        (in_buff_len == 0) || (out_buff_len == 0) || (out_buff == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error verifying the JSON blob failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -2265,14 +2267,15 @@ ovsa_status_t ovsa_crypto_verify_json_blob(int asym_key_slot, const char* in_buf
 
     memset_s(sig_buff, MAX_SIGNATURE_SIZE, 0);
 
-    ret = ovsa_json_extract_and_strip_signature(in_buff, sig_buff, out_buff);
+    ret = ovsa_json_extract_and_strip_signature(in_buff, sig_buff, MAX_SIGNATURE_SIZE, out_buff,
+                                                out_buff_len);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error verifying the JSON blob failed in stripping the signature\n");
         goto end;
     }
 
-    ret = ovsa_crypto_verify_mem(asym_key_slot, out_buff, in_buff_len, sig_buff);
+    ret = ovsa_crypto_verify_mem(asym_key_slot, out_buff, out_buff_len, sig_buff);
     if (ret < OVSA_OK) {
         BIO_printf(
             g_bio_err,
@@ -2289,12 +2292,12 @@ end:
 }
 
 ovsa_status_t ovsa_crypto_hmac_json_blob(int keyiv_hmac_slot, const char* in_buff,
-                                         size_t in_buff_len, char* out_buff) {
+                                         size_t in_buff_len, char* out_buff, size_t out_buff_len) {
     ovsa_status_t ret = OVSA_OK;
     char hmac_buff[MAX_MAC_SIZE];
 
     if ((keyiv_hmac_slot < MIN_KEY_SLOT) || (keyiv_hmac_slot >= MAX_KEY_SLOT) ||
-        (in_buff == NULL) || (in_buff_len == 0) || (out_buff == NULL)) {
+        (in_buff == NULL) || (in_buff_len == 0) || (out_buff_len == 0) || (out_buff == NULL)) {
         BIO_printf(g_bio_err, "LibOVSA: Error hmac JSON blob failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
@@ -2308,7 +2311,7 @@ ovsa_status_t ovsa_crypto_hmac_json_blob(int keyiv_hmac_slot, const char* in_buf
         goto end;
     }
 
-    ret = ovsa_json_apend_signature(in_buff, hmac_buff, out_buff);
+    ret = ovsa_json_apend_signature(in_buff, hmac_buff, out_buff, out_buff_len);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err, "LibOVSA: Error hmac JSON blob failed in appending the signature\n");
         goto end;
@@ -2322,12 +2325,13 @@ end:
 }
 
 ovsa_status_t ovsa_crypto_verify_hmac_json_blob(int keyiv_hmac_slot, const char* in_buff,
-                                                size_t in_buff_len, char* out_buff) {
+                                                size_t in_buff_len, char* out_buff,
+                                                size_t out_buff_len) {
     ovsa_status_t ret = OVSA_OK;
     char hmac_buff[MAX_MAC_SIZE];
 
     if ((keyiv_hmac_slot < MIN_KEY_SLOT) || (keyiv_hmac_slot >= MAX_KEY_SLOT) ||
-        (in_buff == NULL) || (in_buff_len == 0) || (out_buff == NULL)) {
+        (in_buff == NULL) || (in_buff_len == 0) || (out_buff_len == 0) || (out_buff == NULL)) {
         BIO_printf(g_bio_err,
                    "LibOVSA: Error verifying the hmac JSON blob failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
@@ -2335,7 +2339,8 @@ ovsa_status_t ovsa_crypto_verify_hmac_json_blob(int keyiv_hmac_slot, const char*
 
     memset_s(hmac_buff, MAX_MAC_SIZE, 0);
 
-    ret = ovsa_json_extract_and_strip_signature(in_buff, hmac_buff, out_buff);
+    ret = ovsa_json_extract_and_strip_signature(in_buff, hmac_buff, MAX_MAC_SIZE, out_buff,
+                                                out_buff_len);
     if (ret < OVSA_OK) {
         BIO_printf(
             g_bio_err,
