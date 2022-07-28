@@ -85,19 +85,20 @@ rm -rf /opt/ovsa/tmp_dir/*
 echo "Changing ownership to OVSA user with RD/WR & execution permission"
 chown ovsa:ovsa /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
 chmod 700 /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
+chmod 700 /opt/ovsa/gramine/example_runtime/start_secure_ovsa_sgx_model_server.sh 2>&1 | sed 's/^/    /'
 
 echo "Loading the docker image..."
-if [[ "$(docker images -q gsc-openvino/model_server-ovsa-nginx-mtls 2> /dev/null)" == "" ]]; then
+if [[ "$(docker images -q gsc-openvino/model_server-ovsa_sgx-nginx-mtls 2> /dev/null)" == "" ]]; then
         echo "Docker does not exist."
 else
         echo "Removing existing docker image..."
-        docker image rm -f gsc-openvino/model_server-ovsa-nginx-mtls 2>&1 | sed 's/^/    /'
+        docker image rm -f gsc-openvino/model_server-ovsa_sgx-nginx-mtls 2>&1 | sed 's/^/    /'
 fi
-docker load -i model_server-ovsa-nginx-mtls.tar.gz 2>&1 | sed 's/^/    /'
+docker load -i model_server-ovsa_sgx-nginx-mtls.tar.gz 2>&1 | sed 's/^/    /'
 docker run -it \
         -v /opt/ovsa/gramine/artefacts:/opt/ovsa/gramine/artefacts/ \
         --entrypoint bash \
-        gsc-openvino/model_server-ovsa-nginx-mtls \
+        gsc-openvino/model_server-ovsa_sgx-nginx-mtls \
         -c "cp /entrypoint.sig /opt/ovsa/gramine/artefacts"
 
 echo "Generating tokens for Ovsa Tool & Runtime..."

@@ -73,7 +73,7 @@ trap cleanup EXIT
 
 for url in "${urls[@]}"; do
     echo "download: Trying to fetch $url"
-    wget --timeout=10 -O "$tmpd/unverified" "$url" || true
+    wget --no-check-certificate --timeout=10 -O "$tmpd/unverified" "$url" || true
     sha256_received="$(sha256sum "$tmpd/unverified" | cut -d ' ' -f 1)"
     if [ "$sha256" != "$sha256_received" ]; then
         echo "download: WARNING: Hash mismatch: Expected $sha256 but received $sha256_received"
@@ -88,6 +88,5 @@ for url in "${urls[@]}"; do
     mv "$tmpd/unverified" "$output"
     exit 0
 done
-
 echo "download: ERROR: Failed to download '$output' (${sha256:0:8}...)! No URLs left to try."
 exit 1

@@ -37,6 +37,8 @@
 #include "safe_str_lib.h"
 #include "utils.h"
 
+ovsa_status_t ovsa_license_service_generate_randnum(int size, bool b64_format, int out_len,
+                                                    char* nonce_buf);
 void ovsa_license_service_crypto_openssl_free(char** buff) {
     size_t buff_len = 0;
 
@@ -611,93 +613,26 @@ end:
     return ret;
 }
 
-ovsa_status_t ovsa_license_service_create_nonce(char** nonce_buf) {
-    ovsa_status_t ret  = OVSA_OK;
-    BIO* out_bio       = NULL;
-    BIO* nonce_bio     = NULL;
-    BIO* b64           = NULL;
-    BUF_MEM* nonce_ptr = NULL;
-    int bytes, rng = 0;
-    size_t length             = 0;
-    size_t nonce_bin_buff_len = 0;
-    unsigned char nonce[NONCE_SIZE];
-    unsigned char nonce_bin_buff[NONCE_BUF_SIZE];
-    char* nonce_b64_buff = NULL;
-
-    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
-
-    memset_s(nonce, sizeof(nonce), 0);
-    memset_s(nonce_bin_buff, sizeof(nonce_bin_buff), 0);
-
-    nonce_bio = BIO_new(BIO_s_mem());
-    if (nonce_bio == NULL) {
-        OVSA_DBG(DBG_E,
-                 "OVSA: Error generate nonce failed in getting new "
-                 "BIO for the output buffer\n");
-        ret = -1;
-        goto out;
-    }
-
-    /*Generate nonce for customer validation */
-    rng = RAND_bytes(nonce, NONCE_SIZE);
-    if (rng <= OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Error RAND_bytes() returned %d\n", rng);
-        return -EINVAL;
-    }
-
-    for (int count = 0; count < NONCE_SIZE; count++) {
-        if (BIO_printf(nonce_bio, "%02x", nonce[count]) != 2) {
-            goto out;
-        }
-    }
-
-    if (!BIO_flush(nonce_bio)) {
-        OVSA_DBG(DBG_E,
-                 "OVSA: Error client license check callback failed in flushing the "
-                 "output buffer\n");
-        ret = -1;
-        goto out;
-    }
-
-    size_t nouce_len = sizeof(char) * NONCE_SIZE * 2;
-    ret              = ovsa_license_service_safe_malloc(nouce_len, nonce_buf);
-    if (ret < OVSA_OK) {
-        ret = OVSA_MEMORY_ALLOC_FAIL;
-        OVSA_DBG(DBG_E, "OVSA: Error memory init failed\n");
-        goto out;
-    }
-
-    ovsa_license_service_crypto_convert_bin_to_base64(nonce, sizeof(nonce), &nonce_b64_buff);
-    if (nonce_b64_buff == NULL) {
-        OVSA_DBG(DBG_E, "OVSA: Error could not conver nounce to base64\n");
-        ret = -1;
-        goto out;
-    }
-
-    size_t len = strnlen_s(nonce_b64_buff, RSIZE_MAX_STR);
-    if (memcpy_s(*nonce_buf, nouce_len, nonce_b64_buff, len) != EOK) {
-        OVSA_DBG(DBG_E, "OVSA: Error generating nonce\n");
-        ret = -1;
-        goto out;
-    }
-
-out:
-    BIO_free_all(nonce_bio);
-    ovsa_license_service_safe_free(&nonce_b64_buff);
-    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
-    return ret;
-}
 ovsa_status_t ovsa_license_service_generate_nonce_payload(char** nonce_buf, char** json_payload) {
     ovsa_status_t ret        = OVSA_OK;
     char* nonce_json_buf     = NULL;
+    bool is_b64_format       = true;
     size_t nonce_payload_len = 0;
     size_t length            = 0;
     unsigned char nonce[NONCE_SIZE];
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
+    size_t nonce_len = (sizeof(char) * SECRET_NONCE_SIZE * 2) + 1;
+    ret              = ovsa_license_service_safe_malloc(nonce_len, nonce_buf);
+    if (ret < OVSA_OK) {
+        ret = OVSA_MEMORY_ALLOC_FAIL;
+        OVSA_DBG(DBG_E, "OVSA: Error memory init failed\n");
+        goto out;
+    }
+
     /* Generate nonce */
-    ret = ovsa_license_service_create_nonce(nonce_buf);
+    ret = ovsa_license_service_generate_randnum(SECRET_NONCE_SIZE, is_b64_format, nonce_len, *nonce_buf);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "Error create nonce failed with code %d\n", ret);
         goto out;

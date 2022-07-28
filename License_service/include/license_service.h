@@ -144,6 +144,8 @@ typedef struct ovsa_quote_info {
     char* ak_pub_key;
     char* ek_pub_key;
     char* ek_cert;
+    char* ROM_cert;
+    char* Chain_cert;
 } ovsa_quote_info_t;
 
 typedef struct ovsa_ek_ak_bind_info {
@@ -254,6 +256,7 @@ typedef enum {
     OVSA_PLATFORM_CERT_VALIDATION_FAILED = -59,
     OVSA_PCR_DIGEST_NOT_VALID            = -60,
     OVSA_TCB_NOT_VALID                   = -61,
+    OVSA_AK_PUB_KEY_VALIDATION_FAILED    = -62,
     OVSA_FAIL                            = -99
 } ovsa_status_t;
 
@@ -422,13 +425,17 @@ ovsa_status_t ovsa_license_service_crypto_convert_base64_to_bin(const char* in_b
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
 ovsa_status_t ovsa_license_service_generate_nonce_payload(char** nonce_buf, char** json_payload);
-/** \brief This function generates nonce .
+/** \brief This function generates random number in B64 format or in HEX format based on b64_format flag.
  *
- * \param[out] out_buff        Output buffer to store nonce buffer.
+ * \param[in]  size            Size of the key
+ * \param[in] b64_format       format of the output to be generated.
+ * \param[in] out_len          size of the memory allocated for the out buffer
+ * \param[out] out_buff        Output buffer to store generated random number.
  *
  * \return ovsa_status_t: OVSA_OK or OVSA_ERROR
  */
-ovsa_status_t ovsa_license_service_create_nonce(char** nonce_buf);
+ovsa_status_t ovsa_license_service_generate_randnum(int size, bool b64_format, int out_len,
+                                                    char* out_buf);
 /** \brief This function verifies the signature of the input buffer with the specified signature
  *         using the public key from the key slot.
  *

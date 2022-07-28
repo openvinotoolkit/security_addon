@@ -29,11 +29,13 @@ RUN apt update && apt install -y \
 ENV OVMS_DIR=/ovms/src
 
 ARG use_sgx=0
+ARG use_kvm=0
 
 # Copy OVSA src 
 WORKDIR /ovsa
 COPY  Ovsa_runtime/ /ovsa/Ovsa_runtime/
 COPY  Ovsa_tool/ /ovsa/Ovsa_tool
+COPY  deps/ /ovsa/deps
 
 RUN mkdir -vp /ovsa-runtime/lib
 RUN mkdir -vp /ovsa-runtime/usr
@@ -44,6 +46,9 @@ RUN if [ "$use_sgx" == "1" ]; then \
         export GRAMINE_DIR=/ovsa/Ovsa_runtime/src/gramine && \
         cd /ovsa/Ovsa_runtime/src/ovms && \
         SGX=1 make clean all; \
+    elif [ "$use_kvm" == "1" ]; then \
+        cd /ovsa/Ovsa_runtime/src/ovms && \
+        KVM=1 make clean all; \
     else \
         cd /ovsa/Ovsa_runtime/src/ovms && \
         make clean all; \

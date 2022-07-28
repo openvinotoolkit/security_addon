@@ -74,13 +74,13 @@ check_status "Create a new sealing object with the authorized policy Failed"
 # Replace the old persistent sealing object with the one we created above
 # with policyauthorize policy associated with signer public key
 echo "Seal newly created persistent sealing object"
-context=`tpm2_getcap handles-persistent | awk 'NR==1{print $2}'`
+context=`tpm2_getcap handles-persistent | grep 0x81010001 | awk 'NR==1{print $2}'`
+
 if [ ! -z "$context" ] && [ $context = "0x81010001" ]
 then
-  tpm2_evictcontrol --hierarchy=o --object-context=0x81010001
-  check_status "Evicting persistent object failed"
+	tpm2_evictcontrol --hierarchy=o --object-context=0x81010001
+	check_status "Evicting persistent object failed"
 fi
-
 tpm2_load -Q --parent-context=tpm_prim.ctx --public=tpm_auth_pcr_seal_key.pub --private=tpm_auth_pcr_seal_key.priv --name=tpm_auth_pcr_seal_key.name --key-context=tpm_auth_pcr_seal_key.ctx
 check_status "Loading object into TPM failed"
 
@@ -96,4 +96,3 @@ check_status "Signing PCR Policy Failed"
 
 echo "Signing PCR Policy successfully"
 exit 0
-

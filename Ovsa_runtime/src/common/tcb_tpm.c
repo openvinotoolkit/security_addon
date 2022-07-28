@@ -29,17 +29,77 @@ extern ovsa_status_t ovsa_license_service_write(void* ssl, const char* buf, size
 extern ovsa_status_t ovsa_do_tpm2_activatecredential(char* cred_outbuf);
 extern ovsa_status_t ovsa_tpm2_generatequote(char* nonce);
 
+#if !defined KVM && !defined ENABLE_QUOTE_FROM_NVRAM
+static ovsa_status_t ovsa_do_read_ROM_cert_chain_file(ovsa_quote_info_t* hw_quote_info) {
+    ovsa_status_t ret = OVSA_OK;
+    size_t file_size  = 0;
+
+    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+    /*
+     * Check if ROM Certificate exists. If so, read and send it to server
+     */
+    if (ovsa_check_if_file_exists(TPM2_EKCERT_CHAIN_ROM_CERT) == true) {
+        OVSA_DBG(DBG_D, "OVSA:TPM2 EK ROM certificate file exists \n");
+        /* Read ROM cert */
+        ret = ovsa_read_file_content(TPM2_EKCERT_CHAIN_ROM_CERT, &hw_quote_info->ROM_cert,
+                                     &file_size);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error reading EK ROM Certificate failed with error code %d\n",
+                     ret);
+            goto out;
+        }
+        OVSA_DBG(DBG_D, "OVSA:ROM_cert read...!:%s\n", hw_quote_info->ROM_cert);
+    } else {
+        OVSA_DBG(DBG_E, "OVSA: Error TPM2 ROM certificate doesn't exists\n");
+        ret = OVSA_INVALID_PARAMETER;
+        goto out;
+    }
+    /*
+     * Check if on_diechain_certificate exists. If so, read and send it to server
+     */
+    if (ovsa_check_if_file_exists(TPM2_EKCERT_ONDIE_CHAIN) == true) {
+        OVSA_DBG(DBG_D, "OVSA:TPM2 on_diechain Certificate file exists \n");
+        /* Read ROM cert */
+        ret =
+            ovsa_read_file_content(TPM2_EKCERT_ONDIE_CHAIN, &hw_quote_info->Chain_cert, &file_size);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E,
+                     "OVSA: Error reading on_diechain Certificate failed with error code %d\n",
+                     ret);
+            goto out;
+        }
+        OVSA_DBG(DBG_D, "OVSA:On_diechain_certificate read...!:%s\n", hw_quote_info->Chain_cert);
+    } else {
+        OVSA_DBG(DBG_E, "OVSA: Error On_diechain Certificate:%s doesn't exists\n",
+                 TPM2_EKCERT_ONDIE_CHAIN);
+        ret = OVSA_INVALID_PARAMETER;
+        goto out;
+    }
+
+out:
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
+#endif
+
 static ovsa_status_t ovsa_do_read_runtime_quote(ovsa_quote_info_t* sw_quote_info) {
     ovsa_status_t ret       = OVSA_OK;
     char* pcr_list_buf      = NULL;
     char* pcr_quote_buf     = NULL;
     char* pcr_signature_buf = NULL;
     size_t file_size        = 0;
+    char swquote_pcr_file[MAX_FILE_LEN];
+    char swquote_msg_file[MAX_FILE_LEN];
+    char swquote_sig_file[MAX_FILE_LEN];
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
+    CREATE_FILE_PATH(tmp_dir_path, swquote_pcr_file, TPM2_SWQUOTE_PCR_FILE_NAME);
+    CREATE_FILE_PATH(tmp_dir_path, swquote_msg_file, TPM2_SWQUOTE_MSG_FILE_NAME);
+    CREATE_FILE_PATH(tmp_dir_path, swquote_sig_file, TPM2_SWQUOTE_SIG_FILE_NAME);
+
     /* read pcr_list */
-    ret = ovsa_read_file_content(TPM2_SWQUOTE_PCR, &pcr_list_buf, &file_size);
+    ret = ovsa_read_file_content(swquote_pcr_file, &pcr_list_buf, &file_size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error reading TPM2_SWQUOTE_PCR file failed with error code %d\n",
                  ret);
@@ -52,7 +112,7 @@ static ovsa_status_t ovsa_do_read_runtime_quote(ovsa_quote_info_t* sw_quote_info
         goto out;
     }
     /* read pcr quote */
-    ret = ovsa_read_file_content(TPM2_SWQUOTE_MSG, &pcr_quote_buf, &file_size);
+    ret = ovsa_read_file_content(swquote_msg_file, &pcr_quote_buf, &file_size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error reading TPM2_SWQUOTE_PCR file failed with error code %d\n",
                  ret);
@@ -66,7 +126,7 @@ static ovsa_status_t ovsa_do_read_runtime_quote(ovsa_quote_info_t* sw_quote_info
         goto out;
     }
     /* read pcr signature */
-    ret = ovsa_read_file_content(TPM2_SWQUOTE_SIG, &pcr_signature_buf, &file_size);
+    ret = ovsa_read_file_content(swquote_sig_file, &pcr_signature_buf, &file_size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error reading pcr signature file failed with error code %d\n", ret);
         goto out;
@@ -127,6 +187,18 @@ static ovsa_status_t ovsa_extract_hw_quote(char* hw_quote_payload,
     ret = ovsa_json_extract_element(hw_quote_payload, "HW_EK_Cert", &hw_quote_info->ek_cert);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error read HW_EK_Cert from json failed %d\n", ret);
+        goto out;
+    }
+    /* Read ROM_cert from json file */
+    ret = ovsa_json_extract_element(hw_quote_payload, "ROM_cert", &hw_quote_info->ROM_cert);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error read ROM_cert from json failed %d\n", ret);
+        goto out;
+    }
+    /* Read on_die chain_certificate from json file */
+    ret = ovsa_json_extract_element(hw_quote_payload, "Ondie_chain", &hw_quote_info->Chain_cert);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error read on_diechain_certificate from json failed %d\n", ret);
         goto out;
     }
 out:
@@ -197,11 +269,17 @@ static ovsa_status_t ovsa_get_tpm2_base_host_quote(ovsa_quote_info_t* hw_quote_i
     int nv_index        = TPM2_NV_INDEX_START;
     int nv_index_toread = 0;
     int bytes_read      = 0;
+    char tpm2_nvm_hwquote_file_len[MAX_FILE_LEN];
+    char tpm2_nvm_hwquote_blob_file_name[MAX_FILE_LEN];
 
     memset_s(hwquote_len_buff, sizeof(hwquote_len_buff), 0);
 
+    CREATE_FILE_PATH(tmp_dir_path, tpm2_nvm_hwquote_file_len, TPM2_NVM_HWQUOTE_LEN_FILE_NAME);
+    CREATE_FILE_PATH(tmp_dir_path, tpm2_nvm_hwquote_blob_file_name,
+                     TPM2_NVM_HWQUOTE_BLOB_FILE_NAME);
+
     /*Read length of hwquote blob from NV memory */
-    ret = ovsa_tpm2_nvread(TPM2_NVM_HWQUOTE_LEN_FILE, TPM2_NV_INDEX_START, HW_QUOTE_SIZE_LENGTH,
+    ret = ovsa_tpm2_nvread(tpm2_nvm_hwquote_file_len, TPM2_NV_INDEX_START, HW_QUOTE_SIZE_LENGTH,
                            offset, hwquote_len_buff);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error ovsa_tpm2_nvread failed with code %d\n", ret);
@@ -240,7 +318,7 @@ static ovsa_status_t ovsa_get_tpm2_base_host_quote(ovsa_quote_info_t* hw_quote_i
     do {
         memset_s(hwquote_buff_chunk, sizeof(hwquote_buff_chunk), 0);
         memset_s(hwquote_file_index, sizeof(hwquote_file_index), 0);
-        strcpy_s(hwquote_file_name, sizeof(hwquote_file_name), TPM2_NVM_HWQUOTE_BLOB_FILE);
+        strcpy_s(hwquote_file_name, sizeof(hwquote_file_name), tpm2_nvm_hwquote_blob_file_name);
         snprintf(hwquote_file_index, MAX_FILE_NAME, "file_%d", nv_index);
         strcat_s(hwquote_file_name, sizeof(hwquote_file_name), hwquote_file_index);
 
@@ -329,7 +407,11 @@ static ovsa_status_t ovsa_tpm2_generate_runtime_host_quote(char* quote_nonce,
     ovsa_status_t ret = OVSA_OK;
     size_t size = 0, nonce_bin_length = 0;
     char* nonce_bin_buff = NULL;
+    char challenge_nonce_file[MAX_FILE_LEN];
+
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+
+    CREATE_FILE_PATH(tmp_dir_path, challenge_nonce_file, CHALLENGE_NONCE_FILE_NAME);
 
     ret = ovsa_get_string_length(quote_nonce, &size);
     ret = ovsa_safe_malloc((sizeof(char) * size), &nonce_bin_buff);
@@ -430,7 +512,7 @@ static ovsa_status_t ovsa_tpm2_generate_runtime_host_quote(char* quote_nonce,
         OVSA_DBG(DBG_D, "swquote_hash_nonce[i=%d]=%02x\n", i, swquote_hash_nonce[i]);
     }
 #endif
-    FILE* fquote_nonce = fopen(CHALLENGE_NONCE, "w");
+    FILE* fquote_nonce = fopen(challenge_nonce_file, "w");
     if (fquote_nonce == NULL) {
         OVSA_DBG(DBG_E, "OVSA: Error opening quote_nonce.bin !\n");
         ret = OVSA_FILEOPEN_FAIL;
@@ -444,7 +526,7 @@ static ovsa_status_t ovsa_tpm2_generate_runtime_host_quote(char* quote_nonce,
     fclose(fquote_nonce);
 
     /* Generate tpm2 quote*/
-    ret = ovsa_tpm2_generatequote(CHALLENGE_NONCE);
+    ret = ovsa_tpm2_generatequote(challenge_nonce_file);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error ovsa_tpm2_generatequote failed with code %d\n", ret);
         goto out;
@@ -469,8 +551,13 @@ static ovsa_status_t ovsa_do_tpm2_activatecredential_quote_nonce(char* payload,
     size_t credout_bin_length = 0;
     size_t size               = 0;
     size_t file_size          = 0;
+    char tpm2_credout_file[MAX_FILE_LEN];
+    char tpm2_actcred_out_file[MAX_FILE_LEN];
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+
+    CREATE_FILE_PATH(tmp_dir_path, tpm2_credout_file, TPM2_CREDOUT_FILE_NAME);
+    CREATE_FILE_PATH(tmp_dir_path, tpm2_actcred_out_file, TPM2_ACTCRED_OUT_FILE_NAME);
 
     /* Read credout from json file */
     ret = ovsa_json_extract_element(payload, "cred_blob", &cred_outbuf);
@@ -494,7 +581,7 @@ static ovsa_status_t ovsa_do_tpm2_activatecredential_quote_nonce(char* payload,
         goto out;
     }
     /* write credout bin to file  */
-    FILE* fptr_credout = fopen(TPM2_CREDOUT_FILE, "wb");
+    FILE* fptr_credout = fopen(tpm2_credout_file, "wb");
     if (fptr_credout == NULL) {
         ret = OVSA_FILEOPEN_FAIL;
         OVSA_DBG(DBG_E, "OVSA: Error opening file cred.out.bin failed with code %d\n", ret);
@@ -511,7 +598,7 @@ static ovsa_status_t ovsa_do_tpm2_activatecredential_quote_nonce(char* payload,
     }
     /* read decrypted secret */
     file_size = 0;
-    ret       = ovsa_read_file_content(TPM2_ACTCRED_OUT, actcred_buf, &file_size);
+    ret       = ovsa_read_file_content(tpm2_actcred_out_file, actcred_buf, &file_size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error reading TPM2_ACTCRED_OUT file failed with error code %d\n",
                  ret);
@@ -597,6 +684,18 @@ ovsa_status_t ovsa_do_get_quote_nounce(const int asym_keyslot, char* quote_credo
         OVSA_DBG(DBG_E, "OVSA: Error get SW quote measurements failed with error code %d\n", ret);
         goto out;
     }
+#if !defined KVM && !defined ENABLE_QUOTE_FROM_NVRAM
+    if ((ovsa_check_if_file_exists(TPM2_EKCERT_CHAIN_ROM_CERT) == true) &&
+        (ovsa_check_if_file_exists(TPM2_EKCERT_ONDIE_CHAIN) == true)) {
+        /* ROM_cert and chain file */
+        ret = ovsa_do_read_ROM_cert_chain_file(&quote_info);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error ovsa_do_read_ROM_cert_chain_file failed with code %d\n",
+                     ret);
+            goto out;
+        }
+    }
+#endif
     ret = ovsa_json_create_quote_info_blob(actcred_buf, quote_info, hw_quote_info, &quote_blob,
                                            &length);
     if (ret < OVSA_OK) {
@@ -644,6 +743,10 @@ out:
     ovsa_safe_free(&quote_info.quote_sig);
     ovsa_safe_free(&quote_info.ak_pub_key);
     ovsa_safe_free(&quote_info.ek_cert);
+#ifndef KVM
+    ovsa_safe_free(&quote_info.ROM_cert);
+    ovsa_safe_free(&quote_info.Chain_cert);
+#endif
 #ifdef ENABLE_QUOTE_FROM_NVRAM
     ovsa_safe_free(&hw_quote_info.quote_pcr);
     ovsa_safe_free(&hw_quote_info.quote_message);
@@ -651,6 +754,8 @@ out:
     ovsa_safe_free(&hw_quote_info.ak_pub_key);
     ovsa_safe_free(&hw_quote_info.ek_pub_key);
     ovsa_safe_free(&hw_quote_info.ek_cert);
+    ovsa_safe_free(&hw_quote_info.ROM_cert);
+    ovsa_safe_free(&hw_quote_info.Chain_cert);
 #endif
     ovsa_safe_free(&quote_blob);
     ovsa_safe_free((char**)&json_payload);
@@ -661,7 +766,6 @@ out:
     return ret;
 }
 
-#ifdef PTT_EK_ONDIE_CA
 static ovsa_status_t ovsa_do_read_EK_cert_chain_file(ovsa_ek_ak_bind_info_t* ek_ak_bind_info) {
     ovsa_status_t ret = OVSA_OK;
     size_t file_size  = 0;
@@ -671,7 +775,7 @@ static ovsa_status_t ovsa_do_read_EK_cert_chain_file(ovsa_ek_ak_bind_info_t* ek_
      * Check if EK_cert_chain ROM Certificate exists. If so, read and send it to server
      */
     if (ovsa_check_if_file_exists(TPM2_EKCERT_CHAIN_ROM_CERT) == true) {
-        OVSA_DBG(DBG_D, "OVSA:TPM2_SW_EK_Chain ROM certificate file exists \n");
+        OVSA_DBG(DBG_D, "OVSA:TPM2_EK_ROM certificate file exists \n");
         /* Read ROM cert */
         ret = ovsa_read_file_content(TPM2_EKCERT_CHAIN_ROM_CERT, &ek_ak_bind_info->ROM_cert,
                                      &file_size);
@@ -684,7 +788,7 @@ static ovsa_status_t ovsa_do_read_EK_cert_chain_file(ovsa_ek_ak_bind_info_t* ek_
         }
         OVSA_DBG(DBG_I, "OVSA:EKcert Chain ROM_cert read...!:%s\n", ek_ak_bind_info->ROM_cert);
     } else {
-        OVSA_DBG(DBG_E, "OVSA: Error TPM2_SW_EK_Chain ROM certificate doesn't exists\n");
+        OVSA_DBG(DBG_E, "OVSA: Error TPM2_EK_ROM certificate doesn't exists\n");
         ret = OVSA_INVALID_PARAMETER;
         goto out;
     }
@@ -716,7 +820,6 @@ out:
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
 }
-#endif
 
 static ovsa_status_t ovsa_do_sign_EKpub_EKcert(const int asym_keyslot,
                                                ovsa_ek_ak_bind_info_t* ek_ak_bind_info) {
@@ -831,14 +934,15 @@ ovsa_status_t ovsa_send_EK_AK_bind_info(const int asym_keyslot, void** _ssl_sess
         goto out;
     }
 
-#ifdef PTT_EK_ONDIE_CA
-    /* ROM_cert and chain file */
-    ret = ovsa_do_read_EK_cert_chain_file(&ek_ak_bind_info);
-    if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Error Read_EK_cert_chain_file failed with code %d\n", ret);
-        goto out;
+    if ((ovsa_check_if_file_exists(TPM2_EKCERT_CHAIN_ROM_CERT) == true) &&
+        (ovsa_check_if_file_exists(TPM2_EKCERT_ONDIE_CHAIN) == true)) {
+        /* ROM_cert and chain file */
+        ret = ovsa_do_read_EK_cert_chain_file(&ek_ak_bind_info);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error Read_EK_cert_chain_file failed with code %d\n", ret);
+            goto out;
+        }
     }
-#endif
 
     ret = ovsa_json_create_EK_AK_binding_info_blob(ek_ak_bind_info, &EK_AK_bind_info_json, &length);
     if (ret < OVSA_OK) {
@@ -888,27 +992,13 @@ out:
     ovsa_safe_free(&ek_ak_bind_info.ek_cert);
     ovsa_safe_free(&ek_ak_bind_info.ek_cert_sig);
     ovsa_safe_free(&ek_ak_bind_info.platform_cert);
-#ifdef PTT_EK_ONDIE_CA
     ovsa_safe_free(&ek_ak_bind_info.ROM_cert);
     ovsa_safe_free(&ek_ak_bind_info.Chain_cert);
-#endif
     ovsa_safe_free(&json_buf);
     ovsa_safe_free(&json_payload);
     ovsa_safe_free(&EK_AK_bind_info_json);
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;
-}
-
-void ovsa_remove_quote_files(void) {
-    remove(TPM2_SWQUOTE_PCR);
-    remove(TPM2_SWQUOTE_MSG);
-    remove(TPM2_SWQUOTE_SIG);
-    remove(CHALLENGE_NONCE);
-    remove(TPM2_CREDOUT_FILE);
-    remove(TPM2_ACTCRED_OUT);
-    remove(TPM2_NVM_HWQUOTE_LEN_FILE);
-
-    OVSA_DBG(DBG_D, "OVSA:Removed the Quote files from /opt/ovsa/tmp_dir directory\n");
 }
 
 ovsa_status_t ovsa_get_pcr_exclusion_set(char* optarg, int* pcr_id_set) {
@@ -943,11 +1033,14 @@ ovsa_status_t ovsa_do_read_quote_pubkey(ovsa_quote_info_t* sw_quote_info) {
     ovsa_status_t ret = OVSA_OK;
     size_t file_size  = 0;
     char* pcr_buf     = NULL;
+    char swquote_pcr_file[MAX_FILE_LEN];
 
     OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
 
+    CREATE_FILE_PATH(tmp_dir_path, swquote_pcr_file, TPM2_SWQUOTE_PCR_FILE_NAME);
+
     /* read pcr */
-    ret = ovsa_read_file_content(TPM2_SWQUOTE_PCR, &pcr_buf, &file_size);
+    ret = ovsa_read_file_content(swquote_pcr_file, &pcr_buf, &file_size);
     if (ret < OVSA_OK) {
         OVSA_DBG(DBG_E, "OVSA: Error reading TPM2_SWQUOTE_PCR file failed with error code %d\n",
                  ret);
@@ -1078,6 +1171,8 @@ out:
     ovsa_safe_free(&hw_quote_info.quote_message);
     ovsa_safe_free(&hw_quote_info.quote_sig);
     ovsa_safe_free(&hw_quote_info.ek_cert);
+    ovsa_safe_free(&hw_quote_info.ROM_cert);
+    ovsa_safe_free(&hw_quote_info.Chain_cert);
 #endif
     OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
     return ret;

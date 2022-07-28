@@ -52,7 +52,7 @@ static void ovsa_help(const char* argv) {
     printf("%s keygen -storecert -c <Certificate> -k <Key Store File>\n", argv);
     printf("%s keygen -getcert -k <Key Store File> -c <Certificate>\n", argv);
     printf("%s keygen -sign -i <file to be signed> -o <signed file> -k <key_store file>\n", argv);
-    printf("%s keygen -verify -i <file to be verified> -s <signature> -k <key_store file>\n", argv);
+    printf("%s keygen -verify -i <file to be verified> -v <signature> -k <key_store file>\n", argv);
     printf(
         "%s licgen -t <License Type> [-l <Usage Count Limit> or <Time Limit>] -n \"License "
         "name\" -v \"License Version\" -u <License URL> [<Future server certificate file>] [-u "

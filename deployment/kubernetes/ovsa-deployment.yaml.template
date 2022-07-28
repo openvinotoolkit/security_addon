@@ -1,0 +1,157 @@
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ovsa-deployment
+  name: ovsa-deployment
+spec:
+  selector:
+    matchLabels:
+      app: ovsa-deployment
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ovsa-deployment
+    spec:
+      containers:
+      - name: ovsa-basic-container
+        image: openvino/model_server-ovsa_host-k8:latest
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            squat.ai/tpm: 1
+        ports:
+        - containerPort: 3335
+        readinessProbe:
+          tcpSocket:
+            port: 3335
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: sampleloader
+          mountPath: /sampleloader
+        - name: artefacts
+          mountPath: /opt/ovsa/host/artefacts
+        - name: keystore
+          mountPath: /opt/ovsa/host/keystore
+        - name: tmp-dir
+          mountPath: /opt/ovsa/tmp_dir
+        - name: tpm0
+          mountPath: /dev/tpm0
+        - name: tpmrm0
+          mountPath: /dev/tpmrm0
+        - name: var-ovsa
+          mountPath: /var/OVSA
+        - name: ramdisk
+          mountPath: /opt/ovsa/mnt
+          readOnly: true
+        - name: ca-cert
+          mountPath: /etc/ssl/certs/ca-certificates.crt
+          readOnly: true
+        args: [
+          "--config_path", "/sampleloader/sample.json",
+          "--port",  "3335",
+          ]
+      volumes:
+      - name: ramdisk
+        hostPath: 
+          path: /opt/ovsa/mnt
+          #type: Directory
+      - name: sampleloader
+        hostPath:
+          path: /opt/ovsa/host/example_runtime
+      - name: artefacts
+        hostPath:
+          path: /opt/ovsa/host/artefacts
+      - name: keystore
+        hostPath:
+          path: /opt/ovsa/host/keystore
+      - name: tmp-dir
+        hostPath:
+          path: /opt/ovsa/tmp_dir
+      - name: tpm0
+        hostPath:
+          path: /dev/tpm0
+      - name: tpmrm0
+        hostPath:
+          path: /dev/tpmrm0
+      - name: var-ovsa
+        hostPath:
+          path: /var/OVSA
+      - name: ca-cert
+        hostPath:
+          path: /etc/ssl/certs/ca-certificates.crt
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ovsa-deployment
+  name: ovsa-deployment
+spec:
+  ports:
+  - port: 3335
+    targetPort: 3335
+    protocol: TCP
+    name: grpc
+  selector:
+    app: ovsa-deployment
+
+---
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: ovsa-virtual-service
+spec:
+  hosts:
+  - FQDN-name
+  gateways:
+  - "istio-system/ovsa-gateway"
+  http:
+  - route:
+    - destination:
+        host: ovsa-deployment
+        port:
+          number: 3335
+
+---
+
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: ovsa-deployment
+  mtls:
+    mode: STRICT
+
+---
+
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ovsa-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: https
+    tls:
+      mode: MUTUAL #SIMPLE # enables HTTPS on this port
+      credentialName: tls-secret
+    hosts:
+    - "*"
+

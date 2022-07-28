@@ -68,6 +68,10 @@ echo "Changing ownership to OVSA user with RD/WR & execution permission"
 chown ovsa:ovsa /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
 chmod 700 /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
 
+echo "Adding tpm ekcert to trust store"
+cd /opt/ovsa/scripts/ && ./OVSA_add_tpm_ekcert_trust_store.sh 2>&1 | sed 's/^/    /'
+cd -
+
 echo
 echo "Installing OVSA License Server completed."
 echo

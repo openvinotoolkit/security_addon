@@ -21,13 +21,12 @@
 
 #include "ovsa_errors.h"
 
-#define TPM2_CREDOUT_FILE "/opt/ovsa/tmp_dir/cred.out.bin"
-#define TPM2_ACTCRED_OUT  "/opt/ovsa/tmp_dir/actcred.out"
-#define CHALLENGE_NONCE   "/opt/ovsa/tmp_dir/challenge_nonce.bin"
-
-#define TPM2_SWQUOTE_PCR "/opt/ovsa/tmp_dir/pcr.bin"
-#define TPM2_SWQUOTE_MSG "/opt/ovsa/tmp_dir/pcr_quote.plain"
-#define TPM2_SWQUOTE_SIG "/opt/ovsa/tmp_dir/pcr_quote.signature"
+#define TPM2_CREDOUT_FILE_NAME     "cred.out.bin"
+#define TPM2_ACTCRED_OUT_FILE_NAME "actcred.out"
+#define CHALLENGE_NONCE_FILE_NAME  "challenge_nonce.bin"
+#define TPM2_SWQUOTE_PCR_FILE_NAME "pcr.bin"
+#define TPM2_SWQUOTE_MSG_FILE_NAME "pcr_quote.plain"
+#define TPM2_SWQUOTE_SIG_FILE_NAME "pcr_quote.signature"
 
 #define TPM2_PROVISION_DIR     "/var/OVSA/"
 #define TPM2_EK_CERT           TPM2_PROVISION_DIR "Quote/tpm_ek_cert.pem"
@@ -42,21 +41,15 @@
 #define TPM2_HW_QUOTE_NONCE    TPM2_PROVISION_DIR "Quote/HW_QUOTE_nonce.bin"
 #define TPM2_QUOTE_NONCE       TPM2_PROVISION_DIR "Quote/nonce.bin"
 
-#ifdef PTT_EK_ONDIE_CA
 #define TPM2_EKCERT_CHAIN_ROM_CERT TPM2_PROVISION_DIR "Quote/ROM_cert.pem"
 #define TPM2_EKCERT_ONDIE_CHAIN    TPM2_PROVISION_DIR "Quote/Ondie_chain.pem"
-#endif
 
 #define TPM2_SEAL_SIGN_PUB_KEY TPM2_PROVISION_DIR "Seal/signing_key_public.pem"
 #define TPM2_SEAL_PCR_POLICY   TPM2_PROVISION_DIR "Seal/tpm_pcr.policy"
 #define TPM2_SEAL_PCR_SIGN     TPM2_PROVISION_DIR "Seal/tpm_pcr.signature"
 
-#define TPM2_RH_ENDORSEMENT   "0x4000000B"
-#define TPM2_SESSION_CTX      "/opt/ovsa/tmp_dir/session.ctx"
-#define TPM2_PCR_POLICY       "/opt/ovsa/tmp_dir/tpm_pcr.policy"
-#define TPM2_VERIFICATION_TKT "/opt/ovsa/tmp_dir/verification.tkt"
-#define TPM2_SIGNING_KEY_CTX  "/opt/ovsa/tmp_dir/signing_key.ctx"
-#define TPM2_SIGNING_KEY_NAME "/opt/ovsa/tmp_dir/signing_key.name"
+#define TPM2_RH_ENDORSEMENT "0x4000000B"
+#define TPM2_UNSEALKEY_FILE "/opt/ovsa/mnt/unseal_key.bin"
 
 /** \brief This function unseals the encryption key from tpm.
  *

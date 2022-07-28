@@ -109,6 +109,9 @@ typedef enum {
     OVSA_INTEGER_UNDERFLOW                             = -47,
     OVSA_PEER_CERT_HASH_VALIDATION_FAILED              = -48,
     OVSA_CONTROLED_ACCESS_MODEL_HASH_VALIDATION_FAILED = -49,
+    OVSA_RMFILE_FAIL                                   = -50,
+    OVSA_CLOSEDIR_FAIL                                 = -51,
+    OVSA_RMDIR_FAIL                                    = -52,
 
     OVSA_FAIL = -99
 } ovsa_status_t;

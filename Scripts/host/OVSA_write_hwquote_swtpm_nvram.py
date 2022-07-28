@@ -19,6 +19,7 @@ import json, subprocess, sys, os
 NVM_SIZE_LEN=8
 FIRST_CHUNK_SIZE=2040
 CHUNK_SIZE=2048
+PTT_ondie_CA_cert=False
 
 config_str = '{{ "HW_Quote_MSG": "{quote_msg}",  "HW_Quote_SIG": "{quote_sig}", "HW_Quote_PCR": "{quote_pcr}", "HW_AK_Pub_Key": "{tpm_ak}", "HW_EK_Pub_Key": "{tpm_ek}", "HW_EK_Cert": "{tpm_cert}" }}'
 
@@ -39,21 +40,21 @@ def check_result(return_val,user_mesg):
 
 def generate_AK_EK_keys():
     print("Generating EK & AK Keys")
-    return_val = runcommand('tpm2_flushcontext -s')
+    return_val = runcommand('tpm2_flushcontext -s -T device:/dev/tpmrm0')
     check_result(return_val,"Flushing tpm2 context")
-    return_val  = runcommand('tpm2_createek --ek-context tpm_ek.ctx --key-algorithm rsa --public tpm_ek.pub')
+    return_val  = runcommand('tpm2_createek --ek-context tpm_ek.ctx --key-algorithm rsa --public tpm_ek.pub -T device:/dev/tpmrm0')
     check_result(return_val,'Generating EK context')
-    return_val  = runcommand('tpm2_createak --ek-context tpm_ek.ctx --ak-context tpm_ak.ctx --key-algorithm rsa --hash-algorithm sha256 --signing-algorithm rsassa --public tpm_ak.pub --private tpm_ak.priv --ak-name tpm_ak.name')
+    return_val  = runcommand('tpm2_createak --ek-context tpm_ek.ctx --ak-context tpm_ak.ctx --key-algorithm rsa --hash-algorithm sha256 --signing-algorithm rsassa --public tpm_ak.pub --private tpm_ak.priv --ak-name tpm_ak.name -T device:/dev/tpmrm0')
     check_result(return_val,'Generating AK context')
-    return_val  = runcommand('tpm2_startauthsession --session tmp_session_ctx --policy-session')
+    return_val  = runcommand('tpm2_startauthsession --session tmp_session_ctx --policy-session -T device:/dev/tpmrm0')
     check_result(return_val,"Authenticating session context")
-    return_val  = runcommand('tpm2_policysecret --session tmp_session_ctx --object-context e')
+    return_val  = runcommand('tpm2_policysecret --session tmp_session_ctx --object-context e -T device:/dev/tpmrm0')
     check_result(return_val,'Generating policy secret')
-    return_val  = runcommand('tpm2_readpublic -c tpm_ak.ctx -o tpm_ak.pub.pem -f pem')
+    return_val  = runcommand('tpm2_readpublic -c tpm_ak.ctx -o tpm_ak.pub.pem -f pem -T device:/dev/tpmrm0')
     check_result(return_val,'Reading EK Keys in PEM Format')
-    return_val  = runcommand('tpm2_readpublic -c tpm_ek.ctx -o tpm_ek.pub.pem -f pem')
+    return_val  = runcommand('tpm2_readpublic -c tpm_ek.ctx -o tpm_ek.pub.pem -f pem -T device:/dev/tpmrm0')
     check_result(return_val,'Reading AK Keys in PEM Format')
-    return_val  = runcommand('tpm2_load --parent-context tpm_ek.ctx --public tpm_ak.pub --private tpm_ak.priv --key-context tpm_ak.ctx --auth session:tmp_session_ctx')
+    return_val  = runcommand('tpm2_load --parent-context tpm_ek.ctx --public tpm_ak.pub --private tpm_ak.priv --key-context tpm_ak.ctx --auth session:tmp_session_ctx -T device:/dev/tpmrm0')
     check_result(return_val,'Loading tpm2 context')
     print("Successfully generated AK EK keys...")
     
@@ -99,7 +100,73 @@ def read_HWEK_cert():
     return_val  = runcommand(cmd)
     check_result(return_val, 'Reading EK certificate in PEM Format')
     print("Successfully read HW EK Certificate...")
-    
+
+    print( "Check for PTT ondie CA Cert")
+    EK_CERT_CHAIN_START_INDEX='0x01C00100'
+    EK_CERT_CHAIN_END_INDEX='0x01c001ff'
+    from ast import literal_eval
+    nvindex_val = []
+    ek_cert_chain_start_index = literal_eval(EK_CERT_CHAIN_START_INDEX)
+    ek_cert_chain_end_index = literal_eval(EK_CERT_CHAIN_END_INDEX)
+    index = 0
+    NV_INDEX=ek_cert_chain_start_index
+    global PTT_ondie_CA_cert
+    while (hex(NV_INDEX) < hex(ek_cert_chain_end_index)):
+        NV_INDEX= ek_cert_chain_start_index + index
+        cmd="tpm2_nvreadpublic | grep -i " + str(hex(NV_INDEX))
+        return_val = runcommand(cmd)
+        if(return_val[0]==0):
+            print("Reading PTT ondie NVIndex")
+            cmd ="tpm2_nvreadpublic " + str(hex(NV_INDEX)) + " | grep size |  awk '{print $2}'"
+            return_val = runcommand(cmd)
+            NV_SIZE = return_val[1]
+            check_result(return_val,'Error in reading PTT ondie NVIndex')
+            cmd ="tpm2_nvread --hierarchy owner --output tpm_ek_cert_chain_index.bin " + str(hex(NV_INDEX)) + " --size " + str(NV_SIZE)
+            return_val = runcommand(cmd)
+            check_result(return_val,'Error in reading PTT ondie CA Cert from NVIndex')
+            print("Successfully read PTT ondie CA Cert from NVIndex",str(hex(NV_INDEX)))
+            cmd = "cat tpm_ek_cert_chain_index.bin >> tpm_ek_cert_chain.bin"
+            return_val = runcommand(cmd)
+            check_result(return_val, 'cat tpm_ek_cert_chain_index.bin to tpm_ek_cert_chain.bin')
+            PTT_ondie_CA_cert=True
+        else:
+            break
+        index = index + 1
+
+    if(PTT_ondie_CA_cert==True):
+        print("Reading intermediate files from chain")
+        cmd = "./icert_ondie_ca.sh tpm_ek_cert_chain.bin"
+        return_val = runcommand(cmd)
+
+        check_result(return_val, 'Reading EK certificate in PEM Format')
+        cmd = "mv 0.pem ROM_cert.pem"
+        return_val = runcommand(cmd)
+        check_result(return_val, 'Moving 0.pem to ROM_cert.pem')
+
+        cmd = "mv 1.pem Kernel_cert.pem"
+        return_val = runcommand(cmd)
+        check_result(return_val, 'Moving 1.pem to Kernel_cert.pem')
+
+        cmd = "mv 2.pem PTT_cert.pem"
+        return_val = runcommand(cmd)
+        check_result(return_val, 'Moving 2.pem to PTT_cert.pem.pem')
+
+        print("Storing the chain in PEM format")
+
+        cmd = "cat tpm_hw_ek_cert.pem > Ondie_chain.pem"
+        return_val = runcommand(cmd)
+        check_result(return_val, 'cat tpm_ek_cert.pem to Ondie_chain.pem')
+
+        cmd = "cat PTT_cert.pem >> Ondie_chain.pem"
+        return_val = runcommand(cmd)
+        check_result(return_val, 'cat PTT_cert.pem to Ondie_chain.pem')
+
+        cmd = "cat Kernel_cert.pem >> Ondie_chain.pem"
+        return_val = runcommand(cmd)
+        check_result(return_val, 'cat Kernel_cert.pem to Ondie_chain.pem')
+    else:
+        print("PTT ondie NVIndex doesn't exsist")
+
 def generate_HW_quote():
     print("Generate HW quote")
     cmd="openssl dgst -sha256 tpm_sw_ek_cert.pem | grep tpm_sw_ek_cert | awk '{print $2}'"
@@ -145,7 +212,23 @@ def construct_json_blob():
     tmp_qpcr = fd.read()
     tmp_quote_pcr = tmp_qpcr.replace("\n", "\\n")
     fd.close()
-    json_strg = config_str.format(quote_msg=tmp_quote_msg,quote_sig=tmp_quote_sig,quote_pcr=tmp_quote_pcr,tpm_ak=ak_pub_pem,tpm_ek=ek_pub_pem,tpm_cert=ek_cert_pem)
+    global config_str
+    if(PTT_ondie_CA_cert==True):
+        print('PTT_ondie_CA_cert is TRUE')
+        config_str = '{{ "HW_Quote_MSG": "{quote_msg}",  "HW_Quote_SIG": "{quote_sig}", "HW_Quote_PCR": "{quote_pcr}", "HW_AK_Pub_Key": "{tpm_ak}", "HW_EK_Pub_Key": "{tpm_ek}", "HW_EK_Cert": "{tpm_cert}", "ROM_cert": "{ROM_cert}", "Ondie_chain": "{Ondie_chain}"}}'
+        fd = open('ROM_cert.pem', 'r')
+        tmp_rcert = fd.read()
+        tmp_ROM_cert = tmp_rcert.replace("\n", "\\n")
+        fd.close()
+        fd = open('Ondie_chain.pem', 'r')
+        tmp_ondie = fd.read()
+        tmp_Ondie_chain = tmp_ondie.replace("\n", "\\n")
+        fd.close()
+        json_strg = config_str.format(quote_msg=tmp_quote_msg,quote_sig=tmp_quote_sig,quote_pcr=tmp_quote_pcr,tpm_ak=ak_pub_pem,tpm_ek=ek_pub_pem,tpm_cert=ek_cert_pem,
+                ROM_cert=tmp_ROM_cert,Ondie_chain=tmp_Ondie_chain)
+    else:
+        print('PTT_ondie_CA_cert is FALSE')
+        json_strg = config_str.format(quote_msg=tmp_quote_msg,quote_sig=tmp_quote_sig,quote_pcr=tmp_quote_pcr,tpm_ak=ak_pub_pem,tpm_ek=ek_pub_pem,tpm_cert=ek_cert_pem)
     tpm_json = json.loads(json_strg)
     with open("tpm_data.json", "w") as fp:
         fp.write(json.dumps(tpm_json,indent = 4))
@@ -229,7 +312,7 @@ def write_into_nvram(swtmpport):
     print("---------------------------------------------------------------------------")
 
 def cleanup():
-    result = runcommand("rm tpm_* tmp_* chunk_* tpm_data.json")
+    result = runcommand("rm tpm_* tmp_* chunk_* tpm_data.json *.pem")
     
 def main():
     if len(sys.argv) == 1:

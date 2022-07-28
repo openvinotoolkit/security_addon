@@ -15,12 +15,14 @@
 #
 
 SRC_BUILD_DIR  := $(OVSARUNTIME_DIR)
+DEPSDIR := $(SRC_BUILD_DIR)/../deps
+
 DEBUG ?=
 export DEBUG=1
 
 ifeq ($(SGX),1)
 CFLAGS += -DENABLE_SGX_GRAMINE
-else
+else ifeq ($(KVM),1)
 CFLAGS += -DKVM -DENABLE_QUOTE_FROM_NVRAM
 endif
 
@@ -37,12 +39,11 @@ endif
 OVSATOOL_INC_DIR := -I$(SRC_BUILD_DIR)/include \
 	   -I$(SRC_BUILD_DIR)/include/rapidjson \
            -I$(SRC_BUILD_DIR)/../Ovsa_tool/include \
-      	   -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/app \
-           -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/lib/safestringlib/include \
-	   -I$(SRC_BUILD_DIR)/mbedtls/install/include -I../mbedtls/crypto/include \
-	   -I$(SRC_BUILD_DIR)/mbedtls/install/include -I../mbedtls/crypto/include \
-           -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/lib/cJSON \
-           -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/lib/openssl/include
+	   -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/app \
+	   -I$(DEPSDIR)/safestringlib/include \
+	   -I$(DEPSDIR)/mbedtls/install/include -I$(DEPSDIR)/mbedtls/crypto/include \
+	   -I$(DEPSDIR)/cJSON \
+	   -I$(DEPSDIR)/openssl/include
 
 OVSATOOL_SRC_DIR = $(SRC_BUILD_DIR)/../Ovsa_tool/src/app
 OVSATOOL_LIB_DIR := $(SRC_BUILD_DIR)/../Ovsa_tool/lib

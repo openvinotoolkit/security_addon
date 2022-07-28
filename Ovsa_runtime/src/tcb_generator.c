@@ -41,21 +41,25 @@ void ovsa_tcb_gen_help(char* argv) {
     printf("-v : TCB version\n");
     printf("-f : TCB file name\n");
     printf("-k : Keystore name\n");
-#ifndef ENABLE_SGX_GRAMINE
-    printf("-s : sw_pcr_reg_id [exclude sw pcr registers,valid range=0x1:0xffffff]\n");
-    printf("-h : hw_pcr_reg_id [exclude hw pcr registers,valid range=0x1:0xffffff]\n");
-    printf(
-        "%s gen-tcb-signature -n <TCB name> -v <TCB version> -f <TCB file name> -k "
-        "<Keystore> -s <sw_pcr_reg_id> -h <hw_pcr_reg_id>\n",
-        argv);
-#endif
 #ifdef ENABLE_SGX_GRAMINE
     printf("-s : SGX signature file\n");
     printf(
         "%s gen-tcb-signature -n <TCB name> -v <TCB version> -f <TCB file name> -k "
         "<Keystore> -s <SGX signature file>\n",
         argv);
-
+#elif KVM
+    printf("-h : hw_pcr_reg_id [exclude hw pcr registers,valid range=0x1:0xffffff]\n");
+    printf("-s : sw_pcr_reg_id [exclude sw pcr registers,valid range=0x1:0xffffff]\n");
+    printf(
+        "%s gen-tcb-signature -n <TCB name> -v <TCB version> -f <TCB file name> -k "
+        "<Keystore> -s <sw_pcr_reg_id> -h <hw_pcr_reg_id>\n",
+        argv);
+#else /* Host Build */
+    printf("-h : hw_pcr_reg_id [exclude hw pcr registers,valid range=0x1:0xffffff]\n");
+    printf(
+        "%s gen-tcb-signature -n <TCB name> -v <TCB version> -f <TCB file name> -k "
+        "<Keystore> -h <hw_pcr_reg_id>\n",
+        argv);
 #endif
 }
 
@@ -160,6 +164,9 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
                     ret = OVSA_INVALID_PARAMETER;
                     goto out;
                 }
+#ifndef KVM
+                OVSA_DBG(DBG_I, "WARNING: Ignoring Software PCR ID's provided with '-s' option\n");
+#endif
                 ret = ovsa_get_pcr_exclusion_set(optarg, &sw_pcr_reg_id);
                 if (ret < OVSA_OK) {
                     OVSA_DBG(DBG_E, "OVSA: Error get SW pcr exclusion failed with error code %d\n",
@@ -204,6 +211,14 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
     nmask = S_IRGRP | S_IWGRP | /* group read write */
             S_IROTH | S_IWOTH;  /* other read write */
     umask(nmask);               /*0666 & ~066 = 0600 i.e., (-rw-------)*/
+
+    /* crypto init */
+    ret = ovsa_crypto_init();
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error crypto init failed with code %d\n", ret);
+        goto out;
+    }
+
     ret = ovsa_generate_reference_tcb(&tcb_sig_info.tcbinfo,
 #ifndef ENABLE_SGX_GRAMINE
                                       sw_pcr_reg_id, hw_pcr_reg_id
@@ -217,13 +232,6 @@ ovsa_status_t ovsa_do_tcb_generation(int argc, char* argv[]) {
     }
     memcpy_s(tcb_sig_info.tcbinfo.tcb_name, MAX_NAME_SIZE, tcb_name, MAX_NAME_SIZE);
     memcpy_s(tcb_sig_info.tcbinfo.tcb_version, MAX_VERSION_SIZE, tcb_version, MAX_VERSION_SIZE);
-
-    /* crypto init */
-    ret = ovsa_crypto_init();
-    if (ret < OVSA_OK) {
-        OVSA_DBG(DBG_E, "OVSA: Error crypto init failed with code %d\n", ret);
-        goto out;
-    }
 
     OVSA_DBG(DBG_I, "OVSA: Load Asymmetric Key\n");
     /* Get Asym Key Slot from Key store */

@@ -19,7 +19,10 @@
 #define __OVSA_UTILS_H_
 
 #include "license_service.h"
-#define NULL_TERMINATOR 1
+#define NULL_TERMINATOR   1
+#define SECRET_NONCE_SIZE 32
+#define RAND_NONCE_SIZE   16
+#define MAX_SYM_KEY_SIZE  4096
 static BIO* g_bio_err = NULL;
 
 /** \brief This function calculates the length of the input buffer.

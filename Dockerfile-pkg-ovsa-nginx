@@ -21,6 +21,8 @@ LABEL version="1.0.0"
 ARG DL_DIR=/tmp
 ARG build_type=dbg
 
+ARG release_dir=release_files
+
 USER root
 
 RUN apt update && apt install -y \
@@ -33,9 +35,9 @@ RUN apt update && apt install -y \
 WORKDIR /
 RUN mkdir -vp /ovsa-runtime/lib
 
-COPY /release_files/ovsa-runtime/lib /ovsa-runtime/lib
-COPY /release_files/ovsa-runtime/usr /usr
-COPY /release_files/ovsa-runtime/etc /etc
+COPY $release_dir/ovsa-runtime/lib /ovsa-runtime/lib
+COPY $release_dir/ovsa-runtime/usr /usr
+COPY $release_dir/ovsa-runtime/etc /etc
 
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/lib/:/ovsa-runtime/lib/
 

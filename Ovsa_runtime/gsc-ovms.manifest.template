@@ -50,7 +50,7 @@ sgx.allowed_files = [
                         "file:/tmp",
                         "file:/run/nginx.pid",
                         "file:/var/log/nginx/access.log",
-			"file:/sys"
+                        "file:/sys"
                 ]
 sgx.trusted_files = [
 "file:/usr/share/nginx/modules/ngx_http_image_filter_module.so",

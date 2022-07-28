@@ -20,7 +20,7 @@ VERSION = 1.0
 MAJOR = 1
 MINOR = 0
 
-TOPDIR := $(PWD)
+TOPDIR := $(shell pwd)
 export TOPDIR
 
 HTTP_PROXY := "$(http_proxy)"
@@ -28,30 +28,35 @@ HTTPS_PROXY := "$(https_proxy)"
 NO_PROXY := "$(no_proxy)"
 
 SGX ?= 
+KVM ?=
 
 DEBUG ?= 1
 export DEBUG=1
 
 BASE_IMAGE := openvino/model_server-build
+CPREFIX := host
+
+ifeq ($(KVM), 1)
+CPREFIX := kvm
+endif
 ifeq ($(SGX),1)
 export ENABLE_SGX_GRAMINE=1
+CPREFIX := sgx
 endif
 
-DEV_DIR := ovsa-developer
+DEV_DIR := ovsa-tools
 MODEL_HOSTING_DIR := ovsa-model-hosting
-HOST_DIR := ovsa-kvm-host
 LICSVR_DIR := ovsa-license-server
 CLIENT_DIR := ovms-client
 RUNTIME_DOCKER_DIR := ovsa-runtime-docker
 SGX_DIR := ovsa-sgx
-DIST_DIR := release_files
+DIST_DIR := release_files_$(CPREFIX)
 DIST_DEV_DIR := $(DIST_DIR)/$(DEV_DIR)/
 DIST_MODEL_HOSTING_DIR := $(DIST_DIR)/$(MODEL_HOSTING_DIR)/
-DIST_HOST_DIR := $(DIST_DIR)/$(HOST_DIR)/
 DIST_LICSVR_DIR := $(DIST_DIR)/$(LICSVR_DIR)/
 DIST_SGX_DIR := $(DIST_DIR)/$(SGX_DIR)/
 
-SRC_BUILD_DIR  := $(PWD)
+SRC_BUILD_DIR  := $(shell pwd)
 MV             := mv
 
 export MV
@@ -98,12 +103,12 @@ ifneq ($(SGX), 1)
                 --build-arg https_proxy=$(HTTPS_PROXY) \
                 --build-arg no_proxy=$(NO_PROXY) \
                 --build-arg BASE_IMAGE=$(BASE_IMAGE) \
-                -t openvino/model_server-ovsa-build:latest
-	$(eval BASE_IMAGE = openvino/model_server-ovsa-build:latest)
+                -t openvino/model_server-ovsa_$(CPREFIX)-build:latest
+	$(eval BASE_IMAGE = openvino/model_server-ovsa_$(CPREFIX)-build:latest)
 endif
 ifeq ($(SGX), 1)
-	docker image rm -f gsc-openvino/model_server-ovsa-nginx-mtls:latest 2>&1
-	docker image rm -f gsc-openvino/model_server-ovsa-nginx-mtls:latest-unsigned 2>&1
+	docker image rm -f gsc-openvino/model_server-ovsa_$(CPREFIX)-nginx-mtls:latest 2>&1
+	docker image rm -f gsc-openvino/model_server-ovsa_$(CPREFIX)-nginx-mtls:latest-unsigned 2>&1
 
 	mkdir -p  $(SRC_BUILD_DIR)/Ovsa_runtime/src/gramine/Pal/src/host/Linux-SGX/tools/ra-tls
 	cp $(GRAMINE_DIR)/Pal/src/host/Linux-SGX/tools/ra-tls/ra_tls.h \
@@ -133,7 +138,7 @@ ifeq ($(SGX), 1)
 	   $(GRAMINE_DIR)/build/subprojects/mbedtls-mbedtls-2.26.0-1/libmbedx509_gramine.a \
 	   $(SRC_BUILD_DIR)/Ovsa_runtime/lib_gramine/libmbedx509.a
 	cp $(SRC_BUILD_DIR)/Ovsa_runtime/lib/libra_tls_attest.so \
-	   $(SRC_BUILD_DIR)/Ovsa_runtime/lib_gramine/
+		$(SRC_BUILD_DIR)/Ovsa_runtime/lib_gramine/
 endif
 	docker build -f Dockerfile-build-ovsa . \
                 --build-arg http_proxy=$(HTTP_PROXY)  \
@@ -141,10 +146,11 @@ endif
                 --build-arg no_proxy=$(NO_PROXY) \
                 --build-arg BASE_IMAGE=$(BASE_IMAGE) \
                 --build-arg use_sgx=$(SGX) \
-                -t openvino/model_server-ovsa-build:latest
+		--build-arg use_kvm=$(KVM) \
+                -t openvino/model_server-ovsa_$(CPREFIX)-build:latest
 
 	mkdir -vp $(DIST_DIR)/ && cd $(DIST_DIR)/ && \
-                docker run openvino/model_server-ovsa-build:latest bash -c \
+                docker run openvino/model_server-ovsa_$(CPREFIX)-build:latest bash -c \
                         "tar -c -C / ovsa-runtime.tar* ; sleep 2" | tar -x
 
 	cd $(DIST_DIR) && tar -xzvf ovsa-runtime.tar.gz && rm ovsa-runtime.tar.gz
@@ -155,7 +161,9 @@ ifeq ($(SGX), 1)
                 --build-arg https_proxy=$(HTTPS_PROXY) \
                 --build-arg no_proxy=$(NO_PROXY) \
                 --build-arg use_sgx=$(SGX) \
-                -t openvino/model_server-ovsa-nginx-mtls:latest
+		--build-arg use_kvm=$(KVM) \
+		--build-arg release_dir=release_files_$(CPREFIX) \
+                -t openvino/model_server-ovsa_$(CPREFIX)-nginx-mtls:latest
 
 	cd $(GRAMINE_DIR)/gsc && \
                 ./gsc build --no-cache --insecure-args \
@@ -163,57 +171,49 @@ ifeq ($(SGX), 1)
                 --build-arg https_proxy=$(HTTPS_PROXY) \
                 --build-arg no_proxy=$(NO_PROXY) \
                 -c $(SRC_BUILD_DIR)/Ovsa_runtime/gsc-ovms-config.yaml \
-                openvino/model_server-ovsa-nginx-mtls:latest \
+                openvino/model_server-ovsa_$(CPREFIX)-nginx-mtls:latest \
                 $(SRC_BUILD_DIR)/Ovsa_runtime/gsc-ovms.manifest.template
 
 	cd $(GRAMINE_DIR)/gsc && \
                 ./gsc sign-image \
                 -c $(SRC_BUILD_DIR)/Ovsa_runtime/gsc-ovms-config.yaml \
-                openvino/model_server-ovsa-nginx-mtls:latest \
-                $(GRAMINE_DIR)/Pal/src/host/Linux-SGX/signer/enclave-key.pem
-
-	docker save -o $(DIST_DIR)/model_server-ovsa-nginx-mtls.tar.gz \
-		gsc-openvino/model_server-ovsa-nginx-mtls:latest
+                openvino/model_server-ovsa_$(CPREFIX)-nginx-mtls:latest \
+		$(GRAMINE_DIR)/Pal/src/host/Linux-SGX/signer/enclave-key.pem
+	docker save -o $(DIST_DIR)/model_server-ovsa_$(CPREFIX)-nginx-mtls.tar.gz \
+		gsc-openvino/model_server-ovsa_$(CPREFIX)-nginx-mtls:latest
 else
 	docker build --no-cache -f Dockerfile-pkg-ovsa-nginx . \
                 --build-arg http_proxy=$(HTTP_PROXY) \
                 --build-arg https_proxy=$(HTTPS_PROXY) \
                 --build-arg no_proxy=$(NO_PROXY) \
                 --build-arg use_sgx=$(SGX) \
-		-t openvino/model_server-ovsa-nginx-mtls:latest
+		--build-arg use_kvm=$(KVM) \
+		--build-arg release_dir=release_files_$(CPREFIX) \
+		-t openvino/model_server-ovsa_$(CPREFIX)-nginx-mtls:latest
 
-	docker save -o $(DIST_DIR)/model_server-ovsa-nginx-mtls.tar.gz \
-                openvino/model_server-ovsa-nginx-mtls:latest
+	docker save -o $(DIST_DIR)/model_server-ovsa_$(CPREFIX)-nginx-mtls.tar.gz \
+                openvino/model_server-ovsa_$(CPREFIX)-nginx-mtls:latest
 endif
 	cd $(DIST_DIR) && rm -rf ovsa-runtime
 
-.PHONY: runtime_docker_pkg
-runtime_docker_pkg: docker_build
-	mkdir -p $(DIST_DIR)/$(RUNTIME_DOCKER_DIR)
-	cp -vR $(DIST_DIR)/model_server-ovsa-nginx-mtls.tar.gz $(DIST_DIR)/$(RUNTIME_DOCKER_DIR)
-	cp -vR Example/runtime/sample.json $(DIST_DIR)/$(RUNTIME_DOCKER_DIR)
-	cp -vR Example/runtime/start_secure_ovsa_model_server.sh $(DIST_DIR)/$(RUNTIME_DOCKER_DIR)
-	cp -vR Scripts/install/load_ovsa_runtime_docker.sh $(DIST_DIR)/$(RUNTIME_DOCKER_DIR)
-	cd $(DIST_DIR) && tar cvzf $(RUNTIME_DOCKER_DIR).tar.gz $(RUNTIME_DOCKER_DIR)
-	cd $(DIST_DIR) && rm -rf $(RUNTIME_DOCKER_DIR) model_server-ovsa-nginx-mtls.tar.gz
 
 .PHONY: runtime_pkg
 runtime_pkg: docker_build
 ifneq ($(SGX), 1)
 	mkdir -vp $(DIST_MODEL_HOSTING_DIR)
 	cd $(DIST_MODEL_HOSTING_DIR) && \
-		mkdir -vp bin && \
-		mkdir -vp scripts && \
 		mkdir -vp example_client && \
 		mkdir -vp example_runtime
-	mv $(DIST_DIR)/model_server-ovsa-nginx-mtls.tar.gz $(DIST_MODEL_HOSTING_DIR)
-	cp -vR Ovsa_tool/bin/* $(DIST_MODEL_HOSTING_DIR)/bin
+
+	docker save -o $(DIST_DIR)/model_server-ovsa_$(CPREFIX)-nginx-mtls.tar.gz \
+                openvino/model_server-ovsa_$(CPREFIX)-nginx-mtls:latest
+	mv $(DIST_DIR)/model_server-ovsa_$(CPREFIX)-nginx-mtls.tar.gz $(DIST_MODEL_HOSTING_DIR)
 	cp -vR Example/client/* $(DIST_MODEL_HOSTING_DIR)/example_client/
-	cp -vR Example/runtime/* $(DIST_MODEL_HOSTING_DIR)/example_runtime/
-	cp -vR Scripts/guest/OVSA_create_ek_ak_keys.sh $(DIST_MODEL_HOSTING_DIR)/scripts/
-	cp -vR Scripts/guest/OVSA_Seal_Key_TPM_Policy_Authorize.sh $(DIST_MODEL_HOSTING_DIR)/scripts/
-	cp -vR Scripts/install/setupvars_kvm.sh  $(DIST_MODEL_HOSTING_DIR)/scripts/setupvars.sh
-	cp -vR Scripts/install/install_model_hosting.sh $(DIST_MODEL_HOSTING_DIR)/install.sh
+	cp -vR Example/runtime/generate_certs.sh $(DIST_MODEL_HOSTING_DIR)/example_runtime/
+	cp -vR Example/runtime/openssl_ca.conf $(DIST_MODEL_HOSTING_DIR)/example_runtime/
+	cp -vR Example/runtime/sample.json $(DIST_MODEL_HOSTING_DIR)/example_runtime/
+	cp -vR Example/runtime/start_secure_ovsa_$(CPREFIX)_model_server.sh $(DIST_MODEL_HOSTING_DIR)/example_runtime/
+	cp -vR Scripts/install/install_model_hosting_$(CPREFIX).sh $(DIST_MODEL_HOSTING_DIR)/install.sh
 	cd $(DIST_DIR) && tar cvzf $(MODEL_HOSTING_DIR).tar.gz $(MODEL_HOSTING_DIR)
 	cd $(DIST_DIR) && rm -rf $(MODEL_HOSTING_DIR)
 endif
@@ -226,13 +226,17 @@ ifneq ($(SGX), 1)
 		mkdir -vp bin && \
 		mkdir -vp lib && \
 		mkdir -vp scripts
+
 	cp -vR Ovsa_tool/bin/* $(DIST_DEV_DIR)/bin
 	cp -vR Ovsa_runtime/bin/* $(DIST_DEV_DIR)/bin/
 	cp -vR Ovsa_runtime/lib/* $(DIST_DEV_DIR)/lib
+	cp -vR Scripts/guest/ovsa-ramdisk.service $(DIST_DEV_DIR)/scripts
 	cp -vR Scripts/guest/OVSA_create_ek_ak_keys.sh $(DIST_DEV_DIR)/scripts/
+	cp -vR Scripts/guest/icert_ondie_ca.sh $(DIST_DEV_DIR)/scripts/
 	cp -vR Scripts/guest/OVSA_Seal_Key_TPM_Policy_Authorize.sh $(DIST_DEV_DIR)/scripts/
-	cp -vR Scripts/install/setupvars_kvm.sh $(DIST_DEV_DIR)/scripts/setupvars.sh
-	cp -vR Scripts/install/install_developer.sh $(DIST_DEV_DIR)/install.sh
+	cp -vR Scripts/guest/OVSA_Unseal_Key_TPM_Policy_Authorize.sh $(DIST_DEV_DIR)/scripts/
+	cp -vR Scripts/install/setupvars_$(CPREFIX).sh $(DIST_DEV_DIR)/scripts/setupvars.sh
+	cp -vR Scripts/install/install_tools_$(CPREFIX).sh $(DIST_DEV_DIR)/install.sh
 	cd $(DIST_DIR) && tar cvzf $(DEV_DIR).tar.gz $(DEV_DIR)
 	cd $(DIST_DIR) && rm -rf $(DEV_DIR)
 endif
@@ -245,19 +249,11 @@ lic_server_pkg: license_service_build
 	cp -vR License_service/lib/* $(DIST_LICSVR_DIR)/lib
 	cp -vR DB/* $(DIST_LICSVR_DIR)/DB
 	cp -vR Scripts/install/install_license_server.sh $(DIST_LICSVR_DIR)/install.sh
+	cp -vR Scripts/host/OVSA_add_tpm_ekcert_trust_store.sh $(DIST_LICSVR_DIR)/scripts/
 	cp -vR Scripts/guest/OVSA_install_license_server_cert.sh $(DIST_LICSVR_DIR)/scripts/
 	cp -vR Scripts/install/setupvars_license_server.sh $(DIST_LICSVR_DIR)/scripts/setupvars.sh
 	cd $(DIST_DIR) && tar cvzf $(LICSVR_DIR).tar.gz $(LICSVR_DIR)
 	cd $(DIST_DIR) && rm -rf $(LICSVR_DIR)
-
-.PHONY: client_pkg
-client_pkg: 
-	mkdir -p $(DIST_DIR)/$(CLIENT_DIR)
-	cp -vR Example/client/* $(DIST_DIR)/$(CLIENT_DIR)
-	cd $(DIST_DIR) && tar cvzf $(CLIENT_DIR).tar.gz $(CLIENT_DIR)
-	cd $(DIST_DIR) && rm -rf $(CLIENT_DIR)
-
-	echo "Done"
 
 .PHONY: sgx_pkg
 sgx_pkg:
@@ -269,7 +265,7 @@ ifeq ($(SGX), 1)
 		mkdir -vp scripts && \
 		mkdir -vp example_client && \
 		mkdir -vp example_runtime
-	mv $(DIST_DIR)/model_server-ovsa-nginx-mtls.tar.gz $(DIST_SGX_DIR)
+	mv $(DIST_DIR)/model_server-ovsa_$(CPREFIX)-nginx-mtls.tar.gz $(DIST_SGX_DIR)
 	cp -vR Ovsa_tool/bin/* $(DIST_SGX_DIR)/bin
 	cp -vR Ovsa_tool/ovsatool.manifest.sgx $(DIST_SGX_DIR)/
 	cp -vR Ovsa_tool/ovsatool.sig $(DIST_SGX_DIR)/
@@ -278,7 +274,10 @@ ifeq ($(SGX), 1)
 	cp -vR Ovsa_runtime/ovsaruntime.sig $(DIST_SGX_DIR)/
 	cp -vR Ovsa_runtime/lib/* $(DIST_SGX_DIR)/lib
 	cp -vR Example/client/* $(DIST_SGX_DIR)/example_client/
-	cp -vR Example/runtime/* $(DIST_SGX_DIR)/example_runtime/
+	cp -vR Example/runtime/generate_certs.sh $(DIST_SGX_DIR)/example_runtime/
+	cp -vR Example/runtime/openssl_ca.conf $(DIST_SGX_DIR)/example_runtime/
+	cp -vR Example/runtime/sample.json $(DIST_SGX_DIR)/example_runtime/
+	cp -vR Example/runtime/start_secure_ovsa_$(CPREFIX)_model_server.sh $(DIST_SGX_DIR)/example_runtime/
 	cp -vR Scripts/install/setupvars_sgx.sh $(DIST_SGX_DIR)/scripts/setupvars.sh
 	cp -vR Scripts/install/install_sgx.sh $(DIST_SGX_DIR)/install.sh
 	cd $(DIST_DIR) && tar cvzf $(SGX_DIR).tar.gz $(SGX_DIR)

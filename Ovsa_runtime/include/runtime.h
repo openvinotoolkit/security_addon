@@ -33,9 +33,9 @@
 #define SA                   struct sockaddr
 
 #define DISABLE_RA_TLS
-#define DEFAULT_PCR_ID_SET         "0xFFFFFF" /*Set all PCR ID's 0:23 */
-#define TPM2_NVM_HWQUOTE_LEN_FILE  "/opt/ovsa/tmp_dir/read_hwquote_len"
-#define TPM2_NVM_HWQUOTE_BLOB_FILE "/opt/ovsa/tmp_dir/read_hw_quote_"
+#define DEFAULT_PCR_ID_SET              "0xFFFFFF" /*Set all PCR ID's 0:23 */
+#define TPM2_NVM_HWQUOTE_LEN_FILE_NAME  "read_hwquote_len"
+#define TPM2_NVM_HWQUOTE_BLOB_FILE_NAME "read_hw_quote_"
 #endif
 
 #define MESSAGE_BLOB_TEXT_SIZE  34
@@ -68,6 +68,8 @@ typedef struct ovsa_quote_info {
     char* ak_pub_key;
     char* ek_pub_key;
     char* ek_cert;
+    char* ROM_cert;
+    char* Chain_cert;
 } ovsa_quote_info_t;
 
 typedef struct ovsa_ek_ak_bind_info {
@@ -78,10 +80,8 @@ typedef struct ovsa_ek_ak_bind_info {
     char* ek_cert;
     char* ek_cert_sig;
     char* platform_cert;
-#ifdef PTT_EK_ONDIE_CA
     char* ROM_cert;
     char* Chain_cert;
-#endif
 } ovsa_ek_ak_bind_info_t;
 #endif
 
@@ -264,12 +264,6 @@ ovsa_status_t ovsa_get_pcr_exclusion_set(char* pcr_exclusion, int* pcr_id_set);
  * \return ovsa_status_t
  */
 ovsa_status_t ovsa_send_EK_AK_bind_info(const int asym_keyslot, void** _ssl_session);
-
-/*!
- * \brief remove_quote_files
- * \Remove the quote file
- */
-void ovsa_remove_quote_files(void);
 
 /*!
  * \brief do_get_quote_nounce

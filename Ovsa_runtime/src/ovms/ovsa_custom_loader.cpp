@@ -114,6 +114,7 @@ OvsaCustomLoader::OvsaCustomLoader() {
 
 OvsaCustomLoader::~OvsaCustomLoader() {
     std::cout << "OvsaCustomLoader: Instance of Custom SampleLoader deleted" << std::endl;
+    ovsa_crypto_deinit();
 }
 
 CustomLoaderStatus OvsaCustomLoader::loaderInit(const std::string& loader_path) {

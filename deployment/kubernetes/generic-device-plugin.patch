@@ -1,0 +1,38 @@
+diff --git a/manifests/generic-device-plugin.yaml b/manifests/generic-device-plugin.yaml
+index a5f57d2..a4b61ef 100644
+--- a/manifests/generic-device-plugin.yaml
++++ b/manifests/generic-device-plugin.yaml
+@@ -21,30 +21,11 @@ spec:
+       - operator: "Exists"
+         effect: "NoSchedule"
+       containers:
+-      - image: squat/generic-device-plugin
++      - image: squat/generic-device-plugin:amd64-latest
++        imagePullPolicy: IfNotPresent
+         args:
+         - --device
+-        - '{"name": "serial", "groups": [
+-            {"paths": [{"path": "/dev/ttyUSB*"}]},
+-            {"paths": [{"path": "/dev/ttyACM*"}]},
+-            {"paths": [{"path": "/dev/tty.usb*"}]},
+-            {"paths": [{"path": "/dev/cu.*"}]},
+-            {"paths": [{"path": "/dev/cuaU*"}]},
+-            {"paths": [{"path": "/dev/rfcomm*"}]}
+-          ]}'
+-        - --device
+-        - '{"name": "video", "groups": [{"paths": [{"path": "/dev/video0"}]}]}'
+-        - --device
+-        - '{"name": "fuse", "groups": [{"count": 10, "paths": [{"path": "/dev/fuse"}]}]}'
+-        - --device
+-        - '{"name": "audio", "groups": [{"count": 10, "paths": [{"path": "/dev/snd"}]}]}'
+-        - --device
+-        - '{"name": "capture", "groups": [
+-            {"paths": [{"path": "/dev/snd/controlC0"}, {"path": "/dev/snd/pcmC0D0c"}]},
+-            {"paths": [{"path": "/dev/snd/controlC1", "mountPath": "/dev/snd/controlC0"}, {"path": "/dev/snd/pcmC1D0c", "mountPath": "/dev/snd/pcmC0D0c"}]},
+-            {"paths": [{"path": "/dev/snd/controlC2", "mountPath": "/dev/snd/controlC0"}, {"path": "/dev/snd/pcmC2D0c", "mountPath": "/dev/snd/pcmC0D0c"}]},
+-            {"paths": [{"path": "/dev/snd/controlC3", "mountPath": "/dev/snd/controlC0"}, {"path": "/dev/snd/pcmC3D0c", "mountPath": "/dev/snd/pcmC0D0c"}]}
+-          ]}'
++        - '{"name": "tpm", "groups": [{"paths": [{"path": "/dev/tpm0"},{"path": "/dev/tpmrm0"}]}]}'
+         name: generic-device-plugin
+         resources:
+           requests:
