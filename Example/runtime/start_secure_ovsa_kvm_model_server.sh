@@ -18,24 +18,27 @@
 REST_PORT=2225
 GRPC_PORT=3335
 
-MTLS_IMAGE=${1:-"gsc-openvino/model_server-ovsa-nginx-mtls:latest"}
+MTLS_IMAGE=${1:-"openvino/model_server-ovsa_kvm-nginx-mtls"}
 
-echo "Starting container. Hit CTRL+C to stop it. Use another terminal to send some requests, e.g. via using test_rest.sh or test_grpc.sh scripts."
-docker run --rm -ti \
-        --net=host \
-        --device=/dev/sgx_enclave:/dev/sgx_enclave \
-        --security-opt=no-new-privileges:true --cap-drop all \
-        --cap-add DAC_OVERRIDE \
-        --cap-add NET_BIND_SERVICE \
-        --cap-add KILL \
-        -p 88:8888 \
-        -p $REST_PORT:$REST_PORT \
-        -p $GRPC_PORT:$GRPC_PORT \
-        -v /var/run/aesmd/aesm.socket:/var/run/aesmd/aesm.socket \
-        -v ${PWD}:/sampleloader \
+echo "Starting container. Hit CTRL+C to stop it. Use another terminal to send some requests."
+docker run -d --rm -ti \
+	--device=/dev/tpm0:/dev/tpm0 \
+	--device=/dev/tpmrm0:/dev/tpmrm0 \
+	--security-opt=no-new-privileges:true --cap-drop all \
+	--cap-add SETUID \
+	--cap-add SETGID \
+	--cap-add CHOWN \
+	--cap-add DAC_OVERRIDE \
+	--cap-add NET_BIND_SERVICE \
+	--cap-add KILL \
+	-p $REST_PORT:$REST_PORT \
+	-p $GRPC_PORT:$GRPC_PORT \
+	-v ${PWD}:/sampleloader \
+	-v /opt/ovsa/kvm/keystore:/opt/ovsa/kvm/keystore \
+	-v /opt/ovsa/kvm/artefacts:/opt/ovsa/kvm/artefacts \
 	-v /opt/ovsa/tmp_dir:/opt/ovsa/tmp_dir \
-        -v /opt/ovsa/gramine/keystore:/opt/ovsa/gramine/keystore \
-        -v /opt/ovsa/gramine/artefacts:/opt/ovsa/gramine/artefacts \
+	-v /opt/ovsa/mnt:/opt/ovsa/mnt:ro \
+	-v /var/OVSA/Quote:/var/OVSA/Quote \
         -v /var/OVSA/Modelserver/server.pem:/certs/server.pem:ro \
         -v /var/OVSA/Modelserver/server.key:/certs/server.key:ro \
         -v /var/OVSA/Modelserver/client_cert_ca.pem:/certs/client_cert_ca.pem:ro \
@@ -43,8 +46,5 @@ docker run --rm -ti \
         -v /var/OVSA/Modelserver/client_cert_ca.crl:/certs/client_cert_ca.crl:ro \
 	-v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro \
         $MTLS_IMAGE \
-        /ovms_wrapper --config_path /sampleloader/sample.json \
-        --grpc_bind_address 8.8.8.8 --port $GRPC_PORT \
-        --rest_bind_address 1.1.1.1 --rest_port $REST_PORT \
-        --grpc_workers 1 --rest_workers 3
-
+        --config_path /sampleloader/sample.json \
+	--grpc_bind_address 8.8.8.8 --port $GRPC_PORT --rest_bind_address 1.1.1.1 --rest_port $REST_PORT

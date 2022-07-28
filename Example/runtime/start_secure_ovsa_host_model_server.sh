@@ -18,20 +18,27 @@
 REST_PORT=2225
 GRPC_PORT=3335
 
-MTLS_IMAGE=${1:-"openvino/model_server-ovsa-nginx-mtls"}
+MTLS_IMAGE=${1:-"openvino/model_server-ovsa_host-nginx-mtls"}
 
-echo "Starting container. Hit CTRL+C to stop it. Use another terminal to send some requests, e.g. via using test_rest.sh or test_grpc.sh scripts."
+echo "Starting container. Hit CTRL+C to stop it. Use another terminal to send some requests."
 docker run -d --rm -ti \
 	--device=/dev/tpm0:/dev/tpm0 \
 	--device=/dev/tpmrm0:/dev/tpmrm0 \
-	-p 88:8888 \
+	--security-opt=no-new-privileges:true --cap-drop all \
+	--cap-add SETUID \
+	--cap-add SETGID \
+	--cap-add CHOWN \
+	--cap-add DAC_OVERRIDE \
+	--cap-add NET_BIND_SERVICE \
+	--cap-add KILL \
 	-p $REST_PORT:$REST_PORT \
-        -p $GRPC_PORT:$GRPC_PORT \
+	-p $GRPC_PORT:$GRPC_PORT \
 	-v ${PWD}:/sampleloader \
-	-v /opt/ovsa/kvm/keystore:/opt/ovsa/kvm/keystore \
-	-v /opt/ovsa/kvm/artefacts:/opt/ovsa/kvm/artefacts \
+	-v /opt/ovsa/host/keystore:/opt/ovsa/host/keystore \
+	-v /opt/ovsa/host/artefacts:/opt/ovsa/host/artefacts \
 	-v /opt/ovsa/tmp_dir:/opt/ovsa/tmp_dir \
-	-v /var/OVSA:/var/OVSA \
+	-v /opt/ovsa/mnt:/opt/ovsa/mnt:ro \
+	-v /var/OVSA/Quote:/var/OVSA/Quote \
         -v /var/OVSA/Modelserver/server.pem:/certs/server.pem:ro \
         -v /var/OVSA/Modelserver/server.key:/certs/server.key:ro \
         -v /var/OVSA/Modelserver/client_cert_ca.pem:/certs/client_cert_ca.pem:ro \
