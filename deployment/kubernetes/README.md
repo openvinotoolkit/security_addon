@@ -501,7 +501,6 @@ istio-ingressgateway   LoadBalancer   10.108.107.171   <pending>     15021:30966
 	pip install futures==3.1.1
 	pip install opencv-python==4.4.0.46
 	pip install tensorflow-serving-api==2.*
-	deactivate
 	```
 
 #### Step 4:  Run Inference
