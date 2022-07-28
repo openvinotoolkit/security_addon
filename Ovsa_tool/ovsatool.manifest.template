@@ -82,4 +82,3 @@ sgx.allowed_files = [
 "file:/etc/ssl/certs/ca-certificates.crt",
 "file:/opt/ovsa/tmp_dir"
 ]
-

@@ -75,7 +75,6 @@ void OvsaModelInstance::threadFunction(std::future<void> futureObj) {
         if (count != 1) {
             // query license check service
             std::unique_lock<std::mutex> lockGuard(mutex_lock);
-            asym_keyslot = -1;
             status       = false;
             ovsa_status_t ret =
                 ovsa_crypto_load_asymmetric_key((char*)model_ksFile.c_str(), &asym_keyslot);
@@ -83,7 +82,6 @@ void OvsaModelInstance::threadFunction(std::future<void> futureObj) {
                 OVSA_DBG(DBG_E,
                          "OvsaModelInstance: Error load asymmetric keyslot failed with code %d\n",
                          ret);
-                lockGuard.unlock();
                 goto blacklist;
             }
             ret =
@@ -117,6 +115,8 @@ void OvsaModelInstance::threadFunction(std::future<void> futureObj) {
         OVSA_DBG(DBG_I, "OvsaModelInstance: Doing Some Work %d -> for model %s : version %d\n",
                  count, (char*)model_name.c_str(), model_version);
         count++;
+	//reset asym_keyslot value
+	asym_keyslot = -1;
         std::this_thread::sleep_for(std::chrono::milliseconds(watchIntervalSecs));
     }
 out:

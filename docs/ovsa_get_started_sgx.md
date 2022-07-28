@@ -1,4 +1,4 @@
- # OpenVINO™ Security Add-on for Gramine-SGX
+# OpenVINO™ Security Add-on for Gramine-SGX
 
 This guide provides instructions to run the OpenVINO™ Security Add-on in an Intel® Software Guard Extensions(Intel® SGX) enabled CPU running inside a Gramine-SGX Enclave.
 
@@ -62,14 +62,14 @@ modules to aid Intel® Applications in performing attestation
 	```sh
 	git clone https://github.com/gramineproject/gramine.git
 	cd gramine
-	git checkout 3f1601fc9cc86c66ad1810dba2f10f064bb0e1b8
+	git checkout 3f1601fc9cc86c66ad1810dba2f10f064bb0e1b8 
 	export GRAMINE_DIR=$PWD
 	```
 	Prepare a signing key:
 	```sh
 	mkdir -p Pal/src/host/Linux-SGX/signer/
 	openssl genrsa -3 -out Pal/src/host/Linux-SGX/signer/enclave-key.pem 3072
-	```
+ 	```
 	Build Gramine with SGX and RA-TLS DCAP attestation support:
 	```sh
 	# this assumes pre-requisites are not available
@@ -81,10 +81,10 @@ modules to aid Intel® Applications in performing attestation
 	# this assumes Linux 5.11+
 	meson setup build/ --buildtype=release -Ddirect=enabled -Dsgx=enabled -Ddcap=enabled
 	ninja -C build/
-	sudo ninja -C build/ install	
+	sudo ninja -C build/ install
 	```	
 	[For more details refer to Quick start with SGX support](https://gramine.readthedocs.io/en/latest/quickstart.html#quick-start-with-sgx-support)<br>
-	**Note** - In the below section you would need to export the GRAMINE_DIR to the path where Gramine was installed
+	> **Note** - In the below section you would need to export the GRAMINE_DIR to the path where Gramine was installed
 5. Install Gramine-GSC (Gramine Shielded Container) - 
 	Clone Gramine-GSC in the Gramine directory
 	```sh
@@ -138,9 +138,9 @@ Building OpenVINO™ Security Add-on depends on OpenVINO™ Model Server docker 
    SGX=1 make clean all
    SGX=1 make package
    ```
-4. Go to the `release_files` directory:
+4. Go to the `release_files_sgx` directory:
  	```sh
-    cd release_files
+    cd release_files_sgx
  	export OVSA_RELEASE_PATH=$PWD
  	```
 	The following packages are created under the `release_files` directory:
@@ -174,7 +174,7 @@ This step is for the Independent Software Vendor to host the License Server.
     cd $OVSA_RELEASE_PATH
     tar xvfz ovsa-license-server.tar.gz
     cd ovsa-license-server
-    sudo ./install.sh
+    sudo -E ./install.sh
     ```
 	This would install the OpenVINO™ Security Add-on License Server to `/opt/ovsa/` folder. The below are the folder structure details:
 	- `/opt/ovsa/bin`- Contains all the binaries
@@ -191,11 +191,13 @@ This step is for the Independent Software Vendor to host the License Server.
 	cd /opt/ovsa/bin
 	./license_server
 	```
-	**NOTE:** If you are behind a firewall, check and set your proxy settings to ensure the license server is able to validate the certificates.
+	> **Note**: If you are behind a firewall, check and set your proxy settings to ensure the license server is able to validate the certificates.
+
+	> **Note**: In case the License Server need to be hosted on a different machine by the ISV or if the License Server is used to validate requests from the OpenVINO™ Security Add-on KVM / Host only versions, ensure to the run the ```Scripts\reference\install_tpm_deps.sh``` from [OpenVINO™ Security Add-on](https://github.com/openvinotoolkit/security_addon) repo to install the TPM runtime dependencies **(there is no dependency on the physical TPM hardware)**.
 
 ## How to Use the OpenVINO™ Security Add-on
 
-This section requires interactions between the Model Developer/Independent Software vendor and the User. All roles must complete all applicable <a href="#setup-host">set up steps</a> and <a href="#ovsa-install">installation steps</a> before beginning this section.
+This section requires interactions between the Model Developer/Independent Software vendor and the User. All roles must complete all applicable <a href="#setup-host">set up steps</a> before beginning this section.
 
 This document uses the face-detection-retail-0004 model as an example.
 
@@ -280,7 +282,6 @@ gramine-sgx ovsaruntime gen-tcb-signature -n "Face Detect @ Runtime" -v "1.0" -f
 #### Step 6: Publish the access controlled Model and Runtime Reference TCB
 The access controlled model is ready to be shared with the User and the reference TCB is ready to perform license checks.
 
-
 ### Model User - Request Access Controlled Model
 Continue to generate the model User artefacts in the same terminal used to generate the Model Developer artefacts
 
@@ -327,15 +328,21 @@ Since in this example uses the same host machine enviroment, the data would be a
 ```sh
 gramine-sgx ovsatool licgen -t TimeLimit -l30 -n "Time Limit License Config" -v 1.0 -u "localhost:4451" /opt/ovsa/certs/server.crt  -k /opt/ovsa/gramine/keystore/isv_keystore -o /opt/ovsa/gramine/artefacts/fd/1/30daylicense.config
 ```
-**NOTE**: The parameter /opt/ovsa/certs/server.crt  contains the certificate used by the License Server. The server certificate will be added to the customer license and validated during use. Refer to [OpenVINO™ Security Add-on License Server Certificate Pinning](ovsa_license_server_cert_pinning.md)
+
+> **Note**:
+ 1.Mention the ip address according to your configuration at localhost.
+ 2.The parameter /opt/ovsa/certs/server.crt  contains the certificate used by the License Server. The server certificate will be added to the customer license and validated during use. Refer to [OpenVINO™ Security Add-on License Server Certificate Pinning](ovsa_license_server_cert_pinning.md)
 
 #### Step 3: Create the customer license
 ```sh
 gramine-sgx ovsatool sale -m /opt/ovsa/gramine/artefacts/fd/1/face_detection_model.masterlic -k /opt/ovsa/gramine/keystore/isv_keystore -l /opt/ovsa/gramine/artefacts/fd/1/30daylicense.config -t /opt/ovsa/gramine/artefacts/fd/1/face_detect_runtime.tcb -p /opt/ovsa/gramine/artefacts/fd/1/primary_custkeystore.csr.crt -c /opt/ovsa/gramine/artefacts/fd/1/face_detection_model.lic
 ```
-**NOTE**: If new private keys are generated, a new customer license would need to be generated for the model.
+> **Note**: If new private keys are generated, a new customer license would need to be generated for the model.
 
 #### Step 4: Update the license server database with the license.
+
+> **Note**: If the License Server is hosted on a different machine, the customer license, customer primary and secondary certificates need to be copied to the machine hosting the License Server first and then updated to the DB.
+
 ```sh
 python3 /opt/ovsa/DB/ovsa_store_customer_lic_cert_db.py /opt/ovsa/DB/ovsa.db /opt/ovsa/gramine/artefacts/fd/1/face_detection_model.lic /opt/ovsa/gramine/artefacts/fd/1/primary_custkeystore.csr.crt /opt/ovsa/gramine/artefacts/fd/1/secondary_custkeystore.csr.crt
 ```
@@ -345,7 +352,7 @@ Provide these files to the User:
 	* `face_detection_model.dat`
 	* `face_detection_model.lic`
 
-Since all these files are availble in the artefacts are available to model User
+Since all these files are available in the artefacts are available to model User
 
 ### Model User - Load Access Contolled Model to OpenVINO™ Model Server
 
@@ -383,7 +390,7 @@ The folder `/opt/ovsa/gramine/example_runtime/` contains all the required script
 #### Step 2: Start the NGINX Model Server
 The NGINX Model Server publishes the access controlled model.
 ```sh
-./start_secure_sgx_ovsa_model_server.sh
+./start_secure_ovsa_sgx_model_server.sh
 ```
 For information about the NGINX interface, see https://github.com/openvinotoolkit/model_server/blob/main/extras/nginx-mtls-auth/README.md
 
@@ -391,19 +398,22 @@ For information about the NGINX interface, see https://github.com/openvinotoolki
 
 1. Log on to the Host Machine from another terminal.
 
-2. Install the Python dependencies for your set up. For example:
-	```sh
-	sudo apt install pip3
-	pip3 install cmake
-	pip3 install scikit-build
-	pip3 install opencv-python
-	pip3 install futures==3.1.1
-	pip3 install tensorflow-serving-api==1.14.0
-	```
-3. Navigate to the  example_client folder in `/opt/ovsa/example_client`
+2. Navigate to the example_client folder in `/opt/ovsa/gramine/example_client`
 	```sh
 	cd /opt/ovsa/gramine/example_client/
 	```
+3. Install the Python dependencies for your set up in a virtual environment for the first time. For example:
+	Firstly, setup the virtual environment (using python3)
+	```sh
+	pip3 install --upgrade pip
+	sudo -E apt-get install python3-venv
+	python3 -m venv .env 
+	source .env/bin/activate
+	python -m pip install --upgrade pip
+	pip install futures==3.1.1
+	pip install opencv-python==4.4.0.46
+	pip install tensorflow-serving-api==2.*
+	```	
 4. Download the sample images for inferencing. An image directory is created that includes a sample image for inferencing.
 	```sh
 	curl --create-dirs https://raw.githubusercontent.com/openvinotoolkit/model_server/master/example_client/images/people/people1.jpeg -o images/people1.jpeg
@@ -412,7 +422,9 @@ For information about the NGINX interface, see https://github.com/openvinotoolki
 
 Run the `face_detection.py` script.
 ```sh
-python3 face_detection.py --grpc_port 3335 --batch_size 1 --width 300 --height 300 --input_images_dir images --output_dir results --tls --server_cert /var/OVSA/Modelserver/server.pem --client_cert /var/OVSA/Modelserver/client.pem --client_key /var/OVSA/Modelserver/client.key --model_name controlled-access-model
+cd /opt/ovsa/gramine/example_client/
+source .env/bin/activate
+python face_detection.py --grpc_port 3335 --batch_size 1 --width 300 --height 300 --input_images_dir images --output_dir results --tls --server_cert /var/OVSA/Modelserver/server.pem --client_cert /var/OVSA/Modelserver/client.pem --client_key /var/OVSA/Modelserver/client.key --model_name controlled-access-model
 ```
 
 ## Summary

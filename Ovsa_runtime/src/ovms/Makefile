@@ -15,6 +15,8 @@
 #
 
 SRC_BUILD_DIR  := ../..
+DEPSDIR := $(SRC_BUILD_DIR)/../deps
+
 DEBUG ?=
 export DEBUG=1
 
@@ -26,7 +28,7 @@ CP = cp
 
 ifeq ($(SGX),1)
 CFLAGS += -DENABLE_SGX_GRAMINE
-else
+else ifeq ($(KVM),1)
 CFLAGS += -DKVM -DENABLE_QUOTE_FROM_NVRAM
 endif
 
@@ -47,20 +49,19 @@ GRAMINE_INC_DIR := -I$(GRAMINE_DIR)/Pal/src/host/Linux-SGX/tools/ra-tls \
                     -I$(GRAMINE_DIR)/Pal/src/host/Linux-SGX
 endif
 
-
 OVSATOOL_INC_DIR := -I$(SRC_BUILD_DIR)/include \
-	   -I$(SRC_BUILD_DIR)/include/rapidjson \
            -I$(SRC_BUILD_DIR)/../Ovsa_tool/include \
       	   -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/app \
-           -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/lib/safestringlib/include \
-           -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/lib/cJSON \
-           -I$(SRC_BUILD_DIR)/../Ovsa_tool/src/lib/openssl/include -I$(OVMS_DIR)
+	   -I$(DEPSDIR)/rapidjson/include \
+	   -I$(DEPSDIR)/safestringlib/include \
+	   -I$(DEPSDIR)/cJSON \
+	   -I$(DEPSDIR)/openssl/include -I$(OVMS_DIR)
 
 ifeq ($(SGX),1)
 OVSATOOL_INC_DIR += -I$(SRC_BUILD_DIR)/mbedtls_gramine/ 
 else
-OVSATOOL_INC_DIR += -I$(SRC_BUILD_DIR)/mbedtls/install/include \
-		    -I../../mbedtls/crypto/include
+OVSATOOL_INC_DIR += -I$(DEPSDIR)/mbedtls/install/include \
+		    -I$(DEPSDIR)/mbedtls/crypto/include
 endif
 
 OVSATOOL_SRC_DIR = $(SRC_BUILD_DIR)/../Ovsa_tool/src/app

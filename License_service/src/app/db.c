@@ -398,8 +398,6 @@ ovsa_status_t ovsa_db_validate_license_usage(const char* db_name, const char* li
     db_status = sqlite3_step(stmt);
     if (db_status == SQLITE_ROW) {
         /* success */
-        OVSA_DBG(DBG_I, "OVSA:%s: ", sqlite3_column_text(stmt, 0));
-
         OVSA_DBG(DBG_I, "OVSA:license type - %d ", atoi(sqlite3_column_text(stmt, 1)));
         OVSA_DBG(DBG_I, "OVSA:usage count - %s ", sqlite3_column_text(stmt, 2));
         OVSA_DBG(DBG_I, "OVSA:time limit - %s\n", sqlite3_column_text(stmt, 3));

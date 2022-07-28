@@ -1,0 +1,12 @@
+[Unit]
+Description=ovsa-ramdisk service.
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStart=/var/OVSA/misc/OVSA_Unseal_Key_TPM_Policy_Authorize.sh start
+ExecStop=/var/OVSA/misc/OVSA_Unseal_Key_TPM_Policy_Authorize.sh stop
+
+[Install]
+WantedBy=multi-user.target
+

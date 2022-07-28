@@ -15,6 +15,8 @@
 #
 
 SRC_BUILD_DIR  := $(OVSATOOL_DIR)
+DEPSDIR := $(SRC_BUILD_DIR)/../deps
+
 ifeq ($(DEBUG),2)
 CFLAGS += -O0 -ggdb3
 else
@@ -30,8 +32,9 @@ endif
 CFLAGS +=  -g -Wall -DENABLE_SELF_SIGNED_CERT -DENABLE_OCSP_CHECK -fno-exceptions -fPIC -DDEBUG=$(DEBUG) -fstack-protector-strong -fPIE -fPIC -D_FORTIFY_SOURCE=2 -Wformat -Wformat-security -D_GNU_SOURCE
 INC_DIR := -I$(SRC_BUILD_DIR)/include \
 	   -I$(SRC_BUILD_DIR)/src/lib/libovsa \
-	   -I$(SRC_BUILD_DIR)/src/lib/safestringlib/include \
-	   -I$(SRC_BUILD_DIR)/src/lib/openssl/include
+	   -I$(DEPSDIR)/safestringlib/include \
+	   -I$(DEPSDIR)/openssl/include \
+	   -I$(DEPSDIR)/cJSON
 
 LFLAGS += -Wl,-rpath, -L$(SRC_BUILD_DIR)/lib
 

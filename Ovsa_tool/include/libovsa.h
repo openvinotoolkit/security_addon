@@ -23,6 +23,24 @@
 #include <time.h>
 
 #include "ovsa_errors.h"
+#define MAX_FILE_LEN     256
+#define RAND_ID_SIZE     4
+#define RAND_ID_BUF_SIZE (RAND_ID_SIZE * 2) /* In Hex format */
+
+extern char tmp_dir_path[MAX_FILE_LEN];
+
+#define CREATE_TMP_DIR_PATH(tmp_dir_path, rand_id)                              \
+    char random_id_buf[9];                                                      \
+    snprintf(random_id_buf, 9, "%s", rand_id);                                  \
+    memset_s(tmp_dir_path, sizeof(tmp_dir_path), 0);                            \
+    strcpy_s(tmp_dir_path, sizeof("/opt/ovsa/tmp_dir/"), "/opt/ovsa/tmp_dir/"); \
+    strcat_s(tmp_dir_path, MAX_FILE_LEN, random_id_buf);                        \
+    strcat_s(tmp_dir_path, MAX_FILE_LEN, "/");
+
+#define CREATE_FILE_PATH(tmp_dir_path, key_file, FILE_NAME)               \
+    memset_s(key_file, sizeof(key_file), 0);                              \
+    memcpy_s(key_file, MAX_FILE_LEN, tmp_dir_path, sizeof(tmp_dir_path)); \
+    strcat_s(key_file, MAX_FILE_LEN, FILE_NAME);
 
 /* Size of the HASH key Considering SHA512 for HASHING */
 #define HASH_SIZE 192 /* Actual 130: Considering the length for B64 */

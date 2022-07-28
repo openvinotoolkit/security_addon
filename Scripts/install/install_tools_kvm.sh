@@ -16,9 +16,20 @@
 #
 
 #set -e
+EXIT_CODE_CANCEL=1
+
+# check for sudo or root access
+if [ $(id -u) -ne 0 ] ; then
+    echo "Root or sudo permissions are required to run this script"
+    echo "To continue, please run this script under root account or with sudo."
+    echo
+    read -s -p "Press ENTER key to exit."
+    echo
+    exit $EXIT_CODE_CANCEL
+fi;
 
 echo
-echo "Installing OVSA Developer/ISV Tools"
+echo "Installing OVSA Tools"
 echo
 
 echo "Copying files to /opt/ovsa/kvm/bin directory..."
@@ -69,6 +80,7 @@ echo "Changing ownership to OVSA user with RD/WR & execution permission"
 chown ovsa:ovsa /var/OVSA/Quote 2>&1 | sed 's/^/    /'
 chmod 700 /var/OVSA/Quote 2>&1 | sed 's/^/    /'
 cp -vR /opt/ovsa/kvm/scripts/OVSA_create_ek_ak_keys.sh /var/OVSA/Quote 2>&1 | sed 's/^/    /'
+cp -vR /opt/ovsa/kvm/scripts/icert_ondie_ca.sh /var/OVSA/Quote 2>&1 | sed 's/^/ /'
 if [ -e /var/OVSA/Quote/nonce.bin -a \
      -e /var/OVSA/Quote/session.ctx -a \
      -e /var/OVSA/Quote/tpm_ak.ctx -a \
@@ -88,8 +100,19 @@ else
     cd /var/OVSA/Quote && ./OVSA_create_ek_ak_keys.sh 2>&1 | sed 's/^/    /'
     chmod 0600 /var/OVSA/Quote/*
     chmod 0700 /var/OVSA/Quote/OVSA_create_ek_ak_keys.sh
+    chmod 0700 /var/OVSA/Quote/icert_ondie_ca.sh
     cd -
 fi
+
+echo "Setting up ramdisk to store unsealed secret from TPM..."
+mkdir -vp /var/OVSA/misc 2>&1 | sed 's/^/    /'
+cp -vR scripts/OVSA_Unseal_Key_TPM_Policy_Authorize.sh /var/OVSA/misc/
+
+echo "Creating systemd ovsa-ramdisk service..."
+systemctl stop ovsa-ramdisk
+cp -vR scripts/ovsa-ramdisk.service /etc/systemd/system/ovsa-ramdisk.service
+systemctl enable ovsa-ramdisk
+systemctl start ovsa-ramdisk
 
 echo "Creating /opt/ovsa/kvm/keystore directory..."
 mkdir -vp /opt/ovsa/kvm/keystore 2>&1 | sed 's/^/    /'
@@ -114,7 +137,7 @@ chown ovsa:ovsa /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
 chmod 700 /opt/ovsa/tmp_dir 2>&1 | sed 's/^/    /'
 
 echo
-echo "Installing OVSA Developer/ISV Tools completed."
+echo "Installing OVSA Tools completed."
 echo
 echo
 echo "Open the .bashrc file in <user_directory>:"

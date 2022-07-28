@@ -127,8 +127,15 @@ ovsa_status_t ovsa_tpm2_generaterand() {
 
 ovsa_status_t ovsa_tpm2_generatequote(char* nonce) {
     ovsa_status_t ret = OVSA_OK;
+    char swquote_pcr_file[MAX_FILE_LEN];
+    char swquote_msg_file[MAX_FILE_LEN];
+    char swquote_sig_file[MAX_FILE_LEN];
 
     OVSA_DBG(DBG_D, "LibOVSA: Entering %s\n", __func__);
+
+    CREATE_FILE_PATH(tmp_dir_path, swquote_pcr_file, TPM2_SWQUOTE_PCR_FILE_NAME);
+    CREATE_FILE_PATH(tmp_dir_path, swquote_msg_file, TPM2_SWQUOTE_MSG_FILE_NAME);
+    CREATE_FILE_PATH(tmp_dir_path, swquote_sig_file, TPM2_SWQUOTE_SIG_FILE_NAME);
 
     if (nonce[0] == '\0') {
         nonce = TPM2_QUOTE_NONCE;
@@ -159,15 +166,15 @@ ovsa_status_t ovsa_tpm2_generatequote(char* nonce) {
                                "--pcr-list",
                                "sha256:all",
                                "--message",
-                               TPM2_SWQUOTE_MSG,
+                               swquote_msg_file,
                                "--signature",
-                               TPM2_SWQUOTE_SIG,
+                               swquote_sig_file,
                                "--qualification",
                                nonce,
                                "--hash-algorithm",
                                "sha256",
                                "--pcr",
-                               TPM2_SWQUOTE_PCR,
+                               swquote_pcr_file,
                                0};
 
     if (ovsa_do_run_tpm2_command(quote_cmd, NULL) != 0) {
@@ -289,6 +296,8 @@ ovsa_status_t ovsa_do_run_tpm2_command(char* const argv[], char* output) {
 
 ovsa_status_t ovsa_do_tpm2_activatecredential(char* cred_outbuf) {
     ovsa_status_t ret = OVSA_OK;
+    char tpm2_credout_file[MAX_FILE_LEN];
+    char tpm2_actcred_out_file[MAX_FILE_LEN];
 
     OVSA_DBG(DBG_D, "LibOVSA: Entering %s\n", __func__);
 
@@ -321,6 +330,9 @@ ovsa_status_t ovsa_do_tpm2_activatecredential(char* cred_outbuf) {
         return OVSA_TPM2_CMD_EXEC_FAIL;
     }
 
+    CREATE_FILE_PATH(tmp_dir_path, tpm2_credout_file, TPM2_CREDOUT_FILE_NAME);
+    CREATE_FILE_PATH(tmp_dir_path, tpm2_actcred_out_file, TPM2_ACTCRED_OUT_FILE_NAME);
+
     /* Activatecredential */
     char* const activatecredential_argv[] = {"/usr/bin/tpm2_activatecredential",
                                              "--credentialedkey-context",
@@ -328,9 +340,9 @@ ovsa_status_t ovsa_do_tpm2_activatecredential(char* cred_outbuf) {
                                              "--credentialkey-context",
                                              TPM2_EK_CTX,
                                              "--credential-blob",
-                                             TPM2_CREDOUT_FILE,
+                                             tpm2_credout_file,
                                              "--certinfo-data",
-                                             TPM2_ACTCRED_OUT,
+                                             tpm2_actcred_out_file,
                                              "--credentialkey-auth",
                                              "session:" TPM2_QUOTE_SESSION_CTX,
                                              0};
@@ -357,122 +369,41 @@ ovsa_status_t ovsa_do_tpm2_activatecredential(char* cred_outbuf) {
 }
 
 ovsa_status_t ovsa_tpm2_unsealkey(char* encryption_key) {
-    ovsa_status_t ret = OVSA_OK;
+    ovsa_status_t ret          = OVSA_OK;
+    char* unsealkey_buff       = NULL;
+    size_t unsealkey_file_size = 0;
 
     if (encryption_key == NULL) {
         OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
-
-    /* Load object to TPM */
-    char* const loadexternal_cmd[] = {"/usr/bin/tpm2_loadexternal",
-                                      "--key-algorithm=rsa",
-                                      "--hierarchy=o",
-                                      "--public=" TPM2_SEAL_SIGN_PUB_KEY,
-                                      "--key-context=" TPM2_SIGNING_KEY_CTX,
-                                      "--name=" TPM2_SIGNING_KEY_NAME,
-                                      0,
-                                      NULL};
-
-    if (ovsa_do_run_tpm2_command(loadexternal_cmd, NULL) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 loadexternal_cmd[0]);
-        return OVSA_TPM2_CMD_EXEC_FAIL;
+    /* Read unsealkey from ramdisk file */
+    FILE* fptr = fopen(TPM2_UNSEALKEY_FILE, "r");
+    if (fptr == NULL) {
+        ret = OVSA_FILEOPEN_FAIL;
+        OVSA_DBG(DBG_E, "LIBOVSA: Error opening unsealkey_file failed with code %d\n", ret);
+        goto exit;
     }
 
-    /* Verify the signature on the pcr and get the tpm verification tkt */
-    char* const verify_cmd[] = {"/usr/bin/tpm2_verifysignature",
-                                "--key-context=" TPM2_SIGNING_KEY_CTX,
-                                "--hash-algorithm=sha256",
-                                "--message=" TPM2_SEAL_PCR_POLICY,
-                                "--signature=" TPM2_SEAL_PCR_SIGN,
-                                "--ticket=" TPM2_VERIFICATION_TKT,
-                                "--scheme=rsassa",
-                                0,
-                                NULL};
-
-    if (ovsa_do_run_tpm2_command(verify_cmd, NULL) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 verify_cmd[0]);
-        return OVSA_TPM2_CMD_EXEC_FAIL;
+    /* Get length of unsealkey_file */
+    ret = ovsa_crypto_get_file_size(fptr, &unsealkey_file_size);
+    if (ret < OVSA_OK || unsealkey_file_size == 0) {
+        OVSA_DBG(DBG_E, "LIBOVSA: Error file size failed for %s with code %d\n",
+                 TPM2_UNSEALKEY_FILE, ret);
+        fclose(fptr);
+        goto exit;
     }
-
-    /* Start session with TPM */
-    char* const authsession_cmd[] = {"/usr/bin/tpm2_startauthsession", "--policy-session",
-                                     "--session=" TPM2_SESSION_CTX, 0, NULL};
-
-    if (ovsa_do_run_tpm2_command(authsession_cmd, NULL) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 authsession_cmd[0]);
-        return OVSA_TPM2_CMD_EXEC_FAIL;
+    unsealkey_buff = (char*)ovsa_crypto_app_malloc(unsealkey_file_size, TPM2_UNSEALKEY_FILE);
+    if (ret < OVSA_OK || unsealkey_buff == NULL) {
+        OVSA_DBG(DBG_E, "LIBOVSA: Error unsealkey_buff buffer allocation failed %d\n", ret);
+        fclose(fptr);
+        goto exit;
     }
+    ret = fread(unsealkey_buff, 1, unsealkey_file_size, fptr);
+    fclose(fptr);
+    strcpy_s(encryption_key, MAX_EKEY_SIZE, unsealkey_buff);
 
-    /* Create policy with PCR */
-    char* const policypcr_cmd[] = {"/usr/bin/tpm2_policypcr",
-                                   "--pcr-list=sha256:0",
-                                   "--session=" TPM2_SESSION_CTX,
-                                   "--policy=" TPM2_PCR_POLICY,
-                                   0,
-                                   NULL};
-
-    if (ovsa_do_run_tpm2_command(policypcr_cmd, NULL) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 policypcr_cmd[0]);
-        return OVSA_TPM2_CMD_EXEC_FAIL;
-    }
-
-    /* Run policyauthorize to Unseal */
-    char* const policyauth_cmd[] = {"/usr/bin/tpm2_policyauthorize",
-                                    "--session=" TPM2_SESSION_CTX,
-                                    "--input=" TPM2_PCR_POLICY,
-                                    "--name=" TPM2_SIGNING_KEY_NAME,
-                                    "--ticket=" TPM2_VERIFICATION_TKT,
-                                    0,
-                                    NULL};
-
-    if (ovsa_do_run_tpm2_command(policyauth_cmd, NULL) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 policyauth_cmd[0]);
-        return OVSA_TPM2_CMD_EXEC_FAIL;
-    }
-
-    /* Unseal output to the file */
-    char* const unseal_cmd[] = {"/usr/bin/tpm2_unseal", "--auth=session:" TPM2_SESSION_CTX,
-                                "--object-context=0x81010001", 0, NULL};
-
-    if (ovsa_do_run_tpm2_command(unseal_cmd, encryption_key) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 unseal_cmd[0]);
-        return OVSA_TPM2_CMD_EXEC_FAIL;
-    }
-
-    char* const flushcontext_cmd[] = {"/usr/bin/tpm2_flushcontext", TPM2_SESSION_CTX, NULL};
-
-    if (ovsa_do_run_tpm2_command(flushcontext_cmd, NULL) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Error tpm2 unsealing key failed to execute %s command\n",
-                 flushcontext_cmd[0]);
-        return OVSA_TPM2_CMD_EXEC_FAIL;
-    }
-
-    if (remove(TPM2_SIGNING_KEY_NAME) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Warning could not delete %s file\n", TPM2_SIGNING_KEY_NAME);
-    }
-
-    if (remove(TPM2_SIGNING_KEY_CTX) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Warning could not delete %s file\n", TPM2_SIGNING_KEY_CTX);
-    }
-
-    if (remove(TPM2_VERIFICATION_TKT) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Warning could not delete %s file\n", TPM2_VERIFICATION_TKT);
-    }
-
-    if (remove(TPM2_SESSION_CTX) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Warning could not delete %s file\n", TPM2_SESSION_CTX);
-    }
-
-    if (remove(TPM2_PCR_POLICY) != 0) {
-        OVSA_DBG(DBG_E, "LibOVSA: Warning could not delete %s file\n", TPM2_PCR_POLICY);
-    }
-
+exit:
+    ovsa_crypto_openssl_free(&unsealkey_buff);
     return ret;
 }

@@ -21,11 +21,12 @@ MAJOR = 1
 MINOR = 0
 
 ifndef TOPDIR
-TOPDIR := $(PWD)/..
+TOPDIR := $(shell pwd)/..
 endif
 export TOPDIR
 
 SRC_BUILD_DIR  := $(TOPDIR)/License_service
+DEPSDIR := $(SRC_BUILD_DIR)/../deps
 
 ifeq ($(SGX),1)
 export ENABLE_SGX_GRAMINE=1
@@ -56,34 +57,31 @@ endif
 
 .PHONY: ovsa_dependency_build
 ovsa_dependency_build: sqlite openssl_build tls_build
-	echo $(SRC_BUILD_DIR)
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/safestringlib),)
-	$(RM) -R $(SRC_BUILD_DIR)/src/lib/safestringlib
-	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/intel/safestringlib
-	$(MAKE) -C $(SRC_BUILD_DIR)/src/lib/safestringlib
-	$(MV) $(SRC_BUILD_DIR)/src/lib/safestringlib/libsafestring.a $(SRC_BUILD_DIR)/lib
-	$(RM) -R $(SRC_BUILD_DIR)/src/lib/safestringlib/unittests
+ifeq ($(wildcard  $(DEPSDIR)/safestringlib),)
+	cd $(DEPSDIR) && git clone https://github.com/intel/safestringlib
+	$(MAKE) -C $(DEPSDIR)/safestringlib directories libsafestring.a
 endif
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/cJSON),)
-	$(RM) -R $(SRC_BUILD_DIR)/src/lib/cJSON
-	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/DaveGamble/cJSON
-	cd $(SRC_BUILD_DIR)/src/lib/cJSON && git checkout --quiet v1.7.12
-	$(MAKE) -C $(SRC_BUILD_DIR)/src/lib/cJSON
-	$(MV) $(SRC_BUILD_DIR)/src/lib/cJSON/libcjson.a $(SRC_BUILD_DIR)/lib
+	cp $(DEPSDIR)/safestringlib/libsafestring.a $(SRC_BUILD_DIR)/lib
+
+ifeq ($(wildcard  $(DEPSDIR)/cJSON),)
+	cd $(DEPSDIR) && git clone https://github.com/DaveGamble/cJSON
+	cd $(DEPSDIR)/cJSON && git checkout --quiet v1.7.12
+	$(MAKE) -C $(DEPSDIR)/cJSON
 endif
+	cp $(DEPSDIR)/cJSON/libcjson.a $(SRC_BUILD_DIR)/lib
 
 .PHONY: openssl_build
 openssl_build: openssl/libcrypto.a
 
 openssl/libcrypto.a:
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/openssl),)
-	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/openssl/openssl.git
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1m
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && ./config --prefix=$(shell readlink -f crypto/) shared -fPIC
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && $(MAKE) && $(MAKE) -j1 install
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libcrypto.a ../../../lib
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libssl.a ../../../lib
+ifeq ($(wildcard  $(DEPSDIR)/openssl),)
+	cd $(DEPSDIR) && git clone https://github.com/openssl/openssl.git
+	cd $(DEPSDIR)/openssl && git checkout --quiet OpenSSL_1_1_1q
+	cd $(DEPSDIR)/openssl && ./config --prefix=$(shell readlink -f $(DEPSDIR)/crypto/) no-tests shared -fPIC
+	cd $(DEPSDIR)/openssl && $(MAKE) -j1 install_sw
 endif
+	cp $(DEPSDIR)/openssl/libcrypto.a $(SRC_BUILD_DIR)/lib
+	cp $(DEPSDIR)/openssl/libssl.a $(SRC_BUILD_DIR)/lib
 
 .PHONY: tls_build
 tls_build: mbedtls/CMakeLists.txt
@@ -95,7 +93,7 @@ ovsa_license_service_build:
 	CC=$(TARGET_CC)
 
 create_dirs:
-	mkdir -p $(SRC_BUILD_DIR)/lib $(SRC_BUILD_DIR)/bin $(SRC_BUILD_DIR)/src/lib 
+	mkdir -p $(SRC_BUILD_DIR)/lib $(SRC_BUILD_DIR)/bin $(SRC_BUILD_DIR)/src/lib $(DEPSDIR)
 	
 ############################# SQLITE DEPENDENCY ##############################
 
@@ -105,25 +103,22 @@ SQLITE_URI ?= https://www.sqlite.org/2021/
 SQLITE_CHECKSUM ?= f52b72a5c319c3e516ed7a92e123139a6e87af08a2dc43d7757724f6132e6db0
 
 $(SQLITE_SRC):
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/sqlite),)
-	$(SRC_BUILD_DIR)/download.sh --output $@ --url $(SQLITE_URI)/$(SQLITE_SRC) \
+	echo $(SRC_BUILD_DIR)
+	echo $(DEPSDIR)
+ifeq ($(wildcard  $(DEPSDIR)/sqlite),)
+	cd $(DEPSDIR) && $(SRC_BUILD_DIR)/download.sh --output $@ --url $(SQLITE_URI)/$(SQLITE_SRC) \
             --sha256 $(SQLITE_CHECKSUM)
 endif
 
 sqlite: $(SQLITE_SRC)
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/sqlite),)
-	tar -mxzf $(SQLITE_SRC)
-	$(RM) -rf $(SRC_BUILD_DIR)/src/lib/sqlite
-	$(MV) sqlite-autoconf-$(SQLITE_VERSION) src/lib/sqlite
-	$(RM) sqlite-autoconf-$(SQLITE_VERSION).tar.gz
-	cd $(SRC_BUILD_DIR)/src/lib/sqlite && autoreconf -f -i
-	cd $(SRC_BUILD_DIR)/src/lib/sqlite && ./configure
-	cd $(SRC_BUILD_DIR)/src/lib/sqlite && make
-	$(MV) $(SRC_BUILD_DIR)/src/lib/sqlite/.libs/libsqlite3.a $(SRC_BUILD_DIR)/lib
-	$(MV) $(SRC_BUILD_DIR)/src/lib/sqlite/sqlite3.h $(SRC_BUILD_DIR)/include
+ifeq ($(wildcard  $(DEPSDIR)/sqlite),)
+	cd $(DEPSDIR) && tar -mxzf $(SQLITE_SRC)
+	$(MV) $(DEPSDIR)/sqlite-autoconf-$(SQLITE_VERSION) $(DEPSDIR)/sqlite
+	cd $(DEPSDIR)/sqlite && autoreconf -f -i
+	cd $(DEPSDIR)/sqlite && ./configure
+	cd $(DEPSDIR)/sqlite && make
 endif
-
-
+	cp $(DEPSDIR)/sqlite/.libs/libsqlite3.a $(SRC_BUILD_DIR)/lib
 
 ############################# MBEDTLS DEPENDENCY ##############################
 MBEDTLS_VERSION ?= 3.1.0
@@ -143,37 +138,31 @@ MBED_BUILD_TYPE=Release
 endif
 
 $(MBEDTLS_SRC):
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/mbedtls),)
-	$(SRC_BUILD_DIR)/download.sh --output $@ --url $(MBEDTLS_URI)/$(MBEDTLS_SRC) \
-		--sha256 $(MBEDTLS_CHECKSUM)
+ifeq ($(wildcard  $(DEPSDIR)/mbedtls),)
+	cd $(DEPSDIR) && $(SRC_BUILD_DIR)/download.sh --output $@ --url $(MBEDTLS_URI)/$(MBEDTLS_SRC) \
+                --sha256 $(MBEDTLS_CHECKSUM)
 endif
 
 $(MBEDCRYPTO_SRC):
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/mbedtls),)
-	$(SRC_BUILD_DIR)/download.sh --output $@ --url $(MBEDCRYPTO_URI)/$(MBEDCRYPTO_SRC) \
+ifeq ($(wildcard  $(DEPSDIR)/mbedtls),)
+	cd $(DEPSDIR) && $(SRC_BUILD_DIR)/download.sh --output $@ --url $(MBEDCRYPTO_URI)/$(MBEDCRYPTO_SRC) \
 		--sha256 $(MBEDCRYPTO_CHECKSUM)
 endif
 
 mbedtls/CMakeLists.txt: $(MBEDTLS_SRC) $(MBEDCRYPTO_SRC)
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/mbedtls),)
-	tar -mxzf $(MBEDTLS_SRC)
-	tar -mxzf $(MBEDCRYPTO_SRC)
-	$(RM) -r mbedtls/mbedtls-mbedtls-$(MBEDTLS_VERSION)
-	mv mbedtls-mbedtls-$(MBEDTLS_VERSION) mbedtls
-	$(RM) -r mbedtls/crypto
-	mv mbed-crypto-mbedcrypto-$(MBEDCRYPTO_VERSION) mbedtls
-	mv mbedtls/mbed-crypto-mbedcrypto-$(MBEDCRYPTO_VERSION) mbedtls/crypto
-	$(RM) -r mbedtls/install
-	mkdir mbedtls/install
-	cd mbedtls && ./scripts/config.pl set MBEDTLS_CMAC_C && make SHARED=1 DESTDIR=install install .
-	$(RM) -r $(SRC_BUILD_DIR)/src/lib/mbedtls
-	mv mbedtls $(SRC_BUILD_DIR)/src/lib/mbedtls
-	$(RM) $(MBEDTLS_SRC) $(MBEDCRYPTO_SRC)
-	cp $(SRC_BUILD_DIR)/src/lib/mbedtls/install/lib/*.a lib
+ifeq ($(wildcard  $(DEPSDIR)/mbedtls),)
+	cd $(DEPSDIR) && tar -mxzf $(MBEDTLS_SRC)
+	cd $(DEPSDIR) && tar -mxzf $(MBEDCRYPTO_SRC)
+	mv $(DEPSDIR)/mbedtls-mbedtls-$(MBEDTLS_VERSION) $(DEPSDIR)/mbedtls
+	mv $(DEPSDIR)/mbed-crypto-mbedcrypto-$(MBEDCRYPTO_VERSION) $(DEPSDIR)/mbedtls
+	mv $(DEPSDIR)/mbedtls/mbed-crypto-mbedcrypto-$(MBEDCRYPTO_VERSION) $(DEPSDIR)/mbedtls/crypto
+	mkdir $(DEPSDIR)/mbedtls/install
+	cd $(DEPSDIR)/mbedtls && ./scripts/config.pl set MBEDTLS_CMAC_C && make SHARED=1 DESTDIR=install install .
 endif
+	cp $(DEPSDIR)/mbedtls/install/lib/*.a $(SRC_BUILD_DIR)/lib
 
 
- 
+
 .PHONY : clean
 clean:
 	$(MAKE) -C $(SRC_BUILD_DIR)/src/app clean
@@ -181,20 +170,18 @@ clean:
 
 .PHONY: format
 format:
-	clang-format-9 -i $(shell find . -path ./src/lib/safestringlib -prune -o \
-                                     -path ./src/lib/cJSON -prune -o \
-				     -path ./src/lib/sqlite -prune -o \
-                                     -path ./src/lib/safestringlib -prune -o \
-                                     -path ./src/lib/mbedtls -prune -o \
-				     -path ./src/lib/openssl -prune -o \
+	clang-format-9 -i $(shell find . -path ./../deps/safestringlib -prune -o \
+                                     -path ./../deps/cJSON -prune -o \
+				     -path ./../deps/sqlite -prune -o \
+                                     -path ./../deps/safestringlib -prune -o \
+                                     -path ./../deps/mbedtls -prune -o \
+				     -path ./../deps/openssl -prune -o \
 				     -path ./crypto -prune -o \
                                    \( -name '*.h' -o -name '*.c' \) -print)
 
 .PHONY: distclean
 distclean: clean
-	$(RM) $(SRC_BUILD_DIR)/include/sqlite3.h
+	$(RM) -r $(DEPSDIR)
 	$(RM) -r $(SRC_BUILD_DIR)/src/lib
-	$(RM) -r $(SRC_BUILD_DIR)/crypto
-	$(RM) -r $(SRC_BUILD_DIR)/lib/*.a
-	$(RM) -r $(SRC_BUILD_DIR)/lib/libmbed*
+	$(RM) -r $(SRC_BUILD_DIR)/lib
 	$(RM) -r $(SRC_BUILD_DIR)/bin

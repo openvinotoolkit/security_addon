@@ -17,12 +17,17 @@
 
 #include "utils.h"
 
+#include <dirent.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
 #include <pthread.h>
 #include <string.h>
+#include <unistd.h>
 
+#include "tpm.h"
+
+char tmp_dir_path[MAX_FILE_LEN];
 BIO* g_bio_err = NULL;
 
 pthread_mutex_t g_asymmetric_index_lock;
@@ -130,6 +135,109 @@ end:
     return xcert;
 }
 
+static ovsa_status_t ovsa_remove_directory(const char* path) {
+    ovsa_status_t ret = OVSA_OK;
+    size_t path_len   = 0;
+
+    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+
+    DIR* tmpdirectory = opendir(path);
+    ret               = ovsa_get_string_length((char*)path, &path_len);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error could not get length of path string %d\n", ret);
+        return OVSA_FAIL;
+    }
+    if (tmpdirectory) {
+        struct dirent* directory_entry;
+        while ((directory_entry = readdir(tmpdirectory))) {
+            char* buf  = NULL;
+            size_t len = 0;
+
+            /* Skip the names "." and ".." */
+            if (!strcmp(directory_entry->d_name, ".") || !strcmp(directory_entry->d_name, ".."))
+                continue;
+            len = path_len + strnlen_s(directory_entry->d_name, MAX_NAME_SIZE) + 2;
+            buf = ovsa_crypto_app_malloc(sizeof(char) * len, "directory remove buf");
+            if (buf == NULL) {
+                BIO_printf(g_bio_err,
+                           "LibOVSA: Error removing directory failed in allocating memory "
+                           "buffer\n");
+                ret = OVSA_MEMORY_ALLOC_FAIL;
+                goto end;
+            }
+
+            if (buf) {
+                struct stat statbuf;
+                snprintf(buf, len, "%s%s", path, directory_entry->d_name);
+                OVSA_DBG(DBG_D, "OVSA:Deleting '%s' file \n", buf);
+
+                if (!stat(buf, &statbuf)) {
+                    ret = unlink(buf);
+                    if (ret != OVSA_OK) {
+                        ovsa_crypto_openssl_free(&buf);
+                        return OVSA_RMFILE_FAIL;
+                    }
+                }
+                ovsa_crypto_openssl_free(&buf);
+            }
+        }
+        ret = closedir(tmpdirectory);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error close directory  failed with code %d\n", ret);
+            return OVSA_CLOSEDIR_FAIL;
+        }
+        OVSA_DBG(DBG_D, "OVSA:Deleting '%s' directory \n", path);
+        ret = rmdir(path);
+        if (ret < OVSA_OK) {
+            OVSA_DBG(DBG_E, "OVSA: Error remove directory  failed with code %d\n", ret);
+            return OVSA_RMDIR_FAIL;
+        }
+    }
+end:
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
+static void ovsa_convert_to_twodigithex(const char* buf, size_t size, char* outbuf) {
+    int i = 0;
+    for (int n = 0; n < size && i < RAND_ID_BUF_SIZE; n++) {
+        char conv[4];
+        snprintf(conv, 4, "%02hhx", buf[n]);
+        outbuf[i++] = conv[0];
+        outbuf[i++] = conv[1];
+    }
+    outbuf[i] = '\0';
+}
+static ovsa_status_t ovsa_create_rand_id_tmp_dir() {
+    ovsa_status_t ret = OVSA_OK;
+    int rng           = 0;
+    unsigned char rand_id[RAND_ID_SIZE];
+    unsigned char rand_id_buf[RAND_ID_BUF_SIZE];
+
+    OVSA_DBG(DBG_D, "OVSA:Entering %s\n", __func__);
+
+    memset_s(rand_id, sizeof(rand_id), 0);
+    memset_s(rand_id_buf, sizeof(rand_id_buf), 0);
+    memset_s(tmp_dir_path, sizeof(tmp_dir_path), 0);
+
+    /*Generate rand_id for creating tmp_dir */
+    rng = RAND_bytes(rand_id, RAND_ID_SIZE);
+    if (rng <= OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error RAND_bytes() returned %d\n", rng);
+        return -EINVAL;
+    }
+    ovsa_convert_to_twodigithex((const char*)rand_id, 16, (char*)rand_id_buf);
+
+    CREATE_TMP_DIR_PATH(tmp_dir_path, rand_id_buf);
+
+    ret = mkdir(tmp_dir_path, 0700);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error tmp directory %s creation failed ", tmp_dir_path);
+        return OVSA_FILEOPEN_FAIL;
+    }
+    OVSA_DBG(DBG_D, "OVSA:%s Exit\n", __func__);
+    return ret;
+}
+
 ovsa_status_t ovsa_crypto_init(void) {
     ovsa_status_t ret = OVSA_OK;
 
@@ -162,6 +270,12 @@ ovsa_status_t ovsa_crypto_init(void) {
         return OVSA_MUTEX_INIT_FAIL;
     }
 
+    /*Generate random_id directory to store temp files */
+    ret = ovsa_create_rand_id_tmp_dir();
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "Error create rand_id tmp directory failed with code %d\n", ret);
+        return OVSA_CRYPTO_GENERIC_ERROR;
+    }
     ovsa_crypto_initialised = 1;
 
     return ret;
@@ -213,6 +327,12 @@ ovsa_status_t ovsa_crypto_deinit(void) {
 
 end:
     BIO_free_all(g_bio_err);
+    ret = ovsa_remove_directory(tmp_dir_path);
+    if (ret < OVSA_OK) {
+        OVSA_DBG(DBG_E, "OVSA: Error remove directory  failed with code %d\n", ret);
+        return OVSA_RMDIR_FAIL;
+    }
+    OVSA_DBG(DBG_D, "OVSA:Removed the temp files from %s directory\n", tmp_dir_path);
     return ret;
 }
 

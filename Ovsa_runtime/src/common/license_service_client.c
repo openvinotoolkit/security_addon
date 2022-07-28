@@ -1224,7 +1224,6 @@ ovsa_status_t ovsa_perform_tls_license_check(const int asym_keyslot, const char*
                                  ret);
                         goto out;
                     }
-                    ovsa_remove_quote_files();
                     break;
 #endif
                 case OVSA_SEND_UPDATE_CUST_LICENSE:

@@ -15,6 +15,8 @@
 #
 
 SRC_BUILD_DIR  := $(TOPDIR)/License_service
+DEPSDIR := $(SRC_BUILD_DIR)/../deps
+
 ifeq ($(DEBUG),2)
 CFLAGS += -O0 -ggdb3
 else
@@ -33,16 +35,16 @@ all: license_server
 
 INC_LIBS := $(SRC_BUILD_DIR)/lib
 
-CFLAGS += -DDEBUG=$(DEBUG) -DENABLE_SELF_SIGNED_CERT #-DPTT_EK_ONDIE_CA #-DENABLE_OCSP_CHECK
+CFLAGS += -DDEBUG=$(DEBUG) -DENABLE_SELF_SIGNED_CERT #-DENABLE_OCSP_CHECK
 
-INC_DIR := -I$(SRC_BUILD_DIR)/src/lib/mbedtls/install/include \
-           -I$(SRC_BUILD_DIR)/src/lib/mbedtls/crypto/include \
+INC_DIR := -I$(DEPSDIR)/mbedtls/install/include \
+           -I$(DEPSDIR)/mbedtls/crypto/include \
 	   -I$(SRC_BUILD_DIR)/include \
 	   -I$(SRC_BUILD_DIR)/src/app \
-	   -I$(SRC_BUILD_DIR)/src/lib/openssl/include \
-	   -I$(SRC_BUILD_DIR)/src/lib/sqlite \
-	   -I$(SRC_BUILD_DIR)/src/lib/cJSON \
-	   -I$(SRC_BUILD_DIR)/src/lib/safestringlib/include
+	   -I$(DEPSDIR)/openssl/include \
+	   -I$(DEPSDIR)/sqlite \
+	   -I$(DEPSDIR)/cJSON \
+	   -I$(DEPSDIR)/safestringlib/include
 
 LFLAGS += -Wl,-rpath,$(INC_LIBS) -L$(INC_LIBS) -fpic -D_GNU_SOURCE
 
@@ -83,7 +85,7 @@ clean:
 
 .PHONY: format
 format:
-	clang-format-9 -i $(shell find . -path ./src/lib/safestringlib -prune -o \
+	clang-format-9 -i $(shell find . -path ./../deps/safestringlib -prune -o \
                                    \( -name '*.h' -o -name '*.c' \) -print)
 
 .PHONY: distclean

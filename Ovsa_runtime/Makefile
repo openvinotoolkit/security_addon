@@ -21,7 +21,7 @@ MAJOR = 1
 MINOR = 0
 
 ifndef TOPDIR
-TOPDIR := $(PWD)
+TOPDIR := $(shell pwd)
 OVSARUNTIME_DIR ?= $(TOPDIR)
 else
 OVSARUNTIME_DIR ?= $(TOPDIR)/Ovsa_runtime
@@ -36,6 +36,7 @@ ARCH_LIBDIR ?= /lib/$(shell $(CC) -dumpmachine)
 endif
 
 SRC_BUILD_DIR  := $(OVSARUNTIME_DIR)
+DEPSDIR := $(SRC_BUILD_DIR)/../deps
 MV             := mv
 
 export MV
@@ -88,52 +89,45 @@ MBED_BUILD_TYPE=Release
 endif
 
 $(MBEDTLS_SRC):
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/mbedtls),)
-	$(SRC_BUILD_DIR)/download.sh --output $@ --url $(MBEDTLS_URI)/$(MBEDTLS_SRC) \
+ifeq ($(wildcard  $(DEPSDIR)/mbedtls),)
+	cd $(DEPSDIR) && $(SRC_BUILD_DIR)/download.sh --output $@ --url $(MBEDTLS_URI)/$(MBEDTLS_SRC) \
                 --sha256 $(MBEDTLS_CHECKSUM)
 endif
 
 $(MBEDCRYPTO_SRC):
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/mbedtls),)
-	$(SRC_BUILD_DIR)/download.sh --output $@ --url $(MBEDCRYPTO_URI)/$(MBEDCRYPTO_SRC) \
+ifeq ($(wildcard  $(DEPSDIR)/mbedtls),)
+	cd $(DEPSDIR) && $(SRC_BUILD_DIR)/download.sh --output $@ --url $(MBEDCRYPTO_URI)/$(MBEDCRYPTO_SRC) \
                 --sha256 $(MBEDCRYPTO_CHECKSUM)
 endif
 
 build_mbedtls: $(MBEDTLS_SRC) $(MBEDCRYPTO_SRC)
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/mbedtls),)
-	tar -mxzf $(MBEDTLS_SRC)
-	tar -mxzf $(MBEDCRYPTO_SRC)
-	$(RM) -r mbedtls/mbedtls-mbedtls-$(MBEDTLS_VERSION)
-	mv mbedtls-mbedtls-$(MBEDTLS_VERSION) mbedtls
-	$(RM) -r mbedtls/crypto
-	mv mbed-crypto-mbedcrypto-$(MBEDCRYPTO_VERSION) mbedtls
-	mv mbedtls/mbed-crypto-mbedcrypto-$(MBEDCRYPTO_VERSION) mbedtls/crypto
-	$(RM) -r mbedtls/install
-	mkdir mbedtls/install
-	cd mbedtls && ./scripts/config.pl set MBEDTLS_CMAC_C && make SHARED=1 DESTDIR=install install .
-	cp mbedtls/install/lib/*.a lib
-	$(RM) *.tar.gz
+ifeq ($(wildcard  $(DEPSDIR)/mbedtls),)
+	cd $(DEPSDIR) && tar -mxzf $(MBEDTLS_SRC)
+	cd $(DEPSDIR) && tar -mxzf $(MBEDCRYPTO_SRC)
+	mv $(DEPSDIR)/mbedtls-mbedtls-$(MBEDTLS_VERSION) $(DEPSDIR)/mbedtls
+	mv $(DEPSDIR)/mbed-crypto-mbedcrypto-$(MBEDCRYPTO_VERSION) $(DEPSDIR)/mbedtls
+	mv $(DEPSDIR)/mbedtls/mbed-crypto-mbedcrypto-$(MBEDCRYPTO_VERSION) $(DEPSDIR)/mbedtls/crypto
+	mkdir $(DEPSDIR)/mbedtls/install
+	cd $(DEPSDIR)/mbedtls && ./scripts/config.pl set MBEDTLS_CMAC_C && make SHARED=1 DESTDIR=install install .
 endif
+	cp $(DEPSDIR)/mbedtls/install/lib/*.a $(SRC_BUILD_DIR)/lib
 
 ############################# RAPIDJSON DEPENDENCY ##############################
 
 RAPID_JSON_URI ?= https://github.com/Tencent/rapidjson.git
 rapidjson:
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/include/rapidjson),)
-	cd $(SRC_BUILD_DIR) && git clone $(RAPID_JSON_URI)
-	cd $(SRC_BUILD_DIR) && cp -r rapidjson/include/rapidjson $(SRC_BUILD_DIR)/include
-	cd $(SRC_BUILD_DIR) && rm -rf rapidjson
+ifeq ($(wildcard  $(DEPSDIR)/rapidjson),)
+	cd $(DEPSDIR) && git clone $(RAPID_JSON_URI)
 endif
 ####################
 
 create_dirs:
-	mkdir -p  $(SRC_BUILD_DIR)/lib  $(SRC_BUILD_DIR)/bin
+	mkdir -p  $(SRC_BUILD_DIR)/lib  $(SRC_BUILD_DIR)/bin $(DEPSDIR)
 
 ovsaruntime_build:
-	echo $(SRC_BUILD_DIR)
+	$(MAKE) -C $(SRC_BUILD_DIR)/../Ovsa_tool/
 	$(MAKE) -C $(SRC_BUILD_DIR)/src
 	$(MV) src/ovsaruntime $(SRC_BUILD_DIR)/bin
-
 
 	CC=$(TARGET_CC)
 
@@ -170,10 +164,12 @@ clean:
 	
 .PHONY: format
 format:
-	clang-format-9 -i $(shell find . -path ./include/rapidjson -prune -o \
-                                     -path ./mbedtls -prune -o \
+	clang-format-9 -i $(shell find . -path ./../deps/rapidjson -prune -o \
+                                     -path ./../deps/mbedtls -prune -o \
                                    \( -name '*.h' -o -name '*.c' \) -print)
 
 .PHONY: distclean
 distclean: clean
-	$(RM) -rf mbedtls $(SRC_BUILD_DIR)/include/rapidjson $(SRC_BUILD_DIR)/lib/*.so.* $(SRC_BUILD_DIR)/bin
+	$(RM) -rf $(DEPSDIR)
+	$(RM) -rf $(SRC_BUILD_DIR)/lib
+	$(RM) -rf $(SRC_BUILD_DIR)/bin

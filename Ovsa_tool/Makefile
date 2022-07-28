@@ -21,13 +21,12 @@ MAJOR = 1
 MINOR = 0
 
 ifndef TOPDIR
-TOPDIR := $(PWD)
+TOPDIR := $(shell pwd)
 OVSATOOL_DIR ?= $(TOPDIR)
 else
 OVSATOOL_DIR ?= $(TOPDIR)/Ovsa_tool
 endif
 export OVSATOOL_DIR
-
 SGX ?= 0
 
 DEBUG ?=
@@ -58,6 +57,7 @@ else
 endif
 
 SRC_BUILD_DIR  := $(OVSATOOL_DIR)
+DEPSDIR := $(SRC_BUILD_DIR)/../deps
 MV             := mv
 
 export MV
@@ -76,40 +76,38 @@ all: ovsatool.manifest.sgx ovsatool.sig ovsatool.token
 endif
 
 create_dirs:
-	mkdir -p  $(SRC_BUILD_DIR)/lib  $(SRC_BUILD_DIR)/bin
+	mkdir -p  $(SRC_BUILD_DIR)/lib  $(SRC_BUILD_DIR)/bin $(DEPSDIR)
 
 ovsatool_build:
-	echo $(SRC_BUILD_DIR)
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/safestringlib),)
-	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/intel/safestringlib
-	$(MAKE) -C $(SRC_BUILD_DIR)/src/lib/safestringlib
-	$(MV) $(SRC_BUILD_DIR)/src/lib/safestringlib/libsafestring.a $(SRC_BUILD_DIR)/lib
-	$(RM) -R $(SRC_BUILD_DIR)/src/lib/safestringlib/unittests
+ifeq ($(wildcard  $(DEPSDIR)/safestringlib),)
+	cd $(DEPSDIR)/ && git clone https://github.com/intel/safestringlib
+	$(MAKE) -C $(DEPSDIR)/safestringlib directories libsafestring.a
 endif
+	cp $(DEPSDIR)/safestringlib/libsafestring.a $(SRC_BUILD_DIR)/lib
 
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/cJSON),)
-	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/DaveGamble/cJSON
-	cd $(SRC_BUILD_DIR)/src/lib/cJSON && git checkout --quiet v1.7.12
-	$(MAKE) -C $(SRC_BUILD_DIR)/src/lib/cJSON
-	$(MV) $(SRC_BUILD_DIR)/src/lib/cJSON/libcjson.a $(SRC_BUILD_DIR)/lib
-	$(MV) $(SRC_BUILD_DIR)/src/lib/cJSON/cJSON.h $(SRC_BUILD_DIR)/include
+ifeq ($(wildcard  $(DEPSDIR)/cJSON),)
+	cd $(DEPSDIR) && git clone https://github.com/DaveGamble/cJSON
+	cd $(DEPSDIR)/cJSON && git checkout --quiet v1.7.12
+	$(MAKE) -C $(DEPSDIR)/cJSON
+endif
+	cp $(DEPSDIR)/cJSON/libcjson.a $(SRC_BUILD_DIR)/lib
 
+ifeq ($(wildcard  $(DEPSDIR)/curl),)
+	cd $(DEPSDIR) && git clone https://github.com/curl/curl.git
+	cd $(DEPSDIR)/curl && autoreconf -fi && ./configure --without-zlib --without-ssl --without-libidn2
+	$(MAKE) -C $(DEPSDIR)/curl
 endif
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/curl),)
-	$(RM) -R $(SRC_BUILD_DIR)/src/lib/curl
-	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/curl/curl.git
-	cd $(SRC_BUILD_DIR)/src/lib/curl && autoreconf -fi && ./configure --without-zlib --without-ssl --without-libidn2
-	$(MAKE) -C $(SRC_BUILD_DIR)/src/lib/curl
-	$(MV) $(SRC_BUILD_DIR)/src/lib/curl/lib/.libs/libcurl.a $(SRC_BUILD_DIR)/lib
+	cp $(DEPSDIR)/curl/lib/.libs/libcurl.a $(SRC_BUILD_DIR)/lib
+
+ifeq ($(wildcard  $(DEPSDIR)/openssl),)
+	cd $(DEPSDIR) && git clone https://github.com/openssl/openssl.git
+	cd $(DEPSDIR)/openssl && git checkout --quiet OpenSSL_1_1_1q
+	cd $(DEPSDIR)/openssl && ./config --prefix=$(shell readlink -f $(DEPSDIR)/crypto/) no-tests shared -fPIC
+	cd $(DEPSDIR)/openssl && $(MAKE) -j1 install_sw
 endif
-ifeq ($(wildcard  $(SRC_BUILD_DIR)/src/lib/openssl),)
-	cd $(SRC_BUILD_DIR)/src/lib && git clone https://github.com/openssl/openssl.git
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && git checkout --quiet OpenSSL_1_1_1m
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && ./config --prefix=$(shell readlink -f crypto/) shared -fPIC
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && $(MAKE) && $(MAKE) -j1 install_sw
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libcrypto.a ../../../lib
-	cd $(SRC_BUILD_DIR)/src/lib/openssl && mv libssl.a ../../../lib
-endif
+	cp $(DEPSDIR)/openssl/libcrypto.a $(SRC_BUILD_DIR)/lib
+	cp $(DEPSDIR)/openssl/libssl.a $(SRC_BUILD_DIR)/lib
+
 	$(MAKE) all -C $(SRC_BUILD_DIR)/src/lib/libovsa
 	$(MV) src/lib/libovsa/libovsa.*  $(SRC_BUILD_DIR)/lib
 	$(MAKE) -C $(SRC_BUILD_DIR)/src/app
@@ -151,20 +149,15 @@ clean:
 	
 .PHONY: format
 format:
-	clang-format-9 -i $(shell find . -path ./src/lib/safestringlib -prune -o \
-					-path ./src/lib/openssl -prune -o \
-					-path ./src/lib/curl -prune -o \
-					-path ./src/lib/cJSON -prune -o \
+	clang-format-9 -i $(shell find . -path ./../deps/safestringlib -prune -o \
+					-path ./../deps/openssl -prune -o \
+					-path ./../deps/curl -prune -o \
+					-path ./../deps/cJSON -prune -o \
 					-path ./crypto -prune -o \
                                    \( -name '*.h' -o -name '*.c' \) -print)
 
 .PHONY: distclean
 distclean: clean
 	$(RM) -r $(SRC_BUILD_DIR)/lib
+	$(RM) -r $(DEPSDIR)
 	$(RM) -r $(SRC_BUILD_DIR)/bin
-	$(RM) $(SRC_BUILD_DIR)/include/cJSON.h
-	$(RM) -r $(SRC_BUILD_DIR)/src/lib/safestringlib
-	$(RM) -r $(SRC_BUILD_DIR)/src/lib/cJSON
-	$(RM) -R $(SRC_BUILD_DIR)/src/lib/curl
-	$(RM) -r $(SRC_BUILD_DIR)/src/lib/openssl
-	 $(RM) -r $(SRC_BUILD_DIR)/crypto

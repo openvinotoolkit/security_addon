@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "asymmetric.h"
+#include "tpm.h"
 
 #define ROOT_CA_CERTIFICATES "/etc/ssl/certs/ca-certificates.crt"
 /* CA Issuers - URI: */
@@ -85,6 +86,37 @@ static OCSP_RESPONSE* ovsa_crypto_query_responder(BIO* connect_bio, const char* 
                                                   const char* path, OCSP_REQUEST* req,
                                                   int req_timeout);
 #endif /* ENABLE_OCSP_CHECK */
+
+ovsa_status_t ovsa_crypto_get_cert_verify_status(const char* cert, const char* chain_file) {
+    X509_STORE* store = NULL;
+    ovsa_status_t ret = OVSA_OK;
+
+    if ((store = ovsa_crypto_setup_chain(chain_file)) == NULL) {
+        BIO_printf(
+            g_bio_err,
+            "LibOVSA: Error verifying certificate failed in storing the certificate chain\n");
+        ret = OVSA_CRYPTO_X509_ERROR;
+        goto end;
+    }
+
+    X509_STORE_set_verify_cb(store, ovsa_crypto_verify_cb);
+
+    if (ovsa_crypto_cert_check(store, cert) != 0) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error verifying certificate failed in certificate verification\n");
+        ret = OVSA_CRYPTO_X509_ERROR;
+        goto end;
+    }
+
+end:
+    if (store != NULL) {
+        X509_STORE_free(store);
+    }
+    if (ret < OVSA_OK) {
+        ERR_print_errors(g_bio_err);
+    }
+    return ret;
+}
 
 ovsa_status_t ovsa_crypto_extract_pubkey_verify_cert(bool peer_cert, const char* cert,
                                                      bool lifetime_validity_check, int* peer_slot) {
@@ -328,7 +360,6 @@ static int ovsa_crypto_verify_cb(int ok, X509_STORE_CTX* ctx) {
             X509_NAME_print_ex(g_bio_err, X509_get_subject_name(current_cert), 0, XN_FLAG_ONELINE);
             BIO_printf(g_bio_err, "\n");
         }
-
         BIO_printf(g_bio_err, "LibOVSA: %s %d at %d depth lookup: %s\n",
                    X509_STORE_CTX_get0_parent_ctx(ctx) ? "[CRL path] error" : "Error", cert_error,
                    X509_STORE_CTX_get_error_depth(ctx), X509_verify_cert_error_string(cert_error));
@@ -1554,7 +1585,8 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
     int safe_exit               = 0;
     size_t ca_cert_len = 0, cert_len = 0;
     size_t issuer_cert_len = 0, cert_file_size = 0;
-    char* issuer_file_name      = "/opt/ovsa/tmp_dir/issuer_cert.der";
+    char* issuer_file_name = "issuer_cert.der";
+    char issuer_file[MAX_FILE_LEN];
     size_t ca_issuers_field_len = 0;
     int ca_issuers_uri_len = 0, count = 0;
     char ca_issuers_uri[MAX_URL_SIZE];
@@ -1567,6 +1599,7 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
         BIO_printf(g_bio_err, "LibOVSA: Error forming chain failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
+    CREATE_FILE_PATH(tmp_dir_path, issuer_file, issuer_file_name);
 
     ca_issuers_bio = BIO_new(BIO_s_mem());
     if (ca_issuers_bio == NULL) {
@@ -1783,7 +1816,7 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
         }
 
         /* Get the issuer certificate from CAIssuers URI */
-        ret = ovsa_crypto_get_issuer_cert(issuer_file_name, ca_issuers_uri);
+        ret = ovsa_crypto_get_issuer_cert(/*issuer_file_name*/ issuer_file, ca_issuers_uri);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "LibOVSA: Error forming chain failed in getting the issuer certificate\n");
@@ -1792,7 +1825,7 @@ static ovsa_status_t ovsa_crypto_form_chain_do_ocsp_check(const char* cert,
         }
 
         /* Read the downloaded issuer certificate */
-        issuer_fp = fopen(issuer_file_name, "rb");
+        issuer_fp = fopen(issuer_file, "rb");
         if (issuer_fp == NULL) {
             BIO_printf(g_bio_err,
                        "LibOVSA: Error forming chain failed in opening the issuer file\n");
@@ -1945,9 +1978,6 @@ end:
     BIO_free_all(issuer_cert_bio);
     X509_free(xcert);
     xcert = NULL;
-    if (remove(issuer_file_name) != 0) {
-        BIO_printf(g_bio_err, "LibOVSA: Warning could not delete %s file\n", issuer_file_name);
-    }
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);
     }
@@ -1973,8 +2003,9 @@ static ovsa_status_t ovsa_crypto_check_cert_is_self_signed(const X509* xcert,
 
 ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, const char* cert,
                                              bool lifetime_validity_check) {
-    X509_STORE* store           = NULL;
-    char* chain_file            = "/opt/ovsa/tmp_dir/chain.pem";
+    X509_STORE* store     = NULL;
+    char* chain_file_name = "chain.pem";
+    char chain_file[MAX_FILE_LEN];
     EVP_PKEY* cert_pkey         = NULL;
     bool check_self_signed_cert = false;
     ovsa_status_t ret           = OVSA_OK;
@@ -1988,7 +2019,7 @@ ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, 
                    "LibOVSA: Error verifying certificate failed with invalid parameter\n");
         return OVSA_INVALID_PARAMETER;
     }
-
+    CREATE_FILE_PATH(tmp_dir_path, chain_file, chain_file_name);
     if (lifetime_validity_check == true) {
         ret = ovsa_crypto_check_cert_lifetime_validity(cert);
         if (ret < OVSA_OK) {
@@ -1998,7 +2029,6 @@ ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, 
             goto end;
         }
     }
-
     ret = ovsa_crypto_compare_certkey_and_keystore(asym_key_slot, cert, &pkey, &xcert);
     if (ret < OVSA_OK) {
         X509_free(xcert);
@@ -2035,6 +2065,8 @@ ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, 
     }
 
 #ifdef ENABLE_SELF_SIGNED_CERT
+    size_t cert_len = 0;
+
     ret = ovsa_crypto_check_cert_is_self_signed(xcert, &check_self_signed_cert);
     if (ret < OVSA_OK) {
         BIO_printf(g_bio_err,
@@ -2058,10 +2090,35 @@ ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, 
         } else {
             BIO_printf(g_bio_err, "LibOVSA: Certificate signature verified OK\n");
         }
+
+        ret = ovsa_get_string_length(cert, &cert_len);
+        if ((ret < OVSA_OK) || (cert_len == EOK)) {
+            BIO_printf(
+                g_bio_err,
+                "LibOVSA: Error forming chain failed in getting the size of the certificate\n");
+            ret = OVSA_INVALID_FILE_PATH;
+            goto end;
+        }
+
+        /* Write the self_signed certificate to chain file */
+        FILE* chain_fp = fopen(chain_file, "w");
+        if (chain_fp == NULL) {
+            BIO_printf(g_bio_err,
+                       "LibOVSA: Error forming chain failed in opening the chain file\n");
+            ret = OVSA_FILEOPEN_FAIL;
+            goto end;
+        }
+
+        if (!fwrite(cert, cert_len, 1, chain_fp)) {
+            BIO_printf(g_bio_err, "LibOVSA: Error forming chain failed in writing to chain file\n");
+            fclose(chain_fp);
+            ret = OVSA_FILEIO_FAIL;
+            goto end;
+        }
+        fclose(chain_fp);
     } else
 #endif
     {
-
         ret = ovsa_crypto_form_chain_do_ocsp_check(cert, chain_file);
         if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
@@ -2069,25 +2126,13 @@ ovsa_status_t ovsa_crypto_verify_certificate(int asym_key_slot, bool peer_cert, 
                        "created\n");
             goto end;
         }
-
-        if ((store = ovsa_crypto_setup_chain(chain_file)) == NULL) {
-            BIO_printf(
-                g_bio_err,
-                "LibOVSA: Error verifying certificate failed in storing the certificate chain\n");
-            ret = OVSA_CRYPTO_X509_ERROR;
-            goto end;
-        }
-
-        X509_STORE_set_verify_cb(store, ovsa_crypto_verify_cb);
-
-        if (ovsa_crypto_cert_check(store, cert) != 0) {
-            BIO_printf(g_bio_err,
-                       "LibOVSA: Error verifying certificate failed in certificate verification\n");
-            ret = OVSA_CRYPTO_X509_ERROR;
-            goto end;
-        }
     }
-
+    ret = ovsa_crypto_get_cert_verify_status(cert, chain_file);
+    if (ret < OVSA_OK) {
+        BIO_printf(g_bio_err,
+                   "LibOVSA: Error verifying certificate failed in certificate verification\n");
+        goto end;
+    }
     if (peer_cert == true) {
         if (pthread_mutex_lock(&g_asymmetric_index_lock) != 0) {
             BIO_printf(g_bio_err,
@@ -2133,11 +2178,6 @@ end:
     EVP_PKEY_free(pkey);
     if (store != NULL) {
         X509_STORE_free(store);
-    }
-    if (check_self_signed_cert == false) {
-        if (remove(chain_file) != 0) {
-            BIO_printf(g_bio_err, "LibOVSA: Warning could not delete %s file\n", chain_file);
-        }
     }
     if (ret < OVSA_OK) {
         ERR_print_errors(g_bio_err);

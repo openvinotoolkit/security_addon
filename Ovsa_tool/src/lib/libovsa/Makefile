@@ -21,10 +21,11 @@ MAJOR = 1
 MINOR = 0
 
 SRC_BUILD_DIR  := $(OVSATOOL_DIR)
+DEPSDIR := $(SRC_BUILD_DIR)/../deps
 
 OVSALIB_EXT = .so.$(VERSION)
 
-IDIR = $(SRC_BUILD_DIR)/src/lib/safestringlib/include -I$(SRC_BUILD_DIR)/include -I$(SRC_BUILD_DIR)/src/lib/openssl/include -I$(SRC_BUILD_DIR)/src/lib/curl/include
+IDIR = $(DEPSDIR)/safestringlib/include -I$(SRC_BUILD_DIR)/include -I$(DEPSDIR)/openssl/include -I$(DEPSDIR)/curl/include -I$(DEPSDIR)/cJSON
 OVSA_LIB_OBJ = $(SRC_BUILD_DIR)/src/lib/libovsa
 
 ifeq ($(DEBUG),2)

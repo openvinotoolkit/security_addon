@@ -1798,18 +1798,18 @@ ovsa_status_t ovsa_json_create_EK_AK_binding_info_blob(ovsa_ek_ak_bind_info_t ek
         OVSA_DBG(DBG_E, "OVSA: Error add certificate to json failed %d\n", ret);
         goto end;
     }
-#ifdef PTT_EK_ONDIE_CA
-    if (cJSON_AddStringToObject(message, "ROM_cert", ek_ak_bind_info.ROM_cert) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add ROM_certificate to json failed %d\n", ret);
-        goto end;
+    if ((ek_ak_bind_info.ROM_cert != NULL) && (ek_ak_bind_info.Chain_cert != NULL)) {
+        if (cJSON_AddStringToObject(message, "ROM_cert", ek_ak_bind_info.ROM_cert) == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add ROM_certificate to json failed %d\n", ret);
+            goto end;
+        }
+        if (cJSON_AddStringToObject(message, "Chain_cert", ek_ak_bind_info.Chain_cert) == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add Chain_certificate to json failed %d\n", ret);
+            goto end;
+        }
     }
-    if (cJSON_AddStringToObject(message, "Chain_cert", ek_ak_bind_info.Chain_cert) == NULL) {
-        ret = OVSA_JSON_ERROR_ADD_ELEMENT;
-        OVSA_DBG(DBG_E, "OVSA: Error add Chain_certificate to json failed %d\n", ret);
-        goto end;
-    }
-#endif
     str_print = cJSON_Print(message);
     if (str_print == NULL) {
         ret = OVSA_JSON_PRINT_FAIL;
@@ -1867,7 +1867,18 @@ static ovsa_status_t ovsa_create_hw_quote_blob(cJSON** message,
         OVSA_DBG(DBG_E, "OVSA: Error add HW_EK_Cert to json failed %d\n", ret);
         goto end;
     }
-
+    if ((hw_quote_info->ROM_cert != NULL) && (hw_quote_info->Chain_cert != NULL)) {
+        if (cJSON_AddStringToObject(*message, "ROM_cert", hw_quote_info->ROM_cert) == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add ROM_cert to json failed %d\n", ret);
+            goto end;
+        }
+        if (cJSON_AddStringToObject(*message, "Ondie_chain", hw_quote_info->Chain_cert) == NULL) {
+            ret = OVSA_JSON_ERROR_ADD_ELEMENT;
+            OVSA_DBG(DBG_E, "OVSA: Error add Chain_cert to json failed %d\n", ret);
+            goto end;
+        }
+    }
 end:
     OVSA_DBG(DBG_D, "%s exit\n", __func__);
     return ret;

@@ -97,6 +97,37 @@ static OCSP_RESPONSE* ovsa_license_service_crypto_query_responder(
     BIO* connect_bio, const char* host, const char* path, OCSP_REQUEST* req, int req_timeout);
 #endif /* ENABLE_OCSP_CHECK */
 
+ovsa_status_t ovsa_license_service_crypto_get_cert_verify_status(const char* cert,
+                                                                 const char* chain_file) {
+    X509_STORE* store = NULL;
+    ovsa_status_t ret = OVSA_OK;
+
+    if ((store = ovsa_license_service_crypto_setup_chain(chain_file)) == NULL) {
+        BIO_printf(g_bio_err,
+                   "OVSA: Error verifying certificate failed in storing the certificate chain\n");
+        ret = OVSA_CRYPTO_X509_ERROR;
+        goto end;
+    }
+
+    X509_STORE_set_verify_cb(store, ovsa_license_service_crypto_verify_cb);
+
+    if (ovsa_license_service_crypto_cert_check(store, cert) != 0) {
+        BIO_printf(g_bio_err,
+                   "OVSA: Error verifying certificate failed in certificate verification\n");
+        ret = OVSA_CRYPTO_X509_ERROR;
+        goto end;
+    }
+
+end:
+    if (store != NULL) {
+        X509_STORE_free(store);
+    }
+    if (ret < OVSA_OK) {
+        ERR_print_errors(g_bio_err);
+    }
+    return ret;
+}
+
 static int ovsa_license_service_crypto_cert_check(X509_STORE* ctx, const char* cert) {
     ovsa_status_t ret   = OVSA_OK;
     X509* xcert         = NULL;
@@ -1920,6 +1951,8 @@ ovsa_status_t ovsa_license_service_crypto_verify_certificate(const char* cert,
     }
 
 #ifdef ENABLE_SELF_SIGNED_CERT
+    size_t cert_len = 0;
+
     if (check_self_signed_cert == true) {
         cert_verify = X509_verify(xcert, pkey);
         if (cert_verify < 0) {
@@ -1935,6 +1968,30 @@ ovsa_status_t ovsa_license_service_crypto_verify_certificate(const char* cert,
         } else {
             BIO_printf(g_bio_err, "OVSA: Certificate signature verified OK\n");
         }
+
+        ret = ovsa_license_service_get_string_length(cert, &cert_len);
+        if ((ret < OVSA_OK) || (cert_len == EOK)) {
+            BIO_printf(g_bio_err,
+                       "OVSA: Error forming chain failed in getting the size of the certificate\n");
+            ret = OVSA_INVALID_FILE_PATH;
+            goto end;
+        }
+
+        /* Write the self_signed certificate to chain file */
+        FILE* chain_fp = fopen(chain_file, "w");
+        if (chain_fp == NULL) {
+            BIO_printf(g_bio_err, "OVSA: Error forming chain failed in opening the chain file\n");
+            ret = OVSA_FILEOPEN_FAIL;
+            goto end;
+        }
+
+        if (!fwrite(cert, cert_len, 1, chain_fp)) {
+            BIO_printf(g_bio_err, "OVSA: Error forming chain failed in writing to chain file\n");
+            fclose(chain_fp);
+            ret = OVSA_FILEIO_FAIL;
+            goto end;
+        }
+        fclose(chain_fp);
     } else
 #endif
     {
@@ -1946,23 +2003,14 @@ ovsa_status_t ovsa_license_service_crypto_verify_certificate(const char* cert,
             goto end;
         }
 
-        if ((store = ovsa_license_service_crypto_setup_chain(chain_file)) == NULL) {
-            BIO_printf(g_bio_err,
-                       "OVSA: Error verifying certificate failed in storing the "
-                       "certificate chain\n");
-            ret = OVSA_CRYPTO_X509_ERROR;
-            goto end;
-        }
-
-        X509_STORE_set_verify_cb(store, ovsa_license_service_crypto_verify_cb);
-
-        if (ovsa_license_service_crypto_cert_check(store, cert) != 0) {
+        ret = ovsa_license_service_crypto_get_cert_verify_status(cert, chain_file);
+        if (ret < OVSA_OK) {
             BIO_printf(g_bio_err,
                        "OVSA: Error verifying certificate failed in certificate verification\n");
-            ret = OVSA_CRYPTO_X509_ERROR;
             goto end;
         }
     }
+
 end:
     mutex_unlock_ret = pthread_mutex_unlock(&g_cert_verify_lock);
     if (mutex_unlock_ret != OVSA_OK) {
