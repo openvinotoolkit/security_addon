@@ -47,7 +47,7 @@ After the license is successfully validated, the OpenVINO™ Model Server loads 
 
 ## Getting Started with OpenVINO™ Security Add-on
 
-OpenVINO™ Security Add-on can be installed and run within Kernel-based Virtual Machines (KVMs) or an Intel® SGX enabled CPU running inside SGX Enclave as a Trusted Execution Environment. OpenVINO™ Security Add-on can also be installed and run in the Kubernetes environment. In this case, an explicit Trusted Execution Environment does not exist - the entire system is expected to be trusted.
+OpenVINO™ Security Add-on can be installed and run within Kernel-based Virtual Machines (KVMs) or an Intel® SGX enabled CPU running inside SGX Enclave as a Trusted Execution Environment. OpenVINO™ Security Add-on can also be installed and run in the Kubernetes environment however, Trusted Execution Environment runtime isolation (virtualization) is absent: when OpenVINO™ Security Add-on is installed and run in the Kubernetes environment.
 
 Refer the below guides to install and run OpenVINO™ Security Add-on:
 - [OpenVINO™ Security Add-on for KVM](ovsa_get_started_kvm.md)
