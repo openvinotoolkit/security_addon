@@ -252,21 +252,21 @@ install_swtpm () {
     #Install SWTPM for vTPM
     echo
     echo -n "Installing Software TPM for vTPM......"
-    wget https://github.com/stefanberger/libtpms/archive/v0.7.7.tar.gz >> $log_file 2>&1
+    wget https://github.com/stefanberger/libtpms/archive/v0.9.6.tar.gz >> $log_file 2>&1
     if [ "$?" != 0 ]
     then
         echo "Fail"
         print_info "Error while downloading the Libtpms source."
         return $EXIT_CODE_ERROR
     fi
-    tar -xzf v0.7.7.tar.gz >> $log_file 2>&1
+    tar -xzf v0.9.6.tar.gz >> $log_file 2>&1
     if [ "$?" != 0 ]
     then
         echo "Fail"
         print_info "Error while unpacking the Libtpms source."
         return $EXIT_CODE_ERROR
     fi
-    pushd libtpms-0.7.7/ >> $log_file 2>&1
+    pushd libtpms-0.9.6/ >> $log_file 2>&1
     ./autogen.sh --with-tpm2 --with-openssl >> $log_file 2>&1
     if [ $? != 0 ];then
         echo "Fail"
