@@ -86,9 +86,9 @@ If the response indicates a QEMU version lower than 2.12.0 download, compile and
 Build and install the [`libtpm` package](https://github.com/stefanberger/libtpms/).
 
    ```sh
-   wget https://github.com/stefanberger/libtpms/archive/v0.7.7.tar.gz
-   tar -xzf v0.7.7.tar.gz
-   pushd libtpms-0.7.7/
+   wget https://github.com/stefanberger/libtpms/archive/v0.9.6.tar.gz
+   tar -xzf v0.9.6.tar.gz
+   pushd libtpms-0.9.6/
    ./autogen.sh --with-tpm2 --with-openssl
    make
    sudo make install
