@@ -98,9 +98,9 @@ fi
 
 #Install SWTPM for vTPM
 echo "Installing software tpm for qemu......"
-wget https://github.com/stefanberger/libtpms/archive/v0.7.7.tar.gz
-tar -xzf v0.7.7.tar.gz
-pushd libtpms-0.7.7/
+wget https://github.com/stefanberger/libtpms/archive/v0.9.6.tar.gz
+tar -xzf v0.9.6.tar.gz
+pushd libtpms-0.9.6/
 ./autogen.sh --with-tpm2 --with-openssl
 if [ $? != 0 ];then
  echo "ERROR: Missing package dependencies for libtpms installation."
